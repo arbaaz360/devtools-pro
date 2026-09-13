@@ -10,6 +10,7 @@ use devtools_core::{
 };
 use serde::Serialize;
 use serde_json::Value;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -169,6 +170,34 @@ async fn read_preview(document_id: String, offset: u64, state: tauri::State<'_, 
         .cloned().ok_or("Document is no longer open.")?;
     tauri::async_runtime::spawn_blocking(move || preview_document(document_id, &document, offset))
         .await.map_err(|e| e.to_string())?
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BinaryPreview {
+    mime: String,
+    data: String,
+    bytes: usize,
+    truncated: bool,
+}
+
+/// Return a bounded data URI for a generated binary result so the webview can
+/// preview images without gaining arbitrary filesystem access.
+#[tauri::command]
+fn read_binary_preview(document_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result<BinaryPreview, String> {
+    const MAX_BINARY_PREVIEW: u64 = 4 * 1024 * 1024;
+    let document = state.documents.lock().map_err(|e| e.to_string())?.get(&document_id)
+        .cloned().ok_or("Result document is no longer available.")?;
+    let file = File::open(&document.path).map_err(|e| e.to_string())?;
+    let total = file.metadata().map_err(|e| e.to_string())?.len();
+    let mut bytes = Vec::with_capacity(total.min(MAX_BINARY_PREVIEW) as usize);
+    file.take(MAX_BINARY_PREVIEW + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
+    let truncated = bytes.len() as u64 > MAX_BINARY_PREVIEW;
+    if truncated { bytes.truncate(MAX_BINARY_PREVIEW as usize); }
+    let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "image/png" }
+        else if bytes.starts_with(b"\xff\xd8\xff") { "image/jpeg" }
+        else { "application/octet-stream" };
+    Ok(BinaryPreview { mime: mime.into(), bytes: bytes.len(), truncated, data: format!("data:{mime};base64,{}", STANDARD.encode(bytes)) })
 }
 
 #[tauri::command]
@@ -486,9 +515,9 @@ fn run_compare(
             // Compare is an in-memory algorithm, so enforce its declared input
             // limit while reading in chunks instead of buffering an unbounded
             // source file with `fs::read`.
-            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, options.max_input_bytes, &token, &progress)
+            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, options.max_input_bytes.map(|value| value as u64), &token, &progress)
                 .map_err(|error| error.to_string())?;
-            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, options.max_input_bytes, &token, &progress)
+            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, options.max_input_bytes.map(|value| value as u64), &token, &progress)
                 .map_err(|error| error.to_string())?;
             compare_documents(&left_doc, &right_doc, &options, &token, progress).map_err(|error| error.to_string())
         })).unwrap_or_else(|_| Err("The compare worker failed unexpectedly; the workbench is still available.".into()));
@@ -791,7 +820,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, create_text_document, read_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
+            open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

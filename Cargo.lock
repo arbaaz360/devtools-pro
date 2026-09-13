@@ -598,6 +598,7 @@ dependencies = [
 name = "devtools-desktop"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "devtools-core",
  "serde",
  "serde_json",

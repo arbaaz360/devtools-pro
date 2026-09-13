@@ -16,6 +16,7 @@
 .result-preview-heading{flex:0 0 auto;margin:10px 0 5px}
 .curl-input{flex:1;width:100%;min-height:280px;resize:vertical;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:14px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
 #result-output{flex:1 1 auto;width:100%;height:auto;min-height:0;resize:none}
+.binary-preview{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;margin:0 auto;border:1px solid #2b4058;border-radius:5px;background:#0f1721;padding:8px}
 #save-result{flex:0 0 auto;align-self:flex-start}
 .saved-output{flex:0 0 auto;padding:8px 0 0}
 .saved-output .section-label{margin:0 0 5px}

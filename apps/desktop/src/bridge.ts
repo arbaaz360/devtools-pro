@@ -5,7 +5,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 
 export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
-export type CompareNewline = 'preserve' | 'lf' | 'crlf' | 'ignore';
+export type CompareNewline = 'preserve' | 'lf' | 'cr_lf' | 'ignore';
 export type TextUtilityOperation = 'encode' | 'decode' | 'escape' | 'unescape';
 export type InputKind = 'bytes' | 'text' | 'json' | 'csv' | 'nd_json' | 'xml' | 'table' | 'scalar' | 'patch' | 'any';
 export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
@@ -76,7 +76,7 @@ export async function chooseFile(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null;
 }
 
-export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash' | 'image-base64' | 'base64-image' | 'compare'): Promise<string | null> {
+export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash' | 'image-base64' | 'base64-image' | 'compare', resultMime?: string | null): Promise<string | null> {
   if (operation === 'hash') {
     const path = document.path.replace(/(\.[^./\\]+)?$/, '.sha.txt');
     return save({ title: 'Save hash to a new file', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
@@ -90,7 +90,8 @@ export async function chooseOutput(document: FileDocument, operation: Operation 
     return save({ title: 'Save Base64 result', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
   }
   if (operation === 'base64-image') {
-    const path = document.path.replace(/(\.[^./\\]+)?$/, '.decoded.image');
+    const extension = resultMime === 'image/jpeg' ? 'jpg' : 'png';
+    const path = document.path.replace(/(\.[^./\\]+)?$/, `.decoded.${extension}`);
     return save({ title: 'Save decoded image', defaultPath: path, filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
   }
   if (operation === 'compare') {
@@ -115,6 +116,11 @@ export function closeDocument(documentId: string): Promise<void> {
 
 export function readPreview(documentId: string, offset = 0): Promise<FileDocument> {
   return invoke('read_preview', { documentId, offset });
+}
+
+export interface BinaryPreview { mime: string; data: string; bytes: number; truncated: boolean; }
+export function readBinaryPreview(documentId: string): Promise<BinaryPreview> {
+  return invoke('read_binary_preview', { documentId });
 }
 
 export function startOperation(documentId: string, operation: Operation, format: Format): Promise<{ jobId: string }> {
