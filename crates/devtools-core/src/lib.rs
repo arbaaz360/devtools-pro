@@ -5,6 +5,7 @@ mod base64_image;
 mod streaming;
 mod tool;
 mod text_utilities;
+mod hashing;
 
 pub use document::{Document, DocumentKind, Encoding, NewlineStyle};
 pub use json::{JsonOptions, JsonTool};
@@ -16,3 +17,4 @@ pub use tool::{
 };
 pub use streaming::{CancellationToken, FileFormat, FilePreview, Inspection, JsonLayout, Progress, inspect_file, preview_file, transform_json_file};
 pub use text_utilities::{TextUtilityKind, TextUtilityOptions, TextUtilityTool, transform_text};
+pub use hashing::{hash_document, hash_file, hash_reader, HashAlgorithm, HashResult, HashStats, HashTool};

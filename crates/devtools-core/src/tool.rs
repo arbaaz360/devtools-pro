@@ -165,6 +165,13 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
             operations: vec![operation("decode", "Decode")], renderer: RendererKind::Binary,
         },
         ToolManifest {
+            id: "encoding.hash".into(), label: "Hash Generator".into(), contract_version: 1,
+            input_kinds: vec![InputKind::Bytes],
+            limits: ToolLimits { max_input_bytes: None, max_output_bytes: Some(4096) },
+            capabilities: ToolCapabilities { deterministic: true, supports_preview: true, supports_streaming: true, cancellation: true, progress: true, needs_filesystem: true, needs_network: false, needs_secrets: false },
+            operations: vec![operation("sha256", "SHA-256"), operation("sha512", "SHA-512")], renderer: RendererKind::Text,
+        },
+        ToolManifest {
             id: "structured.csv".into(), label: "CSV".into(), contract_version: 1,
             input_kinds: vec![InputKind::Csv],
             limits: ToolLimits { max_input_bytes: None, max_output_bytes: None },
