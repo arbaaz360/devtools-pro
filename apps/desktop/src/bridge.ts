@@ -7,7 +7,7 @@ export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
 export type CompareNewline = 'preserve' | 'lf' | 'crlf' | 'ignore';
 export type TextUtilityOperation = 'encode' | 'decode' | 'escape' | 'unescape';
-export type InputKind = 'bytes' | 'text' | 'json' | 'csv';
+export type InputKind = 'bytes' | 'text' | 'json' | 'csv' | 'nd_json' | 'xml' | 'table' | 'scalar' | 'patch' | 'any';
 export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
 export interface ToolLimits { maxInputBytes: number | null; maxOutputBytes: number | null; }
 export interface ToolCapabilities {
@@ -59,6 +59,14 @@ export interface JobFinished {
   resultDocumentId?: string | null;
   resultPath?: string | null;
   error?: string | null;
+  /** Structured ToolError payload for programmatic error handling. */
+  errorDetails?: { code: string; [key: string]: unknown } | null;
+  renderer?: RendererKind | null;
+  resultKind?: InputKind | null;
+  resultMime?: string | null;
+  diagnostics?: Array<{ severity: 'info' | 'warning' | 'error'; message: string; start: number; end: number }>;
+  sourceDocumentId?: string | null;
+  operationId?: string | null;
 }
 
 export const native = isTauri();
@@ -112,6 +120,22 @@ export function runCompare(leftDocumentId: string, rightDocumentId: string, opti
 export function runTextUtility(documentId: string, toolId: 'text.url' | 'text.html' | 'text.unicode', operationId: TextUtilityOperation, maxOutputBytes?: number): Promise<{ jobId: string }> {
   const options = maxOutputBytes === undefined ? {} : { maxOutputBytes };
   return runTool(documentId, toolId, operationId, options);
+}
+
+export function runHash(documentId: string, algorithm: 'sha256' | 'sha512'): Promise<{ jobId: string }> {
+  return runTool(documentId, 'encoding.hash', algorithm, {});
+}
+
+export function runImageToBase64(documentId: string, options: { dataUri?: boolean; mimeType?: string; maxInputBytes?: number } = {}): Promise<{ jobId: string }> {
+  return runTool(documentId, 'encoding.image-base64', 'encode', options);
+}
+
+export function runBase64ToImage(documentId: string, options: { mimeType?: string; maxInputBytes?: number; maxDecodedBytes?: number; maxPixels?: number } = {}): Promise<{ jobId: string }> {
+  return runTool(documentId, 'encoding.base64-image', 'decode', options);
+}
+
+export function runCurlToCode(documentId: string, target: 'fetch' | 'python'): Promise<{ jobId: string }> {
+  return runTool(documentId, 'web.curl-code', target, {});
 }
 
 export function listTools(): Promise<ToolManifest[]> {

