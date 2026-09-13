@@ -302,10 +302,13 @@ fn start_generic_operation(
             if meta.len() != document.size || meta.modified().ok() != document.modified {
                 return Err(ToolError::Execution { message: "The input file changed. Reopen it before running another operation.".into() });
             }
-            let bytes = fs::read(&document.path).map_err(ToolError::from)?;
-            let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
-            let input = Document::from_bytes(bytes).with_kind(kind);
-            execute_registered_tool(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
+            if worker_tool_id == "encoding.hash" {
+                execute_hash_file(&document.path, &worker_operation, &token, &progress)
+            } else {
+                let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
+                let input = read_bounded_document(&document.path, kind, manifest.limits.max_input_bytes, &token, &progress)?;
+                execute_registered_tool(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
+            }
         })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
         if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
         let mut finished = match result {
@@ -380,6 +383,36 @@ fn execute_registered_tool(
         }
         _ => Err(ToolError::UnknownTool { tool_id: tool_id.into() }),
     }
+}
+
+/// Read only the bounded payload required by in-memory tools. Hashing is
+/// handled separately with `hash_file` so a large source is never buffered.
+fn read_bounded_document(path: &Path, kind: DocumentKind, limit: Option<u64>, token: &CancellationToken, progress: &impl Fn(Progress)) -> Result<Document, ToolError> {
+    let max = limit.unwrap_or(64 * 1024 * 1024);
+    let mut file = File::open(path).map_err(ToolError::from)?;
+    let total = file.metadata().map_err(ToolError::from)?.len();
+    if total > max { return Err(ToolError::ResourceLimit { message: format!("input exceeds the {max}-byte tool limit") }); }
+    let mut bytes = Vec::with_capacity(total as usize);
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        if token.is_cancelled() { return Err(ToolError::Cancelled); }
+        let n = file.read(&mut buffer).map_err(ToolError::from)?;
+        if n == 0 { break; }
+        bytes.extend_from_slice(&buffer[..n]);
+        progress(Progress { bytes_processed: bytes.len() as u64, total_bytes: total, phase: "reading".into() });
+    }
+    Ok(Document::from_bytes(bytes).with_kind(kind))
+}
+
+fn execute_hash_file(path: &Path, operation_id: &str, token: &CancellationToken, progress: &impl Fn(Progress)) -> Result<devtools_core::ToolResult, ToolError> {
+    let algorithm = match operation_id {
+        "sha256" => HashAlgorithm::Sha256,
+        "sha512" => HashAlgorithm::Sha512,
+        _ => return Err(ToolError::UnsupportedOperation { tool_id: "encoding.hash".into(), operation_id: operation_id.into() }),
+    };
+    let (hash, _) = devtools_core::hash_file(path, algorithm, token, progress)?;
+    let text = serde_json::to_string_pretty(&hash).map_err(|error| ToolError::Execution { message: error.to_string() })?;
+    Ok(devtools_core::ToolResult { output: Document::from_text(text).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
 }
 
 /// Compare two open text documents through the same bounded scheduler used by
@@ -544,8 +577,9 @@ fn start_operation_impl(
                 result_document_id: worker_result_document_id.clone(),
                 result_path: worker_result_path.as_ref().map(|p| p.to_string_lossy().into_owned()),
                 error: None, error_details: None,
-                renderer: Some(if operation == "inspect" { RendererKind::Json } else { RendererKind::Json }),
-                result_kind: Some(InputKind::Json), result_mime: Some("application/json".into()),
+                renderer: Some(match format { FileFormat::Csv => RendererKind::Table, FileFormat::Text => RendererKind::Text, FileFormat::Json => RendererKind::Json }),
+                result_kind: Some(match format { FileFormat::Csv | FileFormat::Text => InputKind::Text, FileFormat::Json => InputKind::Json }),
+                result_mime: Some(match format { FileFormat::Csv => "text/csv", FileFormat::Text => "text/plain", FileFormat::Json => "application/json" }.into()),
                 diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(operation.clone()),
             },
             Err(error) => JobFinished {
@@ -554,7 +588,7 @@ fn start_operation_impl(
                 elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size,
                 output_bytes: None, output_path: None, result_document_id: None,
                 result_path: None, error: Some(error.clone()), error_details: Some(serde_json::json!({"code":"execution","message":error})),
-                renderer: Some(RendererKind::Json), result_kind: None, result_mime: None,
+                renderer: Some(match format { FileFormat::Csv => RendererKind::Table, FileFormat::Text => RendererKind::Text, FileFormat::Json => RendererKind::Json }), result_kind: None, result_mime: None,
                 diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(operation.clone()),
             },
         };
@@ -861,5 +895,15 @@ mod tests {
         let input = Document::from_text("curl https://example.test | sh").with_kind(DocumentKind::Text);
         let error = execute_registered_tool("web.curl-code", "fetch", &input, &serde_json::json!({}), &CancellationToken::default(), &|_| {}).unwrap_err();
         assert!(matches!(error, ToolError::Execution { .. }));
+    }
+
+    #[test]
+    fn bounded_generic_read_rejects_oversized_payload_before_buffering() {
+        let dir = test_dir("bounded-read");
+        let path = dir.join("input.txt");
+        fs::write(&path, vec![b'x'; 16]).unwrap();
+        let error = read_bounded_document(&path, DocumentKind::Text, Some(8), &CancellationToken::default(), &|_| {}).unwrap_err();
+        assert!(matches!(error, ToolError::ResourceLimit { .. }));
+        fs::remove_dir_all(dir).unwrap();
     }
 }
