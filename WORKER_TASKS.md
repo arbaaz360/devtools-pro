@@ -158,7 +158,149 @@ Workers must follow these rules:
 
 **Non-goals:** Performance claims without measurements, cloud CI credentials, or screenshot-only validation.
 
-## Task handoff template
+## Tomorrow's follow-on tasks
+
+These tasks assume Tasks 00A–09 and the current desktop integrations are complete. They are intentionally bounded so a worker can implement one task without understanding the entire engine. Keep each task on its own branch or worktree and merge only after its acceptance checks pass.
+
+## Task 15 — Native packaging and visual regression guard
+
+**Goal:** Prevent the desktop app from silently falling back to an unstyled HTML page.
+
+**Files:** `apps/desktop/vite.config.ts`, `apps/desktop/src/styles.css`, `apps/desktop/src/main.ts`, `apps/desktop/src-tauri/tauri.conf.json`, a new `benchmarks/` or `scripts/` smoke check.
+
+**Work:** Keep Vite assets relative for the Tauri protocol. Add a repeatable build check that confirms the generated index references existing CSS/JS assets and that the stylesheet contains the shell layout selectors. Document how to rebuild and launch the native preview.
+
+**Acceptance:** `pnpm --dir apps/desktop build` passes; `pnpm --dir apps/desktop tauri build --debug --no-bundle` produces a runnable executable; the generated index uses relative asset URLs; the native window loads `.app-shell`, `.sidebar`, and `.workspace` with flex layout.
+
+**Recommended worker:** Terra, medium effort.
+
+**Non-goals:** Redesigning the visual system or changing tool behavior.
+
+## Task 16 — Manifest-driven view registration
+
+**Goal:** Remove the remaining hard-coded tool availability and view branching from `main.ts`.
+
+**Files:** `apps/desktop/src/main.ts`, `apps/desktop/src/bridge.ts`, a new `apps/desktop/src/toolViews/` directory, and `ARCHITECTURE.md`.
+
+**Work:** Define a small `ToolView` interface keyed by manifest id/renderer. Move JSON, text, hash, image, cURL, and diff control creation into isolated view modules. Keep the existing host commands and result model unchanged. Unknown manifests must render a safe unavailable state.
+
+**Acceptance:** Removing a tool view module makes only that tool unavailable; adding a test manifest plus view creates one rail item, palette commands, controls, and renderer without editing unrelated tool code. `pnpm build` passes and existing workflows behave identically.
+
+**Recommended worker:** Sol, high effort.
+
+**Dependency:** Task 01 and current manifest registry.
+
+**Non-goals:** Third-party plugin loading or runtime code execution.
+
+## Task 17 — Shared result renderer and lifecycle
+
+**Goal:** Make every tool show results through one consistent right-pane lifecycle.
+
+**Files:** `apps/desktop/src/main.ts`, `apps/desktop/src/bridge.ts`, `apps/desktop/index.html`, `apps/desktop/src/styles.css`.
+
+**Work:** Extract status, metrics, bounded preview, diff, binary-image preview, copy, save, cancellation, and stale-result cleanup into a shared result controller. Render by `RendererKind`; never decode binary output as text. Preserve provenance and result MIME metadata.
+
+**Acceptance:** JSON, hash, text, cURL, diff, image-to-Base64, and Base64-to-image all show a successful result in the same right-pane structure. Switching tools or tabs cannot leave stale output visible. Copy is hidden for binary results; image previews are bounded.
+
+**Recommended worker:** Sol, high effort.
+
+**Dependency:** Task 16 is helpful but not required.
+
+**Non-goals:** New transformations or changes to Rust core algorithms.
+
+## Task 18 — Accessibility and keyboard completion
+
+**Goal:** Make the workbench usable without a mouse and robust for screen readers.
+
+**Files:** `apps/desktop/index.html`, `apps/desktop/src/main.ts`, `apps/desktop/src/styles.css`.
+
+**Work:** Add a clear focus model for the rail, palette, source controls, result actions, and progress/cancel states. Implement predictable Tab/Shift-Tab order, focus return after palette close, visible focus styles, labels for dynamic controls, and keyboard activation for tool selection and compare sources.
+
+**Acceptance:** A documented keyboard-only smoke path can open a file, choose a tool, run it, copy/save a result, cancel a job, and close a tab. `aria-live` status updates are announced once and no focus lands on hidden controls.
+
+**Recommended worker:** Terra, medium effort.
+
+**Non-goals:** Changing the shell layout or adding a component framework.
+
+## Task 19 — Compare scalability and bounded previews
+
+**Goal:** Keep Text Diff responsive and bounded as inputs approach the declared limit.
+
+**Files:** `crates/devtools-core/src/compare.rs`, `apps/desktop/src-tauri/src/main.rs`, compare UI files, acceptance tests.
+
+**Work:** Enforce limits before allocation, add cancellation checks during expensive diff stages, and make hunk/output limits explicit in diagnostics. Keep the UI on structured hunks and bounded previews.
+
+**Acceptance:** Oversized files fail before full buffering; cancellation completes within a documented bound; identical, large, and high-change inputs produce structured summaries without an unbounded webview payload. Existing compare behavior remains compatible.
+
+**Recommended worker:** Sol, high effort.
+
+**Dependency:** Current Task 06 compare implementation.
+
+**Non-goals:** Three-way merge, binary diff, or editing sources.
+
+## Task 20 — Image codec format and preview coverage
+
+**Goal:** Make image workflows clearer while keeping validation strict.
+
+**Files:** `crates/devtools-core/src/image_base64.rs`, `crates/devtools-core/src/base64_image.rs`, image UI/bridge files, fixtures.
+
+**Work:** Decide and document the supported MIME set. Improve result metadata and save-extension selection for each supported format. Add representative PNG/JPEG fixtures and explicit unsupported-format diagnostics; retain bounded binary preview behavior.
+
+**Acceptance:** Supported formats encode/decode, preview, and save with the correct MIME and extension. Unsupported, mismatched, oversized, and malformed inputs return structured errors. No browser-side full-file read is introduced.
+
+**Recommended worker:** Terra, medium effort.
+
+**Non-goals:** Image editing, transcoding, GIF/WebP support unless explicitly added to the manifest and tests.
+
+## Task 21 — CI quality gate and worker check script
+
+**Goal:** Make every worker contribution verifiable before merge.
+
+**Files:** `.github/workflows/`, `scripts/`, `README.md`, `WORKER_TASKS.md`.
+
+**Work:** Add a GitHub Actions workflow for Rust tests, desktop TypeScript build, smoke-shell, formatting/toolchain checks where available, and `git diff --check`. Provide one local command that runs the same checks and records clear failure output.
+
+**Acceptance:** A clean checkout passes the workflow without secrets or network-dependent product tests. A deliberately failing test blocks the workflow. Worker handoff instructions reference the command.
+
+**Recommended worker:** Terra, medium effort.
+
+**Non-goals:** Publishing installers or adding telemetry.
+
+## Task 22 — Streaming benchmark report
+
+**Goal:** Turn the existing large-file harness into a repeatable engineering baseline.
+
+**Files:** `benchmarks/`, `README.md`, `ARCHITECTURE.md`, fixture manifests.
+
+**Work:** Reconcile the benchmark harness with the current CLI/core output contract. Record median runtime, peak memory method, fixture hashes, warmups, cancellation notes, and known measurement limits. Keep generated fixtures/results ignored.
+
+**Acceptance:** The documented command completes on a clean checkout, emits machine-readable and human-readable summaries, and does not claim unsupported performance guarantees.
+
+**Recommended worker:** Terra, low effort.
+
+**Non-goals:** Optimizing algorithms or changing production limits.
+
+## Task 23 — Extension guide and release checklist
+
+**Goal:** Make the architecture understandable to a worker or future maintainer.
+
+**Files:** `ARCHITECTURE.md`, `WORKER_TASKS.md`, `README.md`, a new `docs/RELEASE_CHECKLIST.md`.
+
+**Work:** Document the current semi-dynamic boundary honestly, the exact steps for adding a core tool, manifest, host adapter, view, renderer, tests, and worker branch. Include native preview rebuild instructions and a checklist for source immutability, bounded payloads, cancellation, errors, and save safety.
+
+**Acceptance:** A new worker can implement a sample tool by following the guide; all commands and paths are valid; limitations are explicit and match the code.
+
+**Recommended worker:** Terra, low effort.
+
+**Non-goals:** Implementing a new tool or claiming a fully dynamic plugin system.
+
+## Tomorrow's recommended order
+
+1. Task 15 (packaging guard) and Task 21 (CI gate) establish a safe baseline.
+2. Task 17 (shared result lifecycle) improves the current user-facing shell.
+3. Task 16 (view registration) reduces future worker context and merge conflicts.
+4. Task 18 (accessibility) and Task 19 (compare scalability) harden daily use.
+5. Tasks 20, 22, and 23 complete format coverage, measurement, and maintainer guidance.
 
 Copy one task above to a worker and add:
 
