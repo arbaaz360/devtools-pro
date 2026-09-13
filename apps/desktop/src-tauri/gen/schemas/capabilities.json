@@ -1,0 +1,1 @@
+{"main":{"identifier":"main","description":"Local workbench window: event transport and native file pickers.","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","dialog:allow-save"]}}

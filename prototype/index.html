@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workbench — Structured Data</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand"><span class="brand-mark">⌘</span><span>Workbench</span><span class="beta">Preview</span></div>
+        <div class="top-actions"><button class="icon-btn" title="Command palette" data-command="open-palette">⌘ K</button><button class="icon-btn" title="Settings">⚙</button><div class="avatar">JD</div></div>
+      </header>
+
+      <nav class="tabbar" aria-label="Open documents">
+        <button class="tab active"><span class="file-dot json"></span>payload.json <span class="tab-close">×</span></button>
+        <button class="tab"><span class="file-dot csv"></span>events.csv <span class="tab-close">×</span></button>
+        <button class="tab-add" title="Open file">＋</button>
+        <div class="tab-spacer"></div><button class="outline-btn">Open file</button>
+      </nav>
+
+      <main class="workspace">
+        <section class="toolbar">
+          <div class="tool-identity"><span class="tool-icon">{ }</span><div><strong>Structured data</strong><span>Inspector & formatter</span></div></div>
+          <div class="detection"><span class="status-dot"></span><span>JSON detected</span><span class="confidence">98%</span><button class="chevron">⌄</button></div>
+          <div class="toolbar-actions"><button class="ghost-btn" data-action="minify">Minify</button><button class="primary-btn" data-action="format">Format</button><button class="ghost-btn" data-action="copy">Copy output</button><button class="more-btn">•••</button></div>
+        </section>
+
+        <section class="canvas" aria-label="Document workspace">
+          <div class="pane input-pane">
+            <div class="pane-header"><div class="pane-title"><span class="eyebrow">INPUT</span><span class="muted">Original · 1.2 KB</span></div><div class="pane-controls"><button class="view-btn active" data-view="text">Text</button><button class="view-btn" data-view="tree">Tree</button></div></div>
+            <div class="editor-wrap"><div class="line-numbers" aria-hidden="true">1<br>2<br>3<br>4<br>5<br>6<br>7<br>8<br>9<br>10<br>11<br>12</div><textarea id="input" spellcheck="false" aria-label="Input document">{
+  "service": "payments",
+  "environment": "production",
+  "retries": 3,
+  "features": ["idempotency", "webhooks"],
+  "limits": { "requestsPerMinute": 1200, "burst": 50 }
+}</textarea><pre id="input-tree" class="output-code hidden" aria-label="Input tree view"></pre></div>
+            <div class="pane-footer"><span><kbd>⌘</kbd><kbd>↵</kbd> Run</span><span>UTF-8 · LF</span></div>
+          </div>
+          <div class="splitter" role="separator" aria-label="Resize panes"></div>
+          <div class="pane output-pane">
+            <div class="pane-header"><div class="pane-title"><span class="eyebrow">OUTPUT</span><span id="output-meta" class="muted">Formatted JSON</span></div><div class="pane-controls"><button class="view-btn active" data-output-view="text">Text</button><button class="view-btn" data-output-view="table">Table</button></div></div>
+            <pre id="output" class="output-code" tabindex="0" aria-label="Formatted output"></pre>
+            <div id="table-output" class="table-output hidden"></div>
+            <div class="pane-footer"><span id="result-state"><span class="success-icon">✓</span> Valid JSON</span><span>6 lines · 246 B</span></div>
+          </div>
+        </section>
+
+        <section class="inspector-bar"><div class="inspector-item"><span class="inspector-label">Structure</span><strong>Object · 5 keys</strong></div><div class="inspector-item"><span class="inspector-label">Encoding</span><strong>UTF-8 <span class="muted">BOM absent</span></strong></div><div class="inspector-item"><span class="inspector-label">Last run</span><strong id="last-run">Just now</strong></div><div class="inspector-spacer"></div><button class="link-btn">View diagnostics <span>→</span></button></section>
+      </main>
+
+      <footer class="statusbar"><span><span class="online-dot"></span> Offline mode</span><span>Ready</span><span class="status-spacer"></span><span>⌘K Commands</span><span>v0.1.0</span></footer>
+    </div>
+
+    <div id="palette" class="palette-backdrop hidden" role="dialog" aria-modal="true" aria-label="Command palette"><div class="palette"><input id="palette-input" placeholder="Search commands or tools…" aria-label="Search commands" /><div class="palette-hint">Type to search · <kbd>Esc</kbd> to close</div><div id="command-list" class="command-list"><button data-command="format"><span class="command-glyph">✦</span><span><strong>Format document</strong><small>Structured data</small></span><kbd>⌘↵</kbd></button><button data-command="minify"><span class="command-glyph">↘</span><span><strong>Minify document</strong><small>Structured data</small></span></button><button data-command="copy"><span class="command-glyph">▣</span><span><strong>Copy output</strong><small>Clipboard</small></span></button></div></div></div>
+    <script src="app.js"></script>
+  </body>
+</html>

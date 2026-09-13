@@ -1,0 +1,8 @@
+[package]
+name = "devtools-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+devtools-core = { path = "../devtools-core" }
+serde_json.workspace = true

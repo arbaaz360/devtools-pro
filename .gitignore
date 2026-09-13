@@ -1,0 +1,9 @@
+/target/
+.idea/
+.vscode/
+*.user
+*.suo
+node_modules/
+dist/
+/benchmarks/fixtures/*.json
+**/.git-nested/
