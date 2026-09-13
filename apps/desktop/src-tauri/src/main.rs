@@ -1,7 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use devtools_core::{
-    CancellationToken, FileFormat, Inspection, JsonLayout, Progress,
+    CancellationToken, CompareOptions, Document, FileFormat, Inspection, JsonLayout, Progress,
+    compare_documents,
     inspect_file, transform_json_file,
 };
 use serde::Serialize;
@@ -232,6 +233,92 @@ fn run_tool(
     manifest.supports(input_kind, &operation_id)?;
     start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
         .map_err(|message| devtools_core::ToolError::Execution { message })
+}
+
+/// Compare two open text documents through the same bounded scheduler used by
+/// the single-document compatibility commands. Inputs are read-only and the
+/// JSON diff is published as an app-owned temporary result document.
+#[tauri::command]
+fn run_compare(
+    left_document_id: String,
+    right_document_id: String,
+    options: Value,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<HostState>>,
+) -> Result<StartedJob, devtools_core::ToolError> {
+    if !options.is_object() {
+        return Err(devtools_core::ToolError::InvalidOptions { message: "options must be a JSON object".into() });
+    }
+    let options: CompareOptions = serde_json::from_value(options)
+        .map_err(|error| devtools_core::ToolError::InvalidOptions { message: error.to_string() })?;
+    let (left, right) = {
+        let documents = state.documents.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?;
+        let left = documents.get(&left_document_id).cloned()
+            .ok_or_else(|| devtools_core::ToolError::Execution { message: "Left document is no longer open.".into() })?;
+        let right = documents.get(&right_document_id).cloned()
+            .ok_or_else(|| devtools_core::ToolError::Execution { message: "Right document is no longer open.".into() })?;
+        (left, right)
+    };
+    let token = CancellationToken::default();
+    let job_id = state.next_id("job");
+    let result_document_id = state.next_id("result");
+    let result_path = std::env::temp_dir().join(format!("devtools-pro-{}-{}.diff.json", std::process::id(), result_document_id));
+    {
+        let mut jobs = state.jobs.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?;
+        if jobs.len() >= MAX_JOBS { return Err(devtools_core::ToolError::ResourceLimit { message: "Two operations are already running. Cancel or wait for one to finish.".into() }); }
+        jobs.insert(job_id.clone(), token.clone());
+    }
+    let state = state.inner().clone();
+    let worker_id = job_id.clone();
+    let worker_result_id = result_document_id.clone();
+    let worker_result_path = result_path.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let started = Instant::now();
+        let progress = |p: Progress| {
+            let _ = app.emit_to("main", "job-progress", JobProgress { job_id: worker_id.clone(), bytes_processed: p.bytes_processed, total_bytes: p.total_bytes, phase: p.phase });
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<(devtools_core::CompareResult, devtools_core::CompareStats), String> {
+            let left_meta = fs::metadata(&left.path).map_err(|error| error.to_string())?;
+            let right_meta = fs::metadata(&right.path).map_err(|error| error.to_string())?;
+            if left_meta.len() != left.size || left_meta.modified().ok() != left.modified || right_meta.len() != right.size || right_meta.modified().ok() != right.modified {
+                return Err("An input file changed. Reopen both documents before comparing.".into());
+            }
+            let left_doc = Document::from_bytes(fs::read(&left.path).map_err(|error| error.to_string())?);
+            let right_doc = Document::from_bytes(fs::read(&right.path).map_err(|error| error.to_string())?);
+            compare_documents(&left_doc, &right_doc, &options, &token, progress).map_err(|error| error.to_string())
+        })).unwrap_or_else(|_| Err("The compare worker failed unexpectedly; the workbench is still available.".into()));
+        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
+        let mut finished = match result {
+            Ok((comparison, stats)) => {
+                let bytes = match serde_json::to_vec_pretty(&comparison) {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()) };
+                        if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), failed.clone()); }
+                        let _ = app.emit_to("main", "job-finished", failed);
+                        return;
+                    }
+                };
+                if let Err(error) = fs::write(&worker_result_path, &bytes) {
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()) }
+                } else {
+                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: serde_json::to_string(&comparison.summary).unwrap_or_else(|_| "Comparison completed.".into()), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None }
+                }
+            }
+            Err(error) => JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: left.size.saturating_add(right.size), output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error) },
+        };
+        if finished.ok {
+            if let Ok(meta) = fs::metadata(&worker_result_path) {
+                let result_doc = RegisteredDocument { path: worker_result_path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(format!("{} vs {}.diff.json", left.path.file_stem().unwrap_or_default().to_string_lossy(), right.path.file_stem().unwrap_or_default().to_string_lossy())), origin_path: Some(left.path.clone()) };
+                if let Ok(mut documents) = state.documents.lock() {
+                    if documents.len() < MAX_DOCUMENTS { documents.insert(worker_result_id.clone(), result_doc); } else { let _ = fs::remove_file(&worker_result_path); finished.ok = false; finished.error = Some("Close an unused document before comparing another pair.".into()); finished.result_document_id = None; finished.result_path = None; }
+                }
+            } else { finished.ok = false; finished.error = Some("The comparison output was not created.".into()); finished.result_document_id = None; finished.result_path = None; }
+        } else { let _ = fs::remove_file(&worker_result_path); }
+        if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
+        let _ = app.emit_to("main", "job-finished", finished);
+    });
+    Ok(StartedJob { job_id })
 }
 
 #[tauri::command]
@@ -493,7 +580,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, read_preview, close_document, start_operation, run_tool, cancel_operation, job_status, save_result, list_tools
+            open_document, read_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

@@ -5,6 +5,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 
 export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
+export type CompareNewline = 'preserve' | 'lf' | 'crlf' | 'ignore';
 export type TextUtilityOperation = 'encode' | 'decode' | 'escape' | 'unescape';
 export type InputKind = 'bytes' | 'text' | 'json' | 'csv';
 export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
@@ -92,6 +93,20 @@ export function startOperation(documentId: string, operation: Operation, format:
  * compatibility adapter for older JSON callers. */
 export function runTool(documentId: string, toolId: string, operationId: string, options: Record<string, unknown> = {}): Promise<{ jobId: string }> {
   return invoke('run_tool', { documentId, toolId, operationId, options });
+}
+
+/** Start a bounded two-document text comparison. Both handles remain
+ * immutable; the native host publishes a temporary JSON diff result. */
+export function runCompare(leftDocumentId: string, rightDocumentId: string, options: {
+  leftEncoding?: 'auto' | 'utf8' | 'utf16_le' | 'utf16_be' | 'latin1';
+  rightEncoding?: 'auto' | 'utf8' | 'utf16_le' | 'utf16_be' | 'latin1';
+  newline?: CompareNewline;
+  contextLines?: number;
+  maxInputBytes?: number;
+  maxLines?: number;
+  maxOutputBytes?: number;
+} = {}): Promise<{ jobId: string }> {
+  return invoke('run_compare', { leftDocumentId, rightDocumentId, options });
 }
 
 export function runTextUtility(documentId: string, toolId: 'text.url' | 'text.html' | 'text.unicode', operationId: TextUtilityOperation, maxOutputBytes?: number): Promise<{ jobId: string }> {
