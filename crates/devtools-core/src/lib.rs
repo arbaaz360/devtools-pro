@@ -4,6 +4,7 @@ mod image_base64;
 mod base64_image;
 mod streaming;
 mod tool;
+mod text_utilities;
 
 pub use document::{Document, DocumentKind, Encoding, NewlineStyle};
 pub use json::{JsonOptions, JsonTool};
@@ -14,3 +15,4 @@ pub use tool::{
     ToolCapabilities, ToolError, ToolLimits, ToolManifest, ToolOperation, ToolRegistry, ToolResult,
 };
 pub use streaming::{CancellationToken, FileFormat, FilePreview, Inspection, JsonLayout, Progress, inspect_file, preview_file, transform_json_file};
+pub use text_utilities::{TextUtilityKind, TextUtilityOptions, TextUtilityTool, transform_text};

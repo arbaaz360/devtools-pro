@@ -5,6 +5,7 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 
 export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
+export type TextUtilityOperation = 'encode' | 'decode' | 'escape' | 'unescape';
 export type InputKind = 'bytes' | 'text' | 'json' | 'csv';
 export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
 export interface ToolLimits { maxInputBytes: number | null; maxOutputBytes: number | null; }
@@ -91,6 +92,11 @@ export function startOperation(documentId: string, operation: Operation, format:
  * compatibility adapter for older JSON callers. */
 export function runTool(documentId: string, toolId: string, operationId: string, options: Record<string, unknown> = {}): Promise<{ jobId: string }> {
   return invoke('run_tool', { documentId, toolId, operationId, options });
+}
+
+export function runTextUtility(documentId: string, toolId: 'text.url' | 'text.html' | 'text.unicode', operationId: TextUtilityOperation, maxOutputBytes?: number): Promise<{ jobId: string }> {
+  const options = maxOutputBytes === undefined ? {} : { maxOutputBytes };
+  return runTool(documentId, toolId, operationId, options);
 }
 
 export function listTools(): Promise<ToolManifest[]> {

@@ -32,6 +32,8 @@ pub enum ToolError {
     #[error("invalid image bytes: {message}")] InvalidImage { message: String },
     #[error("unsupported image MIME type: {mime}")] UnsupportedImageMime { mime: String },
     #[error("invalid Base64 input: {message}")] InvalidBase64 { message: String },
+    #[error("invalid {operation} input at byte {position}: {message}")]
+    InvalidText { operation: String, message: String, position: usize },
 }
 
 impl From<std::io::Error> for ToolError {
@@ -176,7 +178,17 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
             capabilities: local_streaming_capabilities(),
             operations: vec![operation("inspect", "Inspect")], renderer: RendererKind::Text,
         },
+        text_manifest("text.url", "URL Encode / Decode", vec![("encode", "Encode"), ("decode", "Decode")]),
+        text_manifest("text.html", "HTML Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
+        text_manifest("text.unicode", "Unicode Escape / Unescape", vec![("encode", "Escape"), ("decode", "Unescape")]),
     ]
+}
+
+fn text_manifest(id: &str, label: &str, ops: Vec<(&str, &str)>) -> ToolManifest {
+    ToolManifest { id: id.into(), label: label.into(), contract_version: 1,
+        input_kinds: vec![InputKind::Text], limits: ToolLimits { max_input_bytes: Some(crate::text_utilities::DEFAULT_MAX_INPUT_BYTES as u64), max_output_bytes: Some(crate::text_utilities::DEFAULT_MAX_OUTPUT_BYTES as u64) },
+        capabilities: ToolCapabilities { deterministic:true, supports_preview:true, supports_streaming:true, cancellation:true, progress:true, needs_filesystem:false, needs_network:false, needs_secrets:false },
+        operations: ops.into_iter().map(|(id,label)| operation(id,label)).collect(), renderer: RendererKind::Text }
 }
 
 #[derive(Debug)]
