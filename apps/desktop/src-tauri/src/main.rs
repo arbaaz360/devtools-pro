@@ -8,7 +8,7 @@ use serde::Serialize;
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{Read, Seek, SeekFrom},
+    io::{self, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     sync::{Arc, Mutex, atomic::{AtomicU64, Ordering}},
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -330,6 +330,89 @@ fn job_status(job_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result
     Ok(state.finished_jobs.lock().map_err(|e| e.to_string())?.get(&job_id).cloned())
 }
 
+fn path_entry_exists(path: &Path) -> bool {
+    // `Path::exists` follows symlinks and therefore misses dangling links.
+    // Treat any directory entry at the destination as occupied so a save can
+    // never replace an existing file or link unexpectedly.
+    fs::symlink_metadata(path).is_ok()
+}
+
+fn canonical_for_compare(path: &Path) -> PathBuf {
+    fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+/// Copy a generated result to a new sibling temporary file, then publish it
+/// with one rename. The temporary path is reserved with `create_new`, and is
+/// removed on every error so interrupted/failed saves cannot leave artifacts.
+fn atomic_copy_with<F>(destination: &Path, copy: F) -> Result<(), String>
+where
+    F: FnOnce(&Path) -> io::Result<()>,
+{
+    if path_entry_exists(destination) {
+        return Err("Choose a new destination; existing files are not overwritten.".into());
+    }
+    let parent = destination.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
+    if !parent.exists() {
+        return Err("The destination folder does not exist.".into());
+    }
+
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default();
+    let mut temporary = None;
+    for attempt in 0..100u32 {
+        let candidate = parent.join(format!(".devtools-pro-save-{}-{nonce}-{attempt}.tmp", std::process::id()));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&candidate) {
+            Ok(_) => { temporary = Some(candidate); break; }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    let temporary = temporary.ok_or_else(|| "Could not allocate a unique temporary save file.".to_string())?;
+
+    let result = (|| {
+        copy(&temporary).map_err(|error| error.to_string())?;
+        // Re-check immediately before publication. A destination created by
+        // another process is rejected on platforms where rename overwrites.
+        if path_entry_exists(destination) {
+            return Err("Choose a new destination; existing files are not overwritten.".into());
+        }
+        fs::rename(&temporary, destination).map_err(|error| error.to_string())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+fn atomic_copy(source: &Path, destination: &Path) -> Result<(), String> {
+    atomic_copy_with(destination, |temporary| {
+        let mut input = File::open(source)?;
+        let mut output = File::options().write(true).truncate(true).open(temporary)?;
+        io::copy(&mut input, &mut output)?;
+        output.flush()?;
+        output.sync_all()
+    })
+}
+
+fn validate_save_destination(
+    destination: &Path,
+    result: &RegisteredDocument,
+    open_documents: &HashMap<String, RegisteredDocument>,
+) -> Result<(), String> {
+    let destination_path = canonical_for_compare(destination);
+    if destination_path == canonical_for_compare(&result.path) {
+        return Err("Choose a different destination.".into());
+    }
+    if open_documents.values().any(|open| !open.temporary && open.path == destination_path) {
+        return Err("Choose a new destination; source files stay unchanged.".into());
+    }
+    if let Some(origin) = &result.origin_path {
+        if destination_path == *origin {
+            return Err("Choose a new file so the original stays unchanged.".into());
+        }
+    }
+    Ok(())
+}
+
 /// Persist an app-owned result after the user has reviewed it. Transform
 /// operations themselves never prompt for a destination, so this command is
 /// the explicit Save action exposed by the right-hand result pane.
@@ -343,34 +426,10 @@ fn save_result(
         .get(&result_document_id).cloned().ok_or("Result is no longer available.")?;
     if !document.temporary { return Err("Only generated results can be saved here.".into()); }
     let destination = PathBuf::from(output_path);
-    if destination == document.path { return Err("Choose a different destination.".into()); }
-    // Never allow an explicit save to replace any open source document.
-    let comparison_path = fs::canonicalize(&destination).unwrap_or_else(|_| destination.clone());
-    if state.documents.lock().map_err(|e| e.to_string())?.values().any(|open| !open.temporary && open.path == comparison_path) {
-        return Err("Choose a new destination; source files stay unchanged.".into());
-    }
-    if let Some(origin) = &document.origin_path {
-        if destination.exists() && fs::canonicalize(&destination).ok().as_ref() == Some(origin) {
-            return Err("Choose a new file so the original stays unchanged.".into());
-        }
-    }
-    if let Some(parent) = destination.parent() {
-        if !parent.as_os_str().is_empty() && !parent.exists() {
-            return Err("The destination folder does not exist.".into());
-        }
-    }
-    if destination.exists() {
-        return Err("Choose a new destination; existing files are not overwritten.".into());
-    }
-    let parent = destination.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
-    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default();
-    let temporary = parent.join(format!(".devtools-pro-save-{}-{}.tmp", std::process::id(), nonce));
-    fs::copy(&document.path, &temporary).map_err(|e| e.to_string())?;
-    if let Err(error) = fs::rename(&temporary, &destination) {
-        let _ = fs::remove_file(&temporary);
-        return Err(error.to_string());
-    }
-    Ok(())
+    let open_documents = state.documents.lock().map_err(|e| e.to_string())?;
+    validate_save_destination(&destination, &document, &open_documents)?;
+    drop(open_documents);
+    atomic_copy(&document.path, &destination)
 }
 
 #[tauri::command]
@@ -400,4 +459,92 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("Unable to start the desktop workbench");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_dir(label: &str) -> PathBuf {
+        let nonce = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let path = std::env::temp_dir().join(format!("devtools-host-safety-{label}-{}-{nonce}", std::process::id()));
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn atomic_save_preserves_source_bytes() {
+        let dir = test_dir("immutable");
+        let source = dir.join("source.json");
+        let destination = dir.join("copy.json");
+        let original = br#"{"a":1,"b":[true,false]}"#;
+        fs::write(&source, original).unwrap();
+
+        atomic_copy(&source, &destination).unwrap();
+
+        assert_eq!(fs::read(&source).unwrap(), original);
+        assert_eq!(fs::read(&destination).unwrap(), original);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn atomic_save_rejects_existing_destination_without_overwriting() {
+        let dir = test_dir("existing");
+        let source = dir.join("source.json");
+        let destination = dir.join("already-there.json");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&destination, b"keep me").unwrap();
+
+        let error = atomic_copy(&source, &destination).unwrap_err();
+
+        assert!(error.contains("existing files are not overwritten"));
+        assert_eq!(fs::read(&destination).unwrap(), b"keep me");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn save_validation_rejects_open_source_aliases() {
+        let dir = test_dir("collision");
+        let source = dir.join("source.json");
+        let result_path = dir.join("result.json");
+        fs::write(&source, b"source").unwrap();
+        fs::write(&result_path, b"result").unwrap();
+        let canonical_source = canonical_for_compare(&source);
+        let source_doc = RegisteredDocument {
+            path: canonical_source.clone(), size: 6, modified: None, temporary: false,
+            display_name: None, origin_path: None,
+        };
+        let result_doc = RegisteredDocument {
+            path: result_path, size: 6, modified: None, temporary: true,
+            display_name: None, origin_path: Some(canonical_source),
+        };
+        let mut open = HashMap::new();
+        open.insert("source".into(), source_doc);
+
+        let error = validate_save_destination(&source, &result_doc, &open).unwrap_err();
+
+        assert!(error.contains("source files stay unchanged"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn failed_atomic_save_removes_partial_sibling_temp() {
+        let dir = test_dir("cleanup");
+        let source = dir.join("source.json");
+        let destination = dir.join("copy.json");
+        fs::write(&source, b"source").unwrap();
+
+        let error = atomic_copy_with(&destination, |temporary| {
+            fs::write(temporary, b"partial").map_err(|error| io::Error::new(error.kind(), error.to_string()))?;
+            Err(io::Error::new(io::ErrorKind::Interrupted, "simulated interrupted save"))
+        }).unwrap_err();
+
+        assert!(error.contains("simulated interrupted save"));
+        assert!(!path_entry_exists(&destination));
+        let leftovers = fs::read_dir(&dir).unwrap().filter_map(Result::ok).filter(|entry| {
+            entry.file_name().to_string_lossy().starts_with(".devtools-pro-save-")
+        }).count();
+        assert_eq!(leftovers, 0);
+        fs::remove_dir_all(dir).unwrap();
+    }
 }
