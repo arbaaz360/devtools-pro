@@ -143,6 +143,26 @@ async fn open_document(path: String, state: tauri::State<'_, Arc<HostState>>) ->
     }).await.map_err(|e| e.to_string())?
 }
 
+/// Create a bounded, app-owned text document for tools that accept pasted input.
+/// The file is temporary and removed when its document handle is closed.
+#[tauri::command]
+async fn create_text_document(text: String, state: tauri::State<'_, Arc<HostState>>) -> Result<OpenedDocument, String> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        if text.len() > 1024 * 1024 { return Err("Pasted input exceeds the 1 MiB limit.".into()); }
+        let id = state.next_id("doc");
+        let path = std::env::temp_dir().join(format!("devtools-pro-{id}.txt"));
+        fs::write(&path, text.as_bytes()).map_err(|e| e.to_string())?;
+        let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+        let document = RegisteredDocument { path, size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some("pasted-curl.txt".into()), origin_path: None };
+        let opened = preview_document(id.clone(), &document, 0)?;
+        let mut documents = state.documents.lock().map_err(|e| e.to_string())?;
+        if documents.len() >= MAX_DOCUMENTS { let _ = fs::remove_file(&document.path); return Err("Close a document before opening another (64-tab limit).".into()); }
+        documents.insert(id, document);
+        Ok(opened)
+    }).await.map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 async fn read_preview(document_id: String, offset: u64, state: tauri::State<'_, Arc<HostState>>) -> Result<OpenedDocument, String> {
     let document = state.documents.lock().map_err(|e| e.to_string())?.get(&document_id)
@@ -766,7 +786,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, read_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
+            open_document, create_text_document, read_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

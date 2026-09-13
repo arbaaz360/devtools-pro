@@ -101,6 +101,10 @@ export function openDocument(path: string): Promise<FileDocument> {
   return invoke('open_document', { path });
 }
 
+export function createTextDocument(text: string): Promise<FileDocument> {
+  return invoke('create_text_document', { text });
+}
+
 export function closeDocument(documentId: string): Promise<void> {
   return invoke('close_document', { documentId });
 }

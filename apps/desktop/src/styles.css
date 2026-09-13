@@ -14,6 +14,7 @@
 .result-summary{flex:0 0 auto;margin:0;max-height:74px}
 .result-preview-block{display:flex;flex:1 1 auto;flex-direction:column;min-height:180px;margin:0}
 .result-preview-heading{flex:0 0 auto;margin:10px 0 5px}
+.curl-input{flex:1;width:100%;min-height:280px;resize:vertical;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:14px;font:12px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace}
 #result-output{flex:1 1 auto;width:100%;height:auto;min-height:0;resize:none}
 #save-result{flex:0 0 auto;align-self:flex-start}
 .saved-output{flex:0 0 auto;padding:8px 0 0}
