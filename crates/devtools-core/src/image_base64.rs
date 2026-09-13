@@ -11,7 +11,7 @@ pub enum ImageFormat { Png, Jpeg }
 
 impl ImageFormat {
     pub fn mime(self) -> &'static str { match self { Self::Png => "image/png", Self::Jpeg => "image/jpeg" } }
-    fn signature(self) -> &'static [u8] { match self { Self::Png => b"\x89PNG\r\n\x1a\n", Self::Jpeg => b"\xff\xd8\xff" } }
+    pub(crate) fn signature(self) -> &'static [u8] { match self { Self::Png => b"\x89PNG\r\n\x1a\n", Self::Jpeg => b"\xff\xd8\xff" } }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ impl Default for ImageBase64Options { fn default() -> Self { Self { data_uri: fa
 #[derive(Debug, Clone, Serialize)]
 pub struct ImageBase64Stats { pub format: ImageFormat, pub input_bytes: u64, pub output_bytes: u64, pub data_uri: bool }
 
-pub fn detect_image_format(bytes: &[u8], explicit_mime: Option<&str>) -> Result<ImageFormat, ToolError> {
+pub(crate) fn detect_image_format(bytes: &[u8], explicit_mime: Option<&str>) -> Result<ImageFormat, ToolError> {
     let detected = if bytes.starts_with(ImageFormat::Png.signature()) { Some(ImageFormat::Png) }
         else if bytes.starts_with(ImageFormat::Jpeg.signature()) { Some(ImageFormat::Jpeg) } else { None };
     if let Some(mime) = explicit_mime {

@@ -31,6 +31,7 @@ pub enum ToolError {
     #[error("tool execution failed: {message}")] Execution { message: String },
     #[error("invalid image bytes: {message}")] InvalidImage { message: String },
     #[error("unsupported image MIME type: {mime}")] UnsupportedImageMime { mime: String },
+    #[error("invalid Base64 input: {message}")] InvalidBase64 { message: String },
 }
 
 impl From<std::io::Error> for ToolError {
@@ -153,6 +154,13 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
                 progress: true, needs_filesystem: false, needs_network: false, needs_secrets: false,
             },
             operations: vec![operation("encode", "Encode")], renderer: RendererKind::Text,
+        },
+        ToolManifest {
+            id: "encoding.base64-image".into(), label: "Base64 to Image".into(), contract_version: 1,
+            input_kinds: vec![InputKind::Text],
+            limits: ToolLimits { max_input_bytes: Some(32 * 1024 * 1024), max_output_bytes: Some(24 * 1024 * 1024) },
+            capabilities: ToolCapabilities { deterministic:true, supports_preview:true, supports_streaming:true, cancellation:true, progress:true, needs_filesystem:false, needs_network:false, needs_secrets:false },
+            operations: vec![operation("decode", "Decode")], renderer: RendererKind::Binary,
         },
         ToolManifest {
             id: "structured.csv".into(), label: "CSV".into(), contract_version: 1,
