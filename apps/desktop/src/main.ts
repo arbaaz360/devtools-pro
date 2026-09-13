@@ -90,6 +90,7 @@ function renderDiffResult(value:string){
   try{const result=JSON.parse(value) as {summary?:Record<string,unknown>;hunks?:Array<{oldStart:number;oldLines:number;newStart:number;newLines:number;lines:Array<{kind:string;text:string;oldLine?:number|null;newLine?:number|null}>}>}; const summary=result.summary||{};
     const line=(l:{kind:string;text:string;oldLine?:number|null;newLine?:number|null})=>`<div class="diff-line ${esc(l.kind||'context').toLowerCase()}"><span class="diff-num">${l.oldLine??''}</span><span class="diff-num">${l.newLine??''}</span><span class="diff-sign">${l.kind==='added'?'+':l.kind==='removed'?'-':' '}</span><code>${esc(l.text||'').replace(/\n$/,'')}</code></div>`;
     host.innerHTML=`<div class="diff-summary"><strong>${summary.identical?'No differences':`${summary.changedHunks??0} changed hunk${summary.changedHunks===1?'':'s'}`}</strong><span>${summary.addedLines??0} additions · ${summary.removedLines??0} deletions${summary.newlineOnly?' · newline style only':''}</span></div>`+((result.hunks||[]).map(h=>`<section class="diff-hunk"><div class="diff-hunk-head">@@ -${h.oldStart},${h.oldLines} +${h.newStart},${h.newLines} @@</div>${(h.lines||[]).map(line).join('')}</section>`).join('')||'<p class="diff-empty">The selected documents are identical.</p>');
+    const heading=document.querySelector('.result-preview-heading .section-label'); if(heading)heading.textContent='Diff hunks';
     host.hidden=false;
     return summary;
   }catch{host.hidden=true;return null;}

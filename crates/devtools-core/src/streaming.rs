@@ -141,8 +141,12 @@ pub fn preview_file(path: &Path, offset: u64, max_bytes: usize) -> Result<FilePr
 
 #[cfg(test)] mod tests {
     use super::*; use std::io::Write;
-    fn file(name:&str,s:&str)->PathBuf { let p=std::env::temp_dir().join(format!("devtools-{name}-{}",std::process::id())); let mut f=File::create(&p).unwrap(); f.write_all(s.as_bytes()).unwrap(); p }
+    fn file(name:&str,s:&str)->PathBuf {
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let p=std::env::temp_dir().join(format!("devtools-{name}-{}-{nonce}",std::process::id()));
+        let mut f=File::create(&p).unwrap(); f.write_all(s.as_bytes()).unwrap(); p
+    }
     #[test] fn cancel_token() { let t=CancellationToken::default(); t.cancel(); assert!(t.is_cancelled()); }
-    #[test] fn json_stream_preserves_lexemes() { let i=file("j",r#"{"a":1.2300,"a":2}"#); let o=i.with_extension("out"); let t=CancellationToken::default(); transform_json_file(&i,&o,JsonLayout::Minify,&t, |_|{}).unwrap(); assert_eq!(std::fs::read_to_string(o).unwrap(),r#"{"a":1.2300,"a":2}"#); }
+    #[test] fn json_stream_preserves_lexemes() { let i=file("j",r#"{"a":1.2300,"a":2}"#); let o=i.with_extension("out"); let t=CancellationToken::default(); transform_json_file(&i,&o,JsonLayout::Minify,&t, |_|{}).unwrap(); assert_eq!(std::fs::read_to_string(&o).unwrap(),r#"{"a":1.2300,"a":2}"#); let _=std::fs::remove_file(i); let _=std::fs::remove_file(o); }
     #[test] fn invalid_and_csv_ragged() { let i=file("bad", "{bad"); assert!(inspect_file(&i,FileFormat::Json,&CancellationToken::default(), |_|{}).is_err()); let c=file("csv","a,b\n1\n"); assert!(inspect_file(&c,FileFormat::Csv,&CancellationToken::default(), |_|{}).is_err()); }
 }

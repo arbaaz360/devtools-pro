@@ -483,8 +483,13 @@ fn run_compare(
             if left_meta.len() != left.size || left_meta.modified().ok() != left.modified || right_meta.len() != right.size || right_meta.modified().ok() != right.modified {
                 return Err("An input file changed. Reopen both documents before comparing.".into());
             }
-            let left_doc = Document::from_bytes(fs::read(&left.path).map_err(|error| error.to_string())?);
-            let right_doc = Document::from_bytes(fs::read(&right.path).map_err(|error| error.to_string())?);
+            // Compare is an in-memory algorithm, so enforce its declared input
+            // limit while reading in chunks instead of buffering an unbounded
+            // source file with `fs::read`.
+            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, options.max_input_bytes, &token, &progress)
+                .map_err(|error| error.to_string())?;
+            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, options.max_input_bytes, &token, &progress)
+                .map_err(|error| error.to_string())?;
             compare_documents(&left_doc, &right_doc, &options, &token, progress).map_err(|error| error.to_string())
         })).unwrap_or_else(|_| Err("The compare worker failed unexpectedly; the workbench is still available.".into()));
         if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
