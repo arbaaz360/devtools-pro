@@ -29,6 +29,8 @@ pub enum ToolError {
     UnsupportedOperation { tool_id: String, operation_id: String },
     #[error("invalid options: {message}")] InvalidOptions { message: String },
     #[error("tool execution failed: {message}")] Execution { message: String },
+    #[error("invalid image bytes: {message}")] InvalidImage { message: String },
+    #[error("unsupported image MIME type: {mime}")] UnsupportedImageMime { mime: String },
 }
 
 impl From<std::io::Error> for ToolError {
@@ -143,6 +145,16 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
             renderer: RendererKind::Json,
         },
         ToolManifest {
+            id: "encoding.image-base64".into(), label: "Image to Base64".into(), contract_version: 1,
+            input_kinds: vec![InputKind::Bytes],
+            limits: ToolLimits { max_input_bytes: Some(25 * 1024 * 1024), max_output_bytes: None },
+            capabilities: ToolCapabilities {
+                deterministic: true, supports_preview: true, supports_streaming: true, cancellation: true,
+                progress: true, needs_filesystem: false, needs_network: false, needs_secrets: false,
+            },
+            operations: vec![operation("encode", "Encode")], renderer: RendererKind::Text,
+        },
+        ToolManifest {
             id: "structured.csv".into(), label: "CSV".into(), contract_version: 1,
             input_kinds: vec![InputKind::Csv],
             limits: ToolLimits { max_input_bytes: None, max_output_bytes: None },
@@ -185,9 +197,10 @@ impl ToolRegistry {
 
     pub fn register<T: GenericTool + 'static>(&mut self, tool: T) -> Result<(), ToolError> {
         let id = tool.manifest().id.clone();
-        if self.tools.insert(id.clone(), Box::new(tool)).is_some() {
+        if self.tools.contains_key(&id) {
             return Err(ToolError::Execution { message: format!("tool id {id} is already registered") });
         }
+        self.tools.insert(id, Box::new(tool));
         Ok(())
     }
 
@@ -278,5 +291,14 @@ mod tests {
         assert!(matches!(registry.execute("test.sample", "missing", &input, &serde_json::json!({})), Err(ToolError::UnsupportedOperation { .. })));
         assert!(matches!(registry.execute("test.sample", "echo", &input, &serde_json::json!(true)), Err(ToolError::InvalidOptions { .. })));
         assert!(matches!(registry.execute("test.sample", "echo", &Document::from_text("x".repeat(33)), &serde_json::json!({})), Err(ToolError::ResourceLimit { .. })));
+    }
+
+    #[test]
+    fn duplicate_registration_is_rejected_without_replacing_tool() {
+        let mut registry = ToolRegistry::new();
+        registry.register(SampleTool { manifest: sample_manifest() }).unwrap();
+        assert!(registry.register(SampleTool { manifest: sample_manifest() }).is_err());
+        let result = registry.execute("test.sample", "echo", &Document::from_text("ok"), &serde_json::json!({})).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "echo:ok");
     }
 }
