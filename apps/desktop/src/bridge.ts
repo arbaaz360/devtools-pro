@@ -76,7 +76,7 @@ export async function chooseFile(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null;
 }
 
-export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash' | 'image-base64' | 'base64-image'): Promise<string | null> {
+export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash' | 'image-base64' | 'base64-image' | 'compare'): Promise<string | null> {
   if (operation === 'hash') {
     const path = document.path.replace(/(\.[^./\\]+)?$/, '.sha.txt');
     return save({ title: 'Save hash to a new file', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
@@ -92,6 +92,10 @@ export async function chooseOutput(document: FileDocument, operation: Operation 
   if (operation === 'base64-image') {
     const path = document.path.replace(/(\.[^./\\]+)?$/, '.decoded.image');
     return save({ title: 'Save decoded image', defaultPath: path, filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
+  }
+  if (operation === 'compare') {
+    const path = document.path.replace(/(\.[^./\\]+)?$/, '.diff.json');
+    return save({ title: 'Save text diff', defaultPath: path, filters: [{ name: 'JSON', extensions: ['json'] }] });
   }
   const path = document.path.replace(/(\.[^./\\]+)?$/, `.${operation === 'format' ? 'formatted' : 'minified'}.json`);
   return save({ title: 'Save JSON to a new file', defaultPath: path, filters: [{ name: 'JSON', extensions: ['json'] }] });
