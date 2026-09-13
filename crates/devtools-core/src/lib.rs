@@ -5,5 +5,8 @@ mod tool;
 
 pub use document::{Document, DocumentKind, Encoding, NewlineStyle};
 pub use json::{JsonOptions, JsonTool};
-pub use tool::{builtin_manifests, Diagnostic, Severity, Tool, ToolError, ToolManifest, ToolResult};
+pub use tool::{
+    builtin_manifests, Diagnostic, GenericTool, InputKind, RendererKind, Severity, Tool,
+    ToolCapabilities, ToolError, ToolLimits, ToolManifest, ToolOperation, ToolRegistry, ToolResult,
+};
 pub use streaming::{CancellationToken, FileFormat, FilePreview, Inspection, JsonLayout, Progress, inspect_file, preview_file, transform_json_file};

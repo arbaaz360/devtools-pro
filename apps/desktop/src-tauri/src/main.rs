@@ -5,6 +5,7 @@ use devtools_core::{
     inspect_file, transform_json_file,
 };
 use serde::Serialize;
+use serde_json::Value;
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -192,8 +193,58 @@ fn parse_format(format: &str) -> Result<FileFormat, String> {
     }
 }
 
+fn manifest_for_tool(tool_id: &str) -> Result<devtools_core::ToolManifest, devtools_core::ToolError> {
+    devtools_core::builtin_manifests().into_iter().find(|manifest| manifest.id == tool_id)
+        .ok_or_else(|| devtools_core::ToolError::UnknownTool { tool_id: tool_id.into() })
+}
+
+fn detected_document_format(document: &RegisteredDocument) -> Result<FileFormat, String> {
+    let opened = preview_document(String::new(), document, 0)?;
+    parse_format(&opened.format)
+}
+
+/// Generic tool entry point. The host resolves a capability-scoped document
+/// handle, validates the manifest's input and operation declarations, then
+/// enters the same bounded job scheduler used by the compatibility command.
+#[tauri::command]
+fn run_tool(
+    document_id: String,
+    tool_id: String,
+    operation_id: String,
+    options: Value,
+    app: tauri::AppHandle,
+    state: tauri::State<'_, Arc<HostState>>,
+) -> Result<StartedJob, devtools_core::ToolError> {
+    if !options.is_object() {
+        return Err(devtools_core::ToolError::InvalidOptions { message: "options must be a JSON object".into() });
+    }
+    let manifest = manifest_for_tool(&tool_id)?;
+    let document = state.documents.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?
+        .get(&document_id).cloned()
+        .ok_or_else(|| devtools_core::ToolError::Execution { message: "Document is no longer open.".into() })?;
+    let format = detected_document_format(&document)
+        .map_err(|message| devtools_core::ToolError::Execution { message })?;
+    let (input_kind, format_name) = match format {
+        FileFormat::Json => (devtools_core::InputKind::Json, "json"),
+        FileFormat::Csv => (devtools_core::InputKind::Csv, "csv"),
+        FileFormat::Text => (devtools_core::InputKind::Text, "text"),
+    };
+    manifest.supports(input_kind, &operation_id)?;
+    start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
+        .map_err(|message| devtools_core::ToolError::Execution { message })
+}
+
 #[tauri::command]
 fn start_operation(
+    document_id: String, operation: String, format: Option<String>,
+    app: tauri::AppHandle, state: tauri::State<'_, Arc<HostState>>,
+) -> Result<StartedJob, String> {
+    start_operation_impl(document_id, operation, format, app, state)
+}
+
+/// Compatibility adapter retained for existing JSON callers. New callers use
+/// `run_tool`, which validates a manifest before entering this scheduler.
+fn start_operation_impl(
     document_id: String, operation: String, format: Option<String>,
     app: tauri::AppHandle, state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<StartedJob, String> {
@@ -442,7 +493,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, read_preview, close_document, start_operation, cancel_operation, job_status, save_result, list_tools
+            open_document, read_preview, close_document, start_operation, run_tool, cancel_operation, job_status, save_result, list_tools
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {

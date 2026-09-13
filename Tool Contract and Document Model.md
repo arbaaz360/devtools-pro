@@ -183,21 +183,25 @@ only after all output chunks are flushed. A tool must acknowledge
 `Cancellation` within 100 ms, stop producing output, and release resources;
 the host may terminate a non-compliant worker. No event may block the UI thread.
 
-An abbreviated JSON manifest is suitable for registry discovery and command
-palette indexing:
+The desktop registry uses a compact serializable manifest for discovery and
+command-palette indexing. `inputKinds`, `limits`, `capabilities`, `operations`,
+and `renderer` are intentionally stable fields so a host can validate a job
+before reading its document. The Rust core also exposes a `ToolRegistry` for
+in-process or test-only tools; it performs the same tool-id, input-kind,
+operation, options, and input-size checks before dispatching execution.
+
+An abbreviated JSON manifest is suitable for registry discovery:
 
 ```json
 {
-  "id": "devtools.base64.encode",
-  "contract_version": "1.0.0",
-  "implementation_version": "0.1.0",
-  "title": "Base64 Encode",
-  "category": "Encoding",
-  "inputs": [{"name":"input","data_type":"Bytes","required":true,"accepts_stream":true}],
-  "outputs": [{"name":"output","data_type":"Text","required":true,"accepts_stream":true}],
-  "options_schema": {"type":"object","properties":{"url_safe":{"type":"boolean"}}},
-  "default_options": {"url_safe":false},
-  "capabilities": {"deterministic":true,"supports_preview":true,"supports_streaming":true,"needs_network":false,"needs_filesystem":false,"needs_secrets":false}
+  "id": "encoding.base64",
+  "label": "Base64 Encode",
+  "contractVersion": 1,
+  "inputKinds": ["bytes"],
+  "limits": {"maxInputBytes": null, "maxOutputBytes": null},
+  "capabilities": {"deterministic":true,"supportsPreview":true,"supportsStreaming":true,"cancellation":true,"progress":true,"needsFilesystem":false,"needsNetwork":false,"needsSecrets":false},
+  "operations": [{"id":"encode","label":"Encode","defaultOptions":{}}],
+  "renderer": "text"
 }
 ```
 

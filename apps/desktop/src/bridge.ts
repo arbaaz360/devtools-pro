@@ -5,6 +5,30 @@ import { open, save } from '@tauri-apps/plugin-dialog';
 
 export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
+export type InputKind = 'bytes' | 'text' | 'json' | 'csv';
+export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
+export interface ToolLimits { maxInputBytes: number | null; maxOutputBytes: number | null; }
+export interface ToolCapabilities {
+  deterministic: boolean;
+  supportsPreview: boolean;
+  supportsStreaming: boolean;
+  cancellation: boolean;
+  progress: boolean;
+  needsFilesystem: boolean;
+  needsNetwork: boolean;
+  needsSecrets: boolean;
+}
+export interface ToolOperation { id: string; label: string; defaultOptions: Record<string, unknown>; }
+export interface ToolManifest {
+  id: string;
+  label: string;
+  contractVersion: number;
+  inputKinds: InputKind[];
+  limits: ToolLimits;
+  capabilities: ToolCapabilities;
+  operations: ToolOperation[];
+  renderer: RendererKind;
+}
 export interface FileDocument {
   id: string;
   name: string;
@@ -61,6 +85,16 @@ export function readPreview(documentId: string, offset = 0): Promise<FileDocumen
 
 export function startOperation(documentId: string, operation: Operation, format: Format): Promise<{ jobId: string }> {
   return invoke('start_operation', { documentId, operation, format });
+}
+
+/** Generic manifest-driven execution boundary. `startOperation` remains as a
+ * compatibility adapter for older JSON callers. */
+export function runTool(documentId: string, toolId: string, operationId: string, options: Record<string, unknown> = {}): Promise<{ jobId: string }> {
+  return invoke('run_tool', { documentId, toolId, operationId, options });
+}
+
+export function listTools(): Promise<ToolManifest[]> {
+  return invoke('list_tools');
 }
 
 export function cancelOperation(jobId: string): Promise<void> {
