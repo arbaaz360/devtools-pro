@@ -76,10 +76,14 @@ export async function chooseFile(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null;
 }
 
-export async function chooseOutput(document: FileDocument, operation: Operation | 'hash'): Promise<string | null> {
+export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash'): Promise<string | null> {
   if (operation === 'hash') {
     const path = document.path.replace(/(\.[^./\\]+)?$/, '.sha.txt');
     return save({ title: 'Save hash to a new file', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
+  }
+  if (operation === 'encode' || operation === 'decode' || operation === 'escape' || operation === 'unescape') {
+    const path = document.path.replace(/(\.[^./\\]+)?$/, `.${operation}.txt`);
+    return save({ title: 'Save text result', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
   }
   const path = document.path.replace(/(\.[^./\\]+)?$/, `.${operation === 'format' ? 'formatted' : 'minified'}.json`);
   return save({ title: 'Save JSON to a new file', defaultPath: path, filters: [{ name: 'JSON', extensions: ['json'] }] });
