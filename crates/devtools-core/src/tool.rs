@@ -189,6 +189,12 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
         text_manifest("text.html", "HTML Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
         text_manifest("text.unicode", "Unicode Escape / Unescape", vec![("encode", "Escape"), ("decode", "Unescape")]),
         crate::compare::compare_manifest(),
+        ToolManifest {
+            id: "web.curl-code".into(), label: "cURL to Code".into(), contract_version: 1,
+            input_kinds: vec![InputKind::Text], limits: ToolLimits { max_input_bytes: Some(1024 * 1024), max_output_bytes: Some(4 * 1024 * 1024) },
+            capabilities: ToolCapabilities { deterministic:true, supports_preview:true, supports_streaming:false, cancellation:true, progress:false, needs_filesystem:false, needs_network:false, needs_secrets:false },
+            operations: vec![operation("fetch", "Generate fetch"), operation("python", "Generate Python requests")], renderer: RendererKind::Text,
+        },
     ]
 }
 

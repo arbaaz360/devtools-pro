@@ -7,6 +7,7 @@ mod tool;
 mod text_utilities;
 mod hashing;
 mod compare;
+mod curl;
 
 pub use document::{Document, DocumentKind, Encoding, NewlineStyle};
 pub use json::{JsonOptions, JsonTool};
@@ -20,3 +21,4 @@ pub use streaming::{CancellationToken, FileFormat, FilePreview, Inspection, Json
 pub use text_utilities::{TextUtilityKind, TextUtilityOptions, TextUtilityTool, transform_text};
 pub use hashing::{hash_document, hash_file, hash_reader, HashAlgorithm, HashResult, HashStats, HashTool};
 pub use compare::{compare_documents, compare_manifest, compare_pair, CompareInput, CompareOptions, CompareProvenance, CompareResult, CompareStats, DiffHunk, DiffLine, DiffLineKind, EncodingOption, NewlineNormalization};
+pub use curl::{parse_curl, generate_fetch, generate_python, CurlRequest, CurlTool};
