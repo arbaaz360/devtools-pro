@@ -22,3 +22,14 @@ test('a new job can attach only to its own pending transition', () => {
   assert.equal(lifecycle.accepts('job-a'), false);
   assert.equal(lifecycle.accepts('job-b'), true);
 });
+
+test('finished jobs stop polling and ignore duplicate completion events', () => {
+  const lifecycle = new ResultLifecycle();
+  const pending = lifecycle.begin({ toolId: 'structured.json', sourceDocumentId: 'doc-a', operationId: 'format', renderer: 'json' });
+  assert.equal(lifecycle.attach(pending, 'job-a'), true);
+  assert.equal(lifecycle.activeJobId(), 'job-a');
+  assert.equal(lifecycle.finish('job-a'), true);
+  assert.equal(lifecycle.activeJobId(), null);
+  assert.equal(lifecycle.isFinished('job-a'), true);
+  assert.equal(lifecycle.finish('job-a'), false);
+});

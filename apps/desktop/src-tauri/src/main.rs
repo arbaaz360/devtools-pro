@@ -515,9 +515,10 @@ fn run_compare(
             // Compare is an in-memory algorithm, so enforce its declared input
             // limit while reading in chunks instead of buffering an unbounded
             // source file with `fs::read`.
-            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, options.max_input_bytes.map(|value| value as u64), &token, &progress)
+            let input_limit = options.max_input_bytes.unwrap_or(devtools_core::DEFAULT_MAX_INPUT_BYTES).min(devtools_core::DEFAULT_MAX_INPUT_BYTES) as u64;
+            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, Some(input_limit), &token, &progress)
                 .map_err(|error| error.to_string())?;
-            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, options.max_input_bytes.map(|value| value as u64), &token, &progress)
+            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, Some(input_limit), &token, &progress)
                 .map_err(|error| error.to_string())?;
             compare_documents(&left_doc, &right_doc, &options, &token, progress).map_err(|error| error.to_string())
         })).unwrap_or_else(|_| Err("The compare worker failed unexpectedly; the workbench is still available.".into()));
@@ -533,6 +534,20 @@ fn run_compare(
                         return;
                     }
                 };
+                let output_limit = options.max_output_bytes.unwrap_or(devtools_core::DEFAULT_MAX_OUTPUT_BYTES).min(devtools_core::DEFAULT_MAX_OUTPUT_BYTES);
+                if token.is_cancelled() {
+                    let _ = fs::remove_file(&worker_result_path);
+                    let cancelled = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: true, summary: "Operation cancelled.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Comparison cancelled before publishing output.".into()), error_details: Some(serde_json::json!({"code":"cancelled","message":"Comparison cancelled before publishing output."})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
+                    if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), cancelled.clone()); }
+                    let _ = app.emit_to("main", "job-finished", cancelled);
+                    return;
+                }
+                if bytes.len() > output_limit {
+                    let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Comparison output exceeded its limit.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: None, result_path: None, error: Some(format!("diff output exceeds {output_limit} bytes (hunk limit enforced; preview is bounded)")), error_details: Some(serde_json::json!({"code":"resource_limit","message":format!("diff output exceeds {output_limit} bytes")})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
+                    if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), failed.clone()); }
+                    let _ = app.emit_to("main", "job-finished", failed);
+                    return;
+                }
                 if let Err(error) = fs::write(&worker_result_path, &bytes) {
                     JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"execution","message":error.to_string()})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) }
                 } else {

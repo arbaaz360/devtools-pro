@@ -48,7 +48,7 @@ export class ResultLifecycle {
   }
 
   finish(jobId: string): boolean {
-    if (!this.accepts(jobId)) return false;
+    if (!this.accepts(jobId) || this.completedJobId === jobId) return false;
     this.running = false;
     this.completedJobId = jobId;
     return true;

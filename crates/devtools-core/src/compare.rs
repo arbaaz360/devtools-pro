@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub const DEFAULT_MAX_INPUT_BYTES: usize = 32 * 1024 * 1024;
 pub const DEFAULT_MAX_LINES: usize = 100_000;
 pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 8 * 1024 * 1024;
+pub const DEFAULT_MAX_HUNKS: usize = 10_000;
 const CONTEXT_LINES: usize = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -24,9 +25,10 @@ pub struct CompareOptions {
     pub max_input_bytes: Option<usize>,
     pub max_lines: Option<usize>,
     pub max_output_bytes: Option<usize>,
+    pub max_hunks: Option<usize>,
 }
 impl Default for CompareOptions {
-    fn default() -> Self { Self { left_encoding: EncodingOption::Auto, right_encoding: EncodingOption::Auto, newline: NewlineNormalization::Preserve, context_lines: CONTEXT_LINES, max_input_bytes: Some(DEFAULT_MAX_INPUT_BYTES), max_lines: Some(DEFAULT_MAX_LINES), max_output_bytes: Some(DEFAULT_MAX_OUTPUT_BYTES) } }
+    fn default() -> Self { Self { left_encoding: EncodingOption::Auto, right_encoding: EncodingOption::Auto, newline: NewlineNormalization::Preserve, context_lines: CONTEXT_LINES, max_input_bytes: Some(DEFAULT_MAX_INPUT_BYTES), max_lines: Some(DEFAULT_MAX_LINES), max_output_bytes: Some(DEFAULT_MAX_OUTPUT_BYTES), max_hunks: Some(DEFAULT_MAX_HUNKS) } }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,7 +90,8 @@ pub fn compare_pair(input: &CompareInput, options: &CompareOptions, cancel: &Can
     compare_documents(&input.left, &input.right, options, cancel, progress)
 }
 
-fn decode(input: &Document, encoding: EncodingOption) -> Result<String, ToolError> {
+fn decode(input: &Document, encoding: EncodingOption, cancel: &CancellationToken) -> Result<String, ToolError> {
+    if cancel.is_cancelled() { return Err(ToolError::Cancelled); }
     let bytes = input.bytes();
     let chosen = match encoding {
         EncodingOption::Auto => match input.encoding { crate::Encoding::Utf16Le => EncodingOption::Utf16Le, crate::Encoding::Utf16Be => EncodingOption::Utf16Be, crate::Encoding::Binary => return Err(ToolError::UnsupportedEncoding { message: "binary document cannot be compared as text".into() }), _ => EncodingOption::Utf8 },
@@ -111,11 +114,13 @@ fn decode(input: &Document, encoding: EncodingOption) -> Result<String, ToolErro
     }
 }
 
-fn normalize_newlines(mut text: String, mode: NewlineNormalization) -> String {
-    if matches!(mode, NewlineNormalization::Preserve) { return text; }
+fn normalize_newlines(mut text: String, mode: NewlineNormalization, cancel: &CancellationToken) -> Result<String, ToolError> {
+    if cancel.is_cancelled() { return Err(ToolError::Cancelled); }
+    if matches!(mode, NewlineNormalization::Preserve) { return Ok(text); }
     text = text.replace("\r\n", "\n").replace('\r', "\n");
     if matches!(mode, NewlineNormalization::CrLf) { text = text.replace('\n', "\r\n"); }
-    text
+    if cancel.is_cancelled() { return Err(ToolError::Cancelled); }
+    Ok(text)
 }
 
 fn lines(text: &str) -> Vec<String> {
@@ -145,37 +150,40 @@ fn diff_lines(left: &[String], right: &[String], cancel: &CancellationToken, pro
     Ok(out)
 }
 
-fn make_hunks(ops: &[Op], context: usize) -> (Vec<DiffHunk>, usize, usize) {
+fn make_hunks(ops: &[Op], context: usize, max_hunks: usize, cancel: &CancellationToken) -> Result<(Vec<DiffHunk>, usize, usize), ToolError> {
     let mut changed = Vec::new(); let mut added = 0; let mut removed = 0;
     for (idx, op) in ops.iter().enumerate() { if !matches!(op, Op::Equal(_)) { let start = idx.saturating_sub(context); let end = (idx + context + 1).min(ops.len()); changed.push((start, end)); } }
     let mut merged: Vec<(usize, usize)> = Vec::new(); for (start, end) in changed { if let Some(last) = merged.last_mut() { if start <= last.1 { last.1 = last.1.max(end); continue; } } merged.push((start, end)); }
     let mut hunks = Vec::new();
     for (start, end) in merged {
+        if cancel.is_cancelled() { return Err(ToolError::Cancelled); }
+        if hunks.len() >= max_hunks { return Err(ToolError::ResourceLimit { message: format!("diff exceeds hunk limit of {max_hunks} (output remains bounded)" ) }); }
         let mut before_old = 0; let mut before_new = 0; for op in &ops[..start] { match op { Op::Equal(_) => { before_old += 1; before_new += 1 }, Op::Add(_) => before_new += 1, Op::Remove(_) => before_old += 1 } }
         let mut hlines = Vec::new(); let (mut ho, mut hn) = (before_old + 1, before_new + 1);
         for op in &ops[start..end] { match op { Op::Equal(text) => { hlines.push(DiffLine { kind: DiffLineKind::Context, text: text.clone(), old_line: Some(ho), new_line: Some(hn) }); ho += 1; hn += 1; }, Op::Add(text) => { added += 1; hlines.push(DiffLine { kind: DiffLineKind::Added, text: text.clone(), old_line: None, new_line: Some(hn) }); hn += 1; }, Op::Remove(text) => { removed += 1; hlines.push(DiffLine { kind: DiffLineKind::Removed, text: text.clone(), old_line: Some(ho), new_line: None }); ho += 1; } } }
         hunks.push(DiffHunk { old_start: before_old + 1, old_lines: ho - before_old - 1, new_start: before_new + 1, new_lines: hn - before_new - 1, lines: hlines });
     }
-    (hunks, added, removed)
+    Ok((hunks, added, removed))
 }
 
 pub fn compare_documents(left: &Document, right: &Document, options: &CompareOptions, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<(CompareResult, CompareStats), ToolError> {
     let max_input = options.max_input_bytes.unwrap_or(DEFAULT_MAX_INPUT_BYTES).min(DEFAULT_MAX_INPUT_BYTES);
     if left.len() > max_input || right.len() > max_input { return Err(ToolError::ResourceLimit { message: format!("each input must be at most {max_input} bytes") }); }
     if cancel.is_cancelled() { return Err(ToolError::Cancelled); }
-    let raw_left = decode(left, options.left_encoding)?; let raw_right = decode(right, options.right_encoding)?;
-    let canonical_left = normalize_newlines(raw_left.clone(), NewlineNormalization::Lf); let canonical_right = normalize_newlines(raw_right.clone(), NewlineNormalization::Lf);
-    let left_text = normalize_newlines(raw_left, options.newline); let right_text = normalize_newlines(raw_right, options.newline);
+    let raw_left = decode(left, options.left_encoding, cancel)?; let raw_right = decode(right, options.right_encoding, cancel)?;
+    let canonical_left = normalize_newlines(raw_left.clone(), NewlineNormalization::Lf, cancel)?; let canonical_right = normalize_newlines(raw_right.clone(), NewlineNormalization::Lf, cancel)?;
+    let left_text = normalize_newlines(raw_left, options.newline, cancel)?; let right_text = normalize_newlines(raw_right, options.newline, cancel)?;
     let left_lines = lines(&left_text); let right_lines = lines(&right_text);
     let max_lines = options.max_lines.unwrap_or(DEFAULT_MAX_LINES).min(DEFAULT_MAX_LINES);
     if left_lines.len() > max_lines || right_lines.len() > max_lines { return Err(ToolError::ResourceLimit { message: format!("each input must contain at most {max_lines} lines") }); }
     let ops = diff_lines(&left_lines, &right_lines, cancel, &progress, (left.len() + right.len()) as u64)?;
-    let (hunks, added, removed) = make_hunks(&ops, options.context_lines.min(64));
+    let max_hunks = options.max_hunks.unwrap_or(DEFAULT_MAX_HUNKS).min(DEFAULT_MAX_HUNKS);
+    let (hunks, added, removed) = make_hunks(&ops, options.context_lines.min(64), max_hunks, cancel)?;
     let summary = CompareSummary { identical: left_text == right_text, newline_only: left_text != right_text && canonical_left == canonical_right, left_bytes: left.len() as u64, right_bytes: right.len() as u64, left_lines: left_lines.len(), right_lines: right_lines.len(), added_lines: added, removed_lines: removed, changed_hunks: hunks.len() };
     let result = CompareResult { summary, hunks, provenance: CompareProvenance { operation: "text.compare".into(), left_encoding: options.left_encoding, right_encoding: options.right_encoding, newline: options.newline } };
     let output_bytes = serde_json::to_vec(&result).map_err(|e| ToolError::Execution { message: e.to_string() })?.len();
     let max_output = options.max_output_bytes.unwrap_or(DEFAULT_MAX_OUTPUT_BYTES).min(DEFAULT_MAX_OUTPUT_BYTES);
-    if output_bytes > max_output { return Err(ToolError::ResourceLimit { message: format!("diff output exceeds {max_output} bytes") }); }
+    if output_bytes > max_output { return Err(ToolError::ResourceLimit { message: format!("diff output exceeds {max_output} bytes (hunk limit {max_hunks}; preview is bounded)") }); }
     progress(Progress { bytes_processed: (left.len() + right.len()) as u64, total_bytes: (left.len() + right.len()) as u64, phase: "complete".into() });
     let hunk_count = result.summary.changed_hunks;
     Ok((result, CompareStats { input_bytes: (left.len() + right.len()) as u64, output_bytes: output_bytes as u64, hunks: hunk_count }))
@@ -195,4 +203,6 @@ mod tests {
     #[test] fn newline_only_can_be_normalized() { let r = run("a\r\nb\r\n", "a\nb\n"); assert!(r.summary.newline_only); let mut o = CompareOptions::default(); o.newline = NewlineNormalization::Lf; let n = compare_documents(&Document::from_text("a\r\n"), &Document::from_text("a\n"), &o, &CancellationToken::default(), |_| {}).unwrap().0; assert!(n.summary.identical); }
     #[test] fn explicit_utf16_and_latin1_decoding_are_supported() { let utf16 = Document::from_bytes(vec![0xff, 0xfe, b'a', 0, b'\n', 0]); let mut o = CompareOptions::default(); o.left_encoding = EncodingOption::Utf16Le; let n = compare_documents(&utf16, &Document::from_text("a\n"), &o, &CancellationToken::default(), |_| {}).unwrap().0; assert!(n.summary.identical); let latin = Document::from_bytes(vec![0xe9]); let mut o = CompareOptions::default(); o.left_encoding = EncodingOption::Latin1; let n = compare_documents(&latin, &Document::from_text("é"), &o, &CancellationToken::default(), |_| {}).unwrap().0; assert!(n.summary.identical); }
     #[test] fn limits_and_cancellation_are_reported() { let mut o = CompareOptions::default(); o.max_input_bytes = Some(2); assert!(matches!(compare_documents(&Document::from_text("abc"), &Document::from_text("x"), &o, &CancellationToken::default(), |_| {}), Err(ToolError::ResourceLimit { .. }))); let t = CancellationToken::default(); t.cancel(); assert!(matches!(compare_documents(&Document::from_text("a"), &Document::from_text("b"), &Default::default(), &t, |_| {}), Err(ToolError::Cancelled))); }
+    #[test] fn hunk_limit_is_enforced_with_structured_diagnostic() { let mut o = CompareOptions::default(); o.max_hunks = Some(0); let error = compare_documents(&Document::from_text("a\nc\ne\n"), &Document::from_text("b\nd\nf\n"), &o, &CancellationToken::default(), |_| {}).unwrap_err(); match error { ToolError::ResourceLimit { message } => assert!(message.contains("hunk limit")), other => panic!("unexpected error: {other:?}"), } }
+    #[test] fn cancellation_during_matrix_build_is_observed() { let token = CancellationToken::default(); let callback_token = token.clone(); let result = compare_documents(&Document::from_text("a\nb\nc\n"), &Document::from_text("x\ny\nz\n"), &Default::default(), &token, move |_| callback_token.cancel()); assert!(matches!(result, Err(ToolError::Cancelled))); }
 }

@@ -23,6 +23,7 @@ function run(command, args) {
 run('node', ['scripts/generate-fixtures.mjs']);
 run('cargo', ['test', '--workspace']);
 run('pnpm', ['--dir', 'apps/desktop', 'build']);
+run('pnpm', ['--dir', 'apps/desktop', 'test:shell']);
 run('node', ['scripts/check-desktop-bundle.mjs']);
 run('cargo', ['build', '-p', 'devtools-cli']);
 run('node', ['scripts/smoke-shell.mjs']);
@@ -41,4 +42,4 @@ if (!existsSync(distIndex)) {
   process.stderr.write('quality gate failed: desktop smoke output is missing after build\n');
   process.exit(1);
 }
-process.stdout.write('\nQuality gate passed: Rust tests, desktop build, built-shell smoke, and whitespace validation.\n');
+process.stdout.write('\nQuality gate passed: Rust tests, desktop build, shell tests, built-shell smoke, and whitespace validation.\n');
