@@ -302,13 +302,12 @@ These tasks assume Tasks 00A–09 and the current desktop integrations are compl
 
 **Non-goals:** Implementing a new tool or claiming a fully dynamic plugin system.
 
-## Tomorrow's recommended order
+## Next recommended order
 
-1. Task 15 (packaging guard) and Task 21 (CI gate) establish a safe baseline.
-2. Task 17 (shared result lifecycle) improves the current user-facing shell.
-3. Task 16 (view registration) reduces future worker context and merge conflicts.
-4. Task 18 (accessibility) and Task 19 (compare scalability) harden daily use.
-5. Tasks 20, 22, and 23 complete format coverage, measurement, and maintainer guidance.
+1. Run the quality gate from a clean checkout before each worker handoff.
+2. Reconcile and run Task 22's benchmark report against the current CLI contract; keep raw results local and review the documented limits.
+3. Complete Task 23's extension guide and release checklist so future workers can add tools without core-engine context.
+4. Only then consider a fully dynamic external plugin loader; that is a separate security and packaging project, not a prerequisite for bundled tools.
 
 Copy one task above to a worker and add:
 
