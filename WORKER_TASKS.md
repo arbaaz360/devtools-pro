@@ -302,12 +302,65 @@ These tasks assume Tasks 00A–09 and the current desktop integrations are compl
 
 **Non-goals:** Implementing a new tool or claiming a fully dynamic plugin system.
 
+## Foundation tasks for full catalogue parity
+
+These tasks implement the v2 contract described in `docs/PARITY_AND_BUILDING_BLOCKS.md`. Do them in order before adding the larger tool catalogue.
+
+### Task 24 — Versioned contract normalizer
+
+**Files:** `crates/devtools-core/src/tool.rs`, `apps/desktop/src/bridge.ts`, `Tool Contract and Document Model.md`, tests.
+
+Add serializable v2 types for named input/output ports, operation option schemas, execution mode/determinism, renderer descriptors, and provenance. Write a v1-to-v2 normalizer and round-trip tests; keep existing v1 commands working. Do not migrate tools yet. **Worker:** Terra, medium.
+
+### Task 25 — Named-input host execution
+
+**Files:** `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/src/bridge.ts`, host tests.
+
+Add an internal v2 request with named document/value inputs and multiple output handles. Adapt current `run_tool` and `run_compare` to it, preserving their public behavior. Record both compare parents in provenance and keep path validation, limits, cancellation, and atomic saves. **Worker:** Sol, high.
+
+### Task 26 — Revisioned text snapshots
+
+**Files:** `apps/desktop/src/main.ts`, `apps/desktop/src/resultLifecycle.ts`, `apps/desktop/src/bridge.ts`, tests.
+
+Add bounded text snapshots with revisions, debounced instant execution, and stale-response rejection. Keep opened files read-only; generated or pasted text may be edited as a new document. Prove the behavior with a small text-transform test. **Worker:** Terra, medium.
+
+### Task 27 — Typed result descriptors and paging
+
+**Files:** `apps/desktop/src-tauri/src/main.rs`, `apps/desktop/src/bridge.ts`, result lifecycle/types, host tests.
+
+Represent text windows, tree pages, table pages, diff hunks, binary previews, and diagnostics as bounded descriptors. Add paged tree/table reads without sending an entire result to the webview. Preserve current text/image/diff adapters. **Worker:** Sol, high.
+
+### Task 28 — Schema-driven option controls
+
+**Files:** `apps/desktop/src/toolViews/`, `apps/desktop/src/main.ts`, bridge/types, tests.
+
+Implement controls for string, number, boolean, enum, textarea, and advanced options from a manifest schema. Validate defaults and user values at the host boundary. Migrate compare options as the proving example while retaining an escape hatch for specialized views. **Worker:** Terra, medium.
+
+### Task 29 — Regex vertical slice
+
+**Files:** a new core regex module, manifest registration, isolated view, tests.
+
+Implement regex engine selection, flags, bounded input, timeout/step limits, structured matches/captures, replacement preview, and span annotations. Run it through the instant lifecycle and show a safe “no matches” state. Do not execute arbitrary scripts or add network access. **Worker:** Sol, high.
+
+### Task 30 — Structured and sandbox renderers
+
+**Files:** renderer modules, bridge/host preview commands, tests, architecture docs.
+
+Add JSON tree/table paging and a restrictive sandbox preview descriptor for HTML/Markdown. Add a QR PNG/SVG preview as a separate renderer proof. Enforce CSP, size limits, and no access to host APIs. **Worker:** Sol, high.
+
+### Task 31 — Catalogue vertical slices
+
+**Files:** one new core module, manifest, isolated view, fixtures, and tests per worker assignment.
+
+After Tasks 24–30, assign one family at a time: YAML/JSON and JSON/CSV, formatter family, JWT/certificate, generators, color/QR, PHP serializers, code generators, and remaining converters. Every slice must include its manifest, option schema, renderer, bounded limits, cancellation behavior, fixtures, and keyboard smoke path. **Worker:** Terra, medium per family.
+
 ## Next recommended order
 
 1. Run the quality gate from a clean checkout before each worker handoff.
 2. Reconcile and run Task 22's benchmark report against the current CLI contract; keep raw results local and review the documented limits.
 3. Complete Task 23's extension guide and release checklist so future workers can add tools without core-engine context.
-4. Only then consider a fully dynamic external plugin loader; that is a separate security and packaging project, not a prerequisite for bundled tools.
+4. Implement Foundation Tasks 24–30 in order, then assign Task 31 families in parallel.
+5. Only then consider a fully dynamic external plugin loader; that is a separate security and packaging project, not a prerequisite for bundled tools.
 
 Copy one task above to a worker and add:
 

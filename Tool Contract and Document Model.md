@@ -190,6 +190,18 @@ before reading its document. The Rust core also exposes a `ToolRegistry` for
 in-process or test-only tools; it performs the same tool-id, input-kind,
 operation, options, and input-size checks before dispatching execution.
 
+### Implementation status and v2 adoption order
+
+The pseudocode above is the target contract, not a claim that every field is
+implemented in the current desktop build. The shipped v1 adapter currently
+supports one required `Document`, one result document, opaque object options,
+and one renderer kind. It intentionally lacks named multi-input ports,
+declarative option schemas, paged structured outputs, annotations, and output
+chunks. Foundation Tasks 24–30 in `WORKER_TASKS.md` implement those pieces in
+compatibility-first steps. A v1 request must continue to normalize to a v2
+request with a single `input` port, and the existing `run_compare` command must
+remain an adapter until named `left` and `right` inputs are available.
+
 An abbreviated JSON manifest is suitable for registry discovery:
 
 ```json

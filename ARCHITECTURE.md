@@ -2,6 +2,8 @@
 
 This document records the decisions behind the current native workbench and the boundary we want future tools to use.
 
+The complete parity target and a plain-language explanation of the building blocks live in [PARITY_AND_BUILDING_BLOCKS.md](docs/PARITY_AND_BUILDING_BLOCKS.md). This architecture document describes implementation boundaries; that roadmap describes how we will grow them to cover the full DevUtils catalogue.
+
 ## Why this technology
 
 - **Rust core** (`crates/devtools-core`) owns file inspection and transformations. It gives predictable memory use, cancellation, progress reporting, strong error types, and good performance for 50–250 MB files without pushing whole documents into the browser.
