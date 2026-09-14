@@ -2,6 +2,13 @@
 
 This file is a queue of self-contained tasks for lower-cost worker models. Each task is deliberately bounded so a worker can complete it without understanding the whole engine. Give a worker one task at a time and require it to report changed files, tests run, and any follow-up work.
 
+## Progress ledger (14 September 2026)
+
+- Completed and pushed: Tasks 00A, 00, 01–15, 16, 17, 18, and the quality-gate portion of 21.
+- Core compare hardening is also merged in `8a19d05`, with explicit input, line, hunk, output, and cancellation checks.
+- In progress: Task 20 (image codec and preview coverage), assigned to a Terra medium worker.
+- Still queued: the benchmark report and extension/release documentation. Keep those tasks separate from feature work so their measurements and guidance remain reproducible.
+
 ## Shared worker contract
 
 Before changing code, read:
