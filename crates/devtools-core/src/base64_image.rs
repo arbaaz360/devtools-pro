@@ -20,7 +20,7 @@ impl Default for Base64ImageOptions {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Base64ImageStats { pub format: crate::ImageFormat, pub input_bytes: u64, pub output_bytes: u64 }
+pub struct Base64ImageStats { pub format: crate::ImageFormat, pub mime: &'static str, pub extension: &'static str, pub input_bytes: u64, pub output_bytes: u64 }
 
 fn parse_input(input: &str) -> Result<(String, &str), ToolError> {
     let trimmed = input.trim();
@@ -43,7 +43,8 @@ fn decoded_len(payload: &str) -> Result<usize, ToolError> {
 
 fn check_dimensions(bytes: &[u8], format: crate::ImageFormat, max_pixels: u64) -> Result<(), ToolError> {
     let (w, h) = match format {
-        crate::ImageFormat::Png if bytes.len() >= 24 => (u32::from_be_bytes(bytes[16..20].try_into().unwrap()) as u64, u32::from_be_bytes(bytes[20..24].try_into().unwrap()) as u64),
+        crate::ImageFormat::Png if bytes.len() >= 24 && &bytes[12..16] == b"IHDR" => (u32::from_be_bytes(bytes[16..20].try_into().unwrap()) as u64, u32::from_be_bytes(bytes[20..24].try_into().unwrap()) as u64),
+        crate::ImageFormat::Png if bytes.len() >= 24 => return Err(ToolError::InvalidImage { message: "PNG IHDR chunk is missing".into() }),
         crate::ImageFormat::Png => return Err(ToolError::InvalidImage { message: "truncated PNG header".into() }),
         crate::ImageFormat::Jpeg => {
             let mut i = 2;
@@ -85,7 +86,7 @@ pub fn decode_base64_image(input: &Document, options: &Base64ImageOptions, cance
     let format = crate::image_base64::detect_image_format(&bytes, explicit)?;
     check_dimensions(&bytes, format, options.max_pixels.unwrap_or(DEFAULT_MAX_PIXELS))?;
     let output = Document::from_bytes(bytes).with_kind(DocumentKind::Binary).with_mime(format.mime());
-    Ok((ToolResult { output, diagnostics: Vec::new() }, Base64ImageStats { format, input_bytes: text.len() as u64, output_bytes: expected as u64 }))
+    Ok((ToolResult { output, diagnostics: Vec::new() }, Base64ImageStats { format, mime: format.mime(), extension: format.extension(), input_bytes: text.len() as u64, output_bytes: expected as u64 }))
 }
 
 pub struct Base64ImageTool { manifest: ToolManifest }
@@ -95,7 +96,10 @@ impl GenericTool for Base64ImageTool { fn manifest(&self) -> &ToolManifest { &se
 #[cfg(test)] mod tests {
     use super::*;
     const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR\0\0\0\x01\0\0\0\x01\x08\06\0\0\0";
+    const JPEG: &[u8] = b"\xff\xd8\xff\xc0\0\x0b\x08\0\x01\0\x01\x01\x01\x11\0\xff\xd9";
     #[test] fn decodes_plain_and_data_uri() { let b = STANDARD.encode(PNG); for s in [b.clone(), format!("data:image/png;base64,{b}")] { let (r, _) = decode_base64_image(&Document::from_text(s), &Default::default(), &CancellationToken::default(), |_| {}).unwrap(); assert_eq!(r.output.bytes(), PNG); assert_eq!(r.output.mime.as_deref(), Some("image/png")); } }
     #[test] fn rejects_malformed_mime_and_limits() { let d=Document::from_text("abcd="); assert!(matches!(decode_base64_image(&d,&Default::default(),&CancellationToken::default(), |_| {}),Err(ToolError::InvalidBase64{..}))); let b=STANDARD.encode(PNG); let d=Document::from_text(b); let o=Base64ImageOptions{max_decoded_bytes:Some(2),..Default::default()}; assert!(matches!(decode_base64_image(&d,&o,&CancellationToken::default(), |_| {}),Err(ToolError::ResourceLimit{..}))); }
     #[test] fn rejects_mismatched_mime_and_cancel() { let b=STANDARD.encode(PNG); let d=Document::from_text(format!("data:image/jpeg;base64,{b}")); assert!(matches!(decode_base64_image(&d,&Default::default(),&CancellationToken::default(), |_| {}),Err(ToolError::InvalidImage{..}))); let t=CancellationToken::default(); t.cancel(); assert!(matches!(decode_base64_image(&Document::from_text(STANDARD.encode(PNG)),&Default::default(),&t, |_| {}),Err(ToolError::Cancelled))); }
+    #[test] fn decodes_jpeg_with_canonical_metadata() { let b = STANDARD.encode(JPEG); let (result, stats) = decode_base64_image(&Document::from_text(format!("data:image/jpeg;base64,{b}")), &Default::default(), &CancellationToken::default(), |_| {}).unwrap(); assert_eq!(result.output.mime.as_deref(), Some("image/jpeg")); assert_eq!(stats.extension, "jpg"); assert_eq!(result.output.bytes(), JPEG); }
+    #[test] fn rejects_unsupported_mime_and_malformed_signature() { let b = STANDARD.encode(PNG); let unsupported = Document::from_text(format!("data:image/gif;base64,{b}")); assert!(matches!(decode_base64_image(&unsupported, &Default::default(), &CancellationToken::default(), |_| {}), Err(ToolError::UnsupportedImageMime { .. }))); let malformed = Document::from_text(STANDARD.encode(b"not an image")); assert!(matches!(decode_base64_image(&malformed, &Default::default(), &CancellationToken::default(), |_| {}), Err(ToolError::InvalidImage { .. }))); }
 }

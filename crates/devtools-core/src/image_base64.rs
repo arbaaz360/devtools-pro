@@ -11,6 +11,11 @@ pub enum ImageFormat { Png, Jpeg }
 
 impl ImageFormat {
     pub fn mime(self) -> &'static str { match self { Self::Png => "image/png", Self::Jpeg => "image/jpeg" } }
+    /// Canonical file extension used when saving decoded output.
+    pub fn extension(self) -> &'static str { match self { Self::Png => "png", Self::Jpeg => "jpg" } }
+    /// MIME types accepted by the image codecs. GIF and WebP are intentionally
+    /// excluded until they are added to the manifest and covered by fixtures.
+    pub const SUPPORTED_MIME_TYPES: &'static [&'static str] = &["image/png", "image/jpeg"];
     pub(crate) fn signature(self) -> &'static [u8] { match self { Self::Png => b"\x89PNG\r\n\x1a\n", Self::Jpeg => b"\xff\xd8\xff" } }
 }
 
@@ -24,7 +29,7 @@ pub struct ImageBase64Options {
 impl Default for ImageBase64Options { fn default() -> Self { Self { data_uri: false, mime_type: None, max_input_bytes: Some(DEFAULT_MAX_INPUT_BYTES) } } }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ImageBase64Stats { pub format: ImageFormat, pub input_bytes: u64, pub output_bytes: u64, pub data_uri: bool }
+pub struct ImageBase64Stats { pub format: ImageFormat, pub mime: &'static str, pub extension: &'static str, pub input_bytes: u64, pub output_bytes: u64, pub data_uri: bool }
 
 pub(crate) fn detect_image_format(bytes: &[u8], explicit_mime: Option<&str>) -> Result<ImageFormat, ToolError> {
     let detected = if bytes.starts_with(ImageFormat::Png.signature()) { Some(ImageFormat::Png) }
@@ -51,7 +56,7 @@ pub fn encode_image_base64(input: &Document, options: &ImageBase64Options, cance
     }
     if options.data_uri { encoded = format!("data:{};base64,{}", format.mime(), encoded); }
     let output_bytes = encoded.len() as u64;
-    Ok((ToolResult { output: Document::from_text(&encoded).with_kind(DocumentKind::Text).with_mime("text/plain"), diagnostics: Vec::new() }, ImageBase64Stats { format, input_bytes: total, output_bytes, data_uri: options.data_uri }))
+    Ok((ToolResult { output: Document::from_text(&encoded).with_kind(DocumentKind::Text).with_mime("text/plain"), diagnostics: Vec::new() }, ImageBase64Stats { format, mime: format.mime(), extension: format.extension(), input_bytes: total, output_bytes, data_uri: options.data_uri }))
 }
 
 pub struct ImageBase64Tool { manifest: ToolManifest }
