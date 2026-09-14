@@ -22,11 +22,13 @@ export class ResultLifecycle {
   private revision = 0;
   private pending: PendingJob | null = null;
   private running = false;
+  private completedJobId: string | null = null;
 
   begin(scope: ResultScope): PendingJob {
     this.revision += 1;
     this.pending = { ...scope, revision: this.revision, jobId: null };
     this.running = true;
+    this.completedJobId = null;
     return this.pending;
   }
 
@@ -48,8 +50,11 @@ export class ResultLifecycle {
   finish(jobId: string): boolean {
     if (!this.accepts(jobId)) return false;
     this.running = false;
+    this.completedJobId = jobId;
     return true;
   }
+
+  isFinished(jobId: string): boolean { return this.completedJobId === jobId; }
 
   isCurrent(token: ResultReadToken): boolean {
     return token.revision === this.revision && this.pending?.jobId === token.jobId;
@@ -60,6 +65,7 @@ export class ResultLifecycle {
     this.revision += 1;
     this.pending = null;
     this.running = false;
+    this.completedJobId = null;
     return jobId;
   }
 
