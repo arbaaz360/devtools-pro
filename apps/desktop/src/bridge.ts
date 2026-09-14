@@ -40,6 +40,11 @@ export interface FileDocument {
   truncated: boolean;
   format: Format;
   encoding: string;
+  contentKind: 'text' | 'image' | 'binary';
+  mime: string | null;
+  editable: boolean;
+  offset?: number;
+  bytesRead?: number;
 }
 export interface JobProgress {
   jobId: string;
@@ -94,8 +99,16 @@ export function openDocument(path: string): Promise<FileDocument> {
   return invoke('open_document', { path });
 }
 
-export function createTextDocument(text: string): Promise<FileDocument> {
-  return invoke('create_text_document', { text });
+export function createTextDocument(text: string, name?: string, format?: Format): Promise<FileDocument> {
+  return invoke('create_text_document', { text, name, format });
+}
+
+export function saveDocument(documentId: string, outputPath: string): Promise<void> {
+  return invoke('save_document', { documentId, outputPath });
+}
+
+export function chooseDocumentOutput(name: string): Promise<string | null> {
+  return save({ title: 'Save document as', defaultPath: name });
 }
 
 export function closeDocument(documentId: string): Promise<void> {

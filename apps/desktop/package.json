@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "tsc --noEmit && vite build",
-    "test:shell": "node --experimental-strip-types --test src/resultLifecycle.test.ts src/toolViews/registry.test.ts",
+    "test:shell": "node --experimental-strip-types --test src/resultLifecycle.test.ts src/toolViews/registry.test.ts src/workbench/state.test.ts",
     "preview": "vite preview --host 127.0.0.1 --port 1420 --strictPort",
     "tauri": "tauri"
   },

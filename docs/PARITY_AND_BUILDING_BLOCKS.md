@@ -24,6 +24,14 @@ The current v1 manifest is intentionally small: one required document, one opera
 
 The existing [Tool Contract and Document Model](../Tool%20Contract%20and%20Document%20Model.md) already sketches the right v2 concepts: named input and output ports, typed values, optional streams, structured results, diagnostics with byte spans, provenance, capability grants, preview mode, and ordered execution events. The next architectural work is to implement that scaffold behind compatibility adapters rather than invent a second contract.
 
+## Shell behavior delivered in this iteration
+
+The desktop shell now treats each open tab as a small workspace record. It owns the selected tool, operation, editable draft, right-hand comparison text, revision, job state, result handle, and dirty state. A pure reducer in `apps/desktop/src/workbench/state.ts` applies transitions; `controller.ts` is the only place that performs Tauri effects. This split keeps DOM code from deciding when a file is opened or a result is retired, and lets a worker test state transitions without launching the app.
+
+`Ctrl+N` and **New document** create an empty UTF-8 tab. Small UTF-8 files can be edited in place; imported source files remain immutable on disk, and saves are exported through the native host. Tabs can run independently, with a bounded global queue and revision tokens preventing late jobs from repainting a newer tab state. Selecting Image to Base64 shows a real bounded image preview and starts encoding automatically. Binary files no longer pass through a lossy text decoder, and incompatible tools explain the accepted input instead of producing junk output.
+
+This is still a bundled tool catalogue with a manifest-driven execution boundary, not an external plugin runtime. Adding a simple worker tool currently requires a core function, manifest entry, host adapter, and (where needed) a view/renderer registration. Tasks 24–30 are the planned work that will make those contracts richer and reduce registration glue; the current shell is a safe proving ground for that migration.
+
 ## Contract needed for the full catalogue
 
 The v2 contract should add these concepts while continuing to accept v1 requests:
@@ -68,4 +76,3 @@ Do not add 40 isolated special cases. Build the reusable layers in this order:
 8. Add a compatibility test for every catalogue entry: manifest, valid/invalid fixtures, limits, cancellation, renderer, copy/save behavior, and keyboard path.
 
 An external plugin loader can come later. A bundled manifest and isolated view are already enough for workers to build tools independently; the v2 contract is the important prerequisite for scale.
-

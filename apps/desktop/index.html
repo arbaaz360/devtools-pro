@@ -1,14 +1,329 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><meta name="color-scheme" content="dark"/><meta name="description" content="Local developer workbench"/><title>DevTools Pro · Developer workbench</title></head>
-<body><div class="app-shell"><header class="topbar"><div class="brand"><span class="brand-mark">⌘</span><span>DevTools <strong>Pro</strong></span><span class="badge">Desktop preview</span></div><div class="topbar-actions"><span class="local-pill"><span class="engine-dot"></span>Local only</span><button id="palette-open" class="command-button" title="Open commands (Ctrl+K)">Command palette <kbd>Ctrl K</kbd></button></div></header>
-<div class="app-body"><aside class="sidebar" aria-label="Tool navigation"><div class="sidebar-head"><div><span class="eyebrow">WORKBENCH</span><h1>Tools</h1></div><button id="sidebar-collapse" class="icon-button" title="Collapse tools" aria-label="Collapse tools">‹</button></div><button id="open-file" class="open-file-button"><span class="open-icon">＋</span><span><strong>Open file</strong><small>JSON, CSV, text</small></span><kbd>⌘O</kbd></button><label class="tool-search"><span>⌕</span><input id="tool-search" type="search" placeholder="Search tools" aria-label="Search tools" autocomplete="off"/><kbd>⌘K</kbd></label>
-<nav class="tool-nav" aria-label="Available tools"><div class="tool-group"><div class="group-label">FAVORITES</div><button class="tool-item active" data-tool="structured"><span class="tool-item-icon json-icon">{ }</span><span><strong>Structured data</strong><small>JSON · CSV · Text</small></span><span class="tool-shortcut">1</span></button></div><div class="tool-group"><div class="group-label">TEXT &amp; ENCODING</div><button class="tool-item" data-tool="text"><span class="tool-item-icon">Aa</span><span><strong>Text utilities</strong><small>Encode, decode, inspect</small></span></button><button class="tool-item" data-tool="hash"><span class="tool-item-icon">#</span><span><strong>Hash generator</strong><small>SHA · MD5 · checksums</small></span></button></div><div class="tool-group"><div class="group-label">COMPARE</div><button class="tool-item" data-tool="diff"><span class="tool-item-icon">⇄</span><span><strong>Text diff</strong><small>Compare two files</small></span></button></div><div class="tool-group"><div class="group-label">WEB &amp; API</div><button class="tool-item" data-tool="curl"><span class="tool-item-icon">↗</span><span><strong>cURL to code</strong><small>Convert requests</small></span></button></div><div class="tool-group"><div class="group-label">TIME &amp; IDS</div><button class="tool-item" data-tool="ids"><span class="tool-item-icon">◷</span><span><strong>UUID &amp; timestamps</strong><small>Generate and convert</small></span></button></div></nav><div class="sidebar-foot"><span class="engine-dot"></span><span>Engine connected</span><span class="version">v0.1.0</span></div></aside>
-<main class="main-content"><nav class="tabbar" aria-label="Open documents"><div id="tabs" role="tablist" aria-label="Documents"><span class="empty-tab">Your workspace</span></div><span class="tab-hint">Files stay on your computer</span></nav><div id="browser-notice" class="notice" hidden>Browser preview · The native Rust engine is unavailable here. Open the desktop app to inspect and transform files.</div><div id="error" class="error-banner" role="alert" hidden></div>
-<section class="tool-header" aria-label="Active tool"><div class="tool-identity"><span class="tool-icon">{ }</span><div><span id="active-tool-label" class="eyebrow">STRUCTURED DATA</span><h2 id="active-tool-title">Inspect and format files</h2><p id="active-tool-subtitle">Drop a file or open one to see results instantly.</p></div></div><div class="format-control"><label for="format">Input type</label><select id="format" disabled><option value="json">JSON</option><option value="csv">CSV</option><option value="text">Text</option></select><label id="hash-algorithm-label" for="hash-algorithm" hidden>Algorithm</label><select id="hash-algorithm" hidden><option value="sha256">SHA-256</option><option value="sha512">SHA-512</option></select><label id="text-operation-label" for="text-operation" hidden>Operation</label><select id="text-operation" hidden></select></div><div class="toolbar-actions"><button id="inspect" class="primary-button" disabled>Inspect file</button><button id="format-file" class="outline-button" disabled>Format JSON</button><button id="minify-file" class="outline-button" disabled>Minify JSON</button><button id="run-hash" class="primary-button" hidden disabled>Generate hash</button><button id="run-text" class="primary-button" hidden disabled>Run utility</button></div></section>
-<section id="document-panel" class="workspace" role="tabpanel" aria-label="Document workspace"><section class="preview-pane" aria-labelledby="preview-heading"><div class="pane-header"><div><h2 id="preview-heading">Input</h2><span id="preview-meta">Open a JSON, CSV, or text file</span></div><span class="small-badge">READ ONLY</span></div><div id="empty-state" class="empty-state"><div class="empty-glyph">↥</div><h3>Open a file to get started</h3><p>We’ll inspect it automatically and keep the original unchanged.</p><button id="empty-open" class="primary-button">Choose a file</button><p class="quiet">Or use <kbd>⌘O</kbd> anywhere</p></div><textarea id="preview" readonly spellcheck="false" wrap="off" aria-label="Read-only source preview" hidden></textarea><div class="pane-footer"><span id="preview-limit">Bounded preview · Full-file processing</span><span id="encoding">—</span></div></section>
-<aside class="results-pane" aria-labelledby="results-heading"><div class="pane-header"><div><h2 id="results-heading">Result</h2><span id="result-subtitle">Automatic inspection output</span></div><span id="result-indicator" class="result-indicator"></span></div><div class="results-content"><div id="result-empty" class="result-empty"><span class="result-glyph">✓</span><h3>Results appear here</h3><p>Open a file and DevTools Pro will inspect the complete document.</p></div><div id="result-content" hidden><p id="result-state" class="result-state"></p><dl id="result-metrics" class="metrics"></dl><h3 class="section-label">Details</h3><pre id="result-summary" class="result-summary" tabindex="0" aria-label="Operation details"></pre><div class="result-preview-block"><div class="result-preview-heading"><span class="section-label">Formatted output</span><span id="result-output-meta">Waiting for result</span></div><textarea id="result-output" readonly spellcheck="false" wrap="off" aria-label="Formatted result preview" hidden></textarea><div class="result-actions"><button id="copy-result" class="outline-button" hidden>Copy result</button><button id="save-result" class="primary-button" hidden>Save formatted copy…</button></div></div><div id="saved-output" class="saved-output" hidden><span class="section-label">Saved output</span><p id="output-path"></p></div></div></div><div class="result-footnote"><span>JSON · CSV · Text</span><span>Processed locally</span></div></aside></section>
-<section id="job-panel" class="job-panel" aria-label="Operation progress" hidden><div class="job-heading"><div><strong id="job-title">Processing</strong><span id="job-phase">Starting…</span></div><button id="cancel-job" class="outline-button">Cancel</button></div><progress id="job-progress" max="100" aria-label="File processing progress"></progress><div class="job-footer"><span id="job-bytes">Waiting for the worker…</span><span id="job-percent">—</span></div></section><section class="document-info" aria-label="Document information"><div><span>Source</span><strong id="source-name">No document open</strong></div><div><span>Size</span><strong id="source-size">—</strong></div><div><span>Detected</span><strong id="source-format">—</strong></div><div class="info-note">Original file stays unchanged</div></section><footer class="statusbar"><span><span id="engine-dot" class="engine-dot"></span><span id="engine-status">Connecting to engine…</span></span><span id="status" role="status" aria-live="polite">Ready</span><span class="status-spacer"></span><span>Native benchmark spike</span></footer></main></div></div>
-<dialog id="palette" aria-labelledby="palette-heading"><div class="palette-header"><div><span class="eyebrow">QUICK ACTIONS</span><h2 id="palette-heading">Command palette</h2></div><button id="palette-close" class="icon-button" aria-label="Close commands">×</button></div><input id="palette-search" type="search" placeholder="Search actions…" aria-label="Find a command" autocomplete="off"/><div id="command-list" class="command-list"></div><p class="palette-hint">↑ ↓ to move · Enter to run · Esc to close</p></dialog><script type="module" src="./src/main.ts"></script></body></html>
-
-
-
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta
+      name="description"
+      content="A local text editor and developer toolbox"
+    />
+    <title>DevTools Pro · Developer workbench</title>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark">⌘</span
+          ><span>DevTools <strong>Pro</strong></span
+          ><span class="badge">Desktop preview</span>
+        </div>
+        <div class="topbar-actions">
+          <span class="local-pill"
+            ><span class="engine-dot"></span>Local only</span
+          ><button id="palette-open" class="command-button">
+            Commands <kbd>Ctrl K</kbd>
+          </button>
+        </div>
+      </header>
+      <div class="app-body">
+        <aside class="sidebar" aria-label="Tool navigation">
+          <div class="sidebar-head">
+            <div>
+              <span class="eyebrow">WORKBENCH</span>
+              <h1>Tools</h1>
+            </div>
+            <button
+              id="sidebar-collapse"
+              class="icon-button"
+              aria-label="Collapse tools"
+              aria-expanded="true"
+            >
+              ‹
+            </button>
+          </div>
+          <div class="sidebar-actions">
+            <button id="new-document" class="primary-button">
+              <span>＋ New document</span><kbd>Ctrl N</kbd></button
+            ><button id="open-file" class="outline-button">
+              <span>Open file…</span><kbd>Ctrl O</kbd>
+            </button>
+          </div>
+          <label class="tool-search"
+            ><span aria-hidden="true">⌕</span
+            ><input
+              id="tool-search"
+              type="search"
+              placeholder="Search tools"
+              aria-label="Search tools"
+              autocomplete="off"
+          /></label>
+          <nav class="tool-nav" aria-label="Available tools"></nav>
+          <div class="sidebar-foot">
+            <span class="engine-dot"></span
+            ><span>Files stay on your computer</span>
+          </div>
+        </aside>
+        <main class="main-content">
+          <div class="tabbar">
+            <div id="tabs" role="tablist" aria-label="Documents"></div>
+            <button
+              id="tab-new"
+              class="icon-button"
+              aria-label="New document"
+              title="New document (Ctrl+N)"
+            >
+              ＋
+            </button>
+          </div>
+          <div id="browser-notice" class="notice" hidden>
+            Browser preview · Use the desktop app to open files and run the Rust
+            tools.
+          </div>
+          <div id="error" class="error-banner" role="alert" hidden></div>
+          <section class="tool-header" aria-label="Active tool">
+            <div class="tool-identity">
+              <span id="active-tool-icon" class="tool-icon" aria-hidden="true"
+                >Aa</span
+              >
+              <div>
+                <span id="active-tool-label" class="eyebrow">WORKSPACE</span>
+                <h2 id="active-tool-title">Create or open a document</h2>
+                <p id="active-tool-subtitle">
+                  Ctrl+N creates a blank document.
+                </p>
+              </div>
+            </div>
+            <div class="format-control"></div>
+            <div class="toolbar-actions"></div>
+            <button
+              id="save-document"
+              class="outline-button"
+              disabled
+              title="Save document as (Ctrl+S)"
+            >
+              Save document…
+            </button>
+          </section>
+          <section
+            id="document-panel"
+            class="workspace"
+            role="tabpanel"
+            aria-label="Document workspace"
+          >
+            <section class="preview-pane" aria-labelledby="preview-heading">
+              <div class="pane-header">
+                <div>
+                  <h2 id="preview-heading">Document</h2>
+                  <span id="preview-meta"
+                    >Create a document or open a file</span
+                  >
+                </div>
+                <span id="source-mode" class="small-badge">INPUT</span>
+              </div>
+              <div id="editor-host" class="editor-host">
+                <div id="empty-state" class="empty-state">
+                  <div class="empty-glyph">＋</div>
+                  <h3>A place for your next idea</h3>
+                  <p>
+                    Write something, paste a snippet, or open a file.<br />Choose
+                    a tool on the left to see its result.
+                  </p>
+                  <div class="empty-actions">
+                    <button id="empty-new" class="primary-button">
+                      New document</button
+                    ><button id="empty-open" class="outline-button">
+                      Open file…
+                    </button>
+                  </div>
+                  <p class="quiet">
+                    Ctrl+N · New document &nbsp; Ctrl+O · Open file
+                  </p>
+                </div>
+                <textarea
+                  id="preview"
+                  spellcheck="false"
+                  wrap="off"
+                  aria-label="Document text"
+                  placeholder="Start typing or paste text here…"
+                  hidden
+                ></textarea>
+                <div id="input-image-wrap" class="image-stage" hidden>
+                  <img id="input-image" alt="Input image" />
+                </div>
+                <p
+                  id="input-message"
+                  class="input-message"
+                  role="status"
+                  hidden
+                ></p>
+              </div>
+              <div id="tool-source" class="tool-source" hidden>
+                <div class="compare-heading">
+                  <strong>Compare two text documents</strong
+                  ><span>Original files remain unchanged.</span>
+                </div>
+                <div class="compare-sources">
+                  <section class="compare-source">
+                    <label for="compare-left">Left / original</label
+                    ><textarea
+                      id="compare-left"
+                      spellcheck="false"
+                      wrap="off"
+                    ></textarea>
+                  </section>
+                  <section class="compare-source">
+                    <label for="compare-right">Right / revised</label
+                    ><textarea
+                      id="compare-right"
+                      spellcheck="false"
+                      wrap="off"
+                      placeholder="Paste revised text here…"
+                    ></textarea
+                    ><button id="compare-open-right" class="outline-button">
+                      Open right file…
+                    </button>
+                  </section>
+                </div>
+              </div>
+              <div class="pane-footer">
+                <span id="preview-limit"
+                  >Editable documents · Local processing</span
+                ><span id="encoding">UTF-8</span>
+              </div>
+            </section>
+            <aside class="results-pane" aria-labelledby="results-heading">
+              <div class="pane-header">
+                <div>
+                  <h2 id="results-heading">Result</h2>
+                  <span id="result-subtitle">Results update as you work</span>
+                </div>
+                <span class="small-badge">OUTPUT</span>
+              </div>
+              <div class="results-content">
+                <div id="result-empty" class="result-empty">
+                  <span class="result-glyph">↗</span>
+                  <h3 id="result-empty-title">Tools at your fingertips</h3>
+                  <p id="result-empty-text">
+                    Choose a tool on the left. Your document stays in this tab,
+                    and the result appears here.
+                  </p>
+                </div>
+                <div id="result-content" hidden>
+                  <p id="result-state" class="result-state"></p>
+                  <dl id="result-metrics" class="metrics"></dl>
+                  <details class="result-details">
+                    <summary>Operation details</summary>
+                    <pre
+                      id="result-summary"
+                      tabindex="0"
+                      aria-label="Operation details"
+                    ></pre>
+                  </details>
+                  <div class="result-preview-block">
+                    <div class="result-preview-heading">
+                      <span class="section-label">OUTPUT</span
+                      ><span id="result-output-meta"></span>
+                    </div>
+                    <textarea
+                      id="result-output"
+                      readonly
+                      spellcheck="false"
+                      wrap="off"
+                      aria-label="Result text"
+                    ></textarea>
+                    <div id="result-media" class="image-stage" hidden></div>
+                    <div class="result-actions">
+                      <button id="copy-result" class="outline-button" hidden>
+                        Copy result</button
+                      ><button id="save-result" class="primary-button" hidden>
+                        Save result…
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="pane-footer">
+                <span>Separate result · Source stays intact</span
+                ><span>Processed locally</span>
+              </div>
+            </aside>
+          </section>
+          <section
+            id="job-panel"
+            class="job-panel"
+            aria-label="Operation progress"
+            hidden
+          >
+            <div class="job-heading">
+              <div>
+                <strong id="job-title">Processing</strong
+                ><span id="job-phase">Starting…</span>
+              </div>
+              <button id="cancel-job" class="outline-button">Cancel</button>
+            </div>
+            <progress
+              id="job-progress"
+              max="100"
+              aria-label="Processing progress"
+            ></progress>
+            <div class="job-footer">
+              <span id="job-bytes"></span><span id="job-percent"></span>
+            </div>
+          </section>
+          <section class="document-info" aria-label="Document information">
+            <div>
+              <span>Document</span
+              ><strong id="source-name">No document open</strong>
+            </div>
+            <div><span>Size</span><strong id="source-size">—</strong></div>
+            <div><span>Kind</span><strong id="source-format">—</strong></div>
+            <span class="info-note"
+              >Each tab keeps its own tool and result</span
+            >
+          </section>
+          <footer class="statusbar">
+            <span
+              ><span id="engine-dot" class="engine-dot"></span
+              ><span id="engine-status">Connecting…</span></span
+            ><span id="status" role="status" aria-live="polite">Ready</span>
+          </footer>
+        </main>
+      </div>
+    </div>
+    <dialog id="palette" aria-labelledby="palette-heading">
+      <div class="palette-header">
+        <div>
+          <span class="eyebrow">QUICK ACTIONS</span>
+          <h2 id="palette-heading">Command palette</h2>
+        </div>
+        <button
+          id="palette-close"
+          class="icon-button"
+          aria-label="Close commands"
+        >
+          ×
+        </button>
+      </div>
+      <input
+        id="palette-search"
+        type="search"
+        placeholder="Search actions…"
+        aria-label="Find a command"
+        autocomplete="off"
+      />
+      <div id="command-list" class="command-list"></div>
+      <p class="palette-hint">↑ ↓ to move · Enter to run · Esc to close</p>
+    </dialog>
+    <dialog id="unsaved-dialog" aria-labelledby="unsaved-title">
+      <h2 id="unsaved-title">Save your changes?</h2>
+      <p id="unsaved-message"></p>
+      <div class="dialog-actions">
+        <button id="unsaved-cancel" class="outline-button">Cancel</button
+        ><button id="unsaved-discard" class="outline-button">Discard</button
+        ><button id="unsaved-save" class="primary-button">Save…</button>
+      </div>
+    </dialog>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>

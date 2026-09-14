@@ -1,93 +1,601 @@
-import './styles.css';
-import './toolViews.css';
-import { native, chooseFile, chooseResultOutput, openDocument, createTextDocument, closeDocument, readPreview, readBinaryPreview, saveResult, runTool, cancelOperation, jobStatus, subscribeJobs, type FileDocument, type JobFinished, type JobProgress, type RendererKind, type ToolManifest } from './bridge';
-import { ToolViewRegistry } from './toolViews/registry';
-import { jsonView } from './toolViews/jsonView';
-import { textView } from './toolViews/textView';
-import { hashView } from './toolViews/hashView';
-import { imageToBase64View, base64ToImageView } from './toolViews/imageView';
-import { curlView } from './toolViews/curlView';
-import { diffView } from './toolViews/diffView';
-import type { ToolViewRuntime, SavePresentation } from './toolViews/types';
-import { ResultLifecycle, type ResultScope, type ResultReadToken } from './resultLifecycle';
+import "./styles.css";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import {
+  native,
+  chooseFile,
+  chooseDocumentOutput,
+  chooseResultOutput,
+  openDocument,
+  createTextDocument,
+  closeDocument,
+  readPreview,
+  readBinaryPreview,
+  saveDocument,
+  saveResult,
+  runTool,
+  runCompare,
+  cancelOperation,
+  jobStatus,
+  subscribeJobs,
+  listTools,
+} from "./bridge";
+import { WorkbenchController, type WorkbenchApi } from "./workbench/controller";
+import {
+  activeTab,
+  type TabState,
+  type WorkspaceState,
+} from "./workbench/state";
+import {
+  bundledTools,
+  definition,
+  type ToolDefinition,
+} from "./workbench/tools";
 
-const $ = <T extends HTMLElement = HTMLElement>(selector: string) => document.querySelector<T>(selector)!;
-const docs = new Map<string, FileDocument>();
-const manifests = new Map<string, ToolManifest>();
-const views = new ToolViewRegistry().register(jsonView).register(textView).register(hashView).register(imageToBase64View).register(base64ToImageView).register(curlView).register(diffView);
-const lifecycle = new ResultLifecycle();
-let active: string | null = null; let activeToolId = 'structured.json'; let current: JobFinished | null = null; let currentScope: ResultScope | null = null; let resultText = ''; let poll: number | null = null; let renderedViewKey = '';
-const pendingEvents = new Map<string, Array<{ kind: 'progress' | 'finished'; event: JobProgress | JobFinished }>>();
-const paletteDialog = $('#palette') as HTMLDialogElement; const searchInput = $('#palette-search') as HTMLInputElement; let paletteOpener: HTMLElement | null = null;
-paletteDialog.setAttribute('aria-modal', 'true'); $('#command-list').setAttribute('role', 'listbox');
-function openPalette(opener?: HTMLElement) { paletteOpener = opener ?? (document.activeElement as HTMLElement); renderCommands(); paletteDialog.showModal(); searchInput.focus(); }
-function closePalette() { if (paletteDialog.open) paletteDialog.close(); paletteOpener?.focus(); paletteOpener = null; }
-void openPalette; void closePalette;
-const preview = $('#preview') as HTMLTextAreaElement; const output = $('#result-output') as HTMLTextAreaElement; const optionsHost = $('.format-control'); const actionsHost = $('.toolbar-actions');
-const sourceHost = document.createElement('div'); sourceHost.id = 'tool-source'; sourceHost.className = 'tool-source'; document.querySelector('.preview-pane .pane-footer')?.before(sourceHost);
-$('#job-panel').setAttribute('aria-live', 'polite'); $('#cancel-job').setAttribute('aria-label', 'Cancel current operation');
-const bytes = (value: number | null | undefined) => { if (typeof value !== 'number' || !Number.isFinite(value)) return '—'; const units = ['B', 'KB', 'MB', 'GB']; let n = value; let i = 0; while (n >= 1024 && i < units.length - 1) { n /= 1024; i += 1; } return `${i === 0 || n >= 100 ? n.toFixed(0) : n.toFixed(1)} ${units[i]}`; };
-const esc = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[char] ?? char));
-const setStatus = (value: string) => { $('#status').textContent = value; }; const clearError = () => { $('#error').hidden = true; }; const fail = (message: string) => { $('#error').textContent = message; $('#error').hidden = false; setStatus('Action failed'); };
+const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
+  document.querySelector<T>(selector)!;
+const esc = (value: string) =>
+  value.replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;",
+      })[char] ?? char,
+  );
+const bytes = (value: number | null | undefined) => {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "—";
+  const units = ["B", "KB", "MB", "GB"];
+  let n = value;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i += 1;
+  }
+  return `${i ? n.toFixed(n >= 100 ? 0 : 1) : n.toFixed(0)} ${units[i]}`;
+};
+let state: WorkspaceState;
+let controller: WorkbenchController;
+let paletteOpener: HTMLElement | null = null;
+const palette = $("#palette") as HTMLDialogElement;
+const paletteSearch = $("#palette-search") as HTMLInputElement;
+const notify = (message: string) => {
+  $("#status").textContent = message;
+};
 
-function fallbackManifests(): ToolManifest[] { const base = (id: string, label: string, operations: string[], renderer: RendererKind, inputKinds: ToolManifest['inputKinds'] = ['text']): ToolManifest => ({ id, label, contractVersion: 1, inputKinds, limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: { deterministic: true, supportsPreview: true, supportsStreaming: true, cancellation: true, progress: true, needsFilesystem: false, needsNetwork: false, needsSecrets: false }, operations: operations.map(operation => ({ id: operation, label: operation[0].toUpperCase() + operation.slice(1), defaultOptions: {} })), renderer }); return [base('structured.json', 'JSON', ['inspect', 'format', 'minify'], 'json', ['json']), base('structured.csv', 'CSV', ['inspect'], 'table', ['csv']), base('text.inspect', 'Text', ['inspect'], 'text'), base('text.url', 'URL Encode / Decode', ['encode', 'decode'], 'text'), base('text.html', 'HTML Escape / Unescape', ['escape', 'unescape'], 'text'), base('text.unicode', 'Unicode Escape / Unescape', ['encode', 'decode'], 'text'), base('encoding.hash', 'Hash Generator', ['sha256', 'sha512'], 'text', ['bytes']), base('encoding.image-base64', 'Image → Base64', ['encode'], 'text', ['bytes']), base('encoding.base64-image', 'Base64 → Image', ['decode'], 'binary', ['text']), base('web.curl-code', 'cURL to Code', ['fetch', 'python'], 'text'), base('text.compare', 'Diff & Compare', ['compare'], 'diff')]; }
-function currentManifest(): ToolManifest | null { return manifests.get(activeToolId) ?? null; } function currentView() { const manifest = currentManifest(); return manifest ? views.resolve(manifest).view : null; } function currentDocument() { return active ? docs.get(active) ?? null : null; }
-
-async function cancelActive() { const oldJob = lifecycle.invalidate(); if (oldJob) { try { await cancelOperation(oldJob); } catch { /* best effort */ } } if (poll !== null) { clearInterval(poll); poll = null; } pendingEvents.clear(); current = null; currentScope = null; resultText = ''; $('#job-panel').hidden = true; clearResultPane(); renderShell(); }
-function clearResultPane() { $('#result-empty').hidden = false; $('#result-content').hidden = true; output.value = ''; output.hidden = true; resultText = ''; const binary = document.querySelector<HTMLImageElement>('#binary-preview'); if (binary) { binary.src = ''; binary.remove(); } document.querySelector('#diff-renderer')?.remove(); $('#saved-output').hidden = true; $('#result-output-meta').textContent = 'Waiting for result'; }
-function syncViewControls() { actionsHost.querySelectorAll<HTMLButtonElement>('button').forEach(button => { button.disabled = !!lifecycle.activeJobId() || (currentView()?.sourceMode !== 'custom' && !currentDocument()); }); }
-
-function runtimeFor(manifest: ToolManifest): ToolViewRuntime { return { manifest, document: currentDocument(), busy: !!lifecycle.activeJobId(), optionsHost, actionsHost, sourceHost, documents: docs, bytes, fail, setStatus,
-  async chooseDocument() { if (!native) { fail('The native Rust engine is unavailable in this browser preview.'); return null; } const path = await chooseFile(); if (!path) return null; const document = await openDocument(path); docs.set(document.id, document); renderTabs(); return document; },
-  async createTextDocument(text) { const document = await createTextDocument(text); docs.set(document.id, document); renderTabs(); return document; },
-  async removeDocument(id) { try { await closeDocument(id); } catch { /* best effort */ } docs.delete(id); renderTabs(); }, setActiveDocument(id) { active = id; renderTabs(); renderShell(); },
-  async startJob(request) { const scope: ResultScope = { toolId: request.toolId, sourceDocumentId: request.sourceDocumentId ?? request.documentId, operationId: request.operationId, renderer: manifest.renderer }; const pending = lifecycle.begin(scope); current = null; currentScope = null; clearResultPane(); clearError(); $('#job-panel').hidden = false; $('#job-title').textContent = request.title; $('#job-phase').textContent = 'Starting…'; ($('#job-progress') as HTMLProgressElement).value = 0; setStatus(request.status); try { await eventsReady; const started = request.run ? await request.run() : await runTool(request.documentId, request.toolId, request.operationId, request.options ?? {}); if (!lifecycle.attach(pending, started.jobId)) { await cancelOperation(started.jobId).catch(() => undefined); return; } drain(started.jobId); if (lifecycle.accepts(started.jobId)) startPoll(started.jobId); renderShell(); } catch (error) { if (lifecycle.activeJobId() === pending.jobId || lifecycle.activeJobId() === null) { lifecycle.invalidate(); $('#job-panel').hidden = true; renderShell(); fail(error instanceof Error ? error.message : String(error)); } } }, };
+function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
+  const dialog = $("#unsaved-dialog") as HTMLDialogElement;
+  $("#unsaved-message").textContent = `${tab.name} has unsaved changes.`;
+  dialog.showModal();
+  return new Promise((resolve) => {
+    const finish = (answer: "save" | "discard" | "cancel") => {
+      dialog.close();
+      resolve(answer);
+    };
+    $("#unsaved-save").onclick = () => finish("save");
+    $("#unsaved-discard").onclick = () => finish("discard");
+    $("#unsaved-cancel").onclick = () => finish("cancel");
+    dialog.oncancel = (event) => { event.preventDefault(); finish("cancel"); };
+  });
 }
-
-function renderTabs() { const root = $('#tabs'); root.innerHTML = docs.size ? '' : '<span class="empty-tab">Your workspace</span>'; docs.forEach(doc => { const tab = document.createElement('div'); tab.className = `tab${doc.id === active ? ' active' : ''}`; tab.role = 'tab'; tab.tabIndex = 0; tab.ariaSelected = String(doc.id === active); tab.setAttribute('aria-label', `${doc.name}${doc.id === active ? ', active document' : ''}`); tab.title = doc.path; tab.innerHTML = `<span class="file-dot ${doc.format}" aria-hidden="true"></span><span class="tab-name">${esc(doc.name)}</span><button type="button" class="tab-close" title="Close document" aria-label="Close ${esc(doc.name)}">×</button>`; tab.addEventListener('click', event => { if ((event.target as HTMLElement).closest('.tab-close')) return; void switchDocument(doc.id); }); tab.addEventListener('keydown', event => { if ((event.key === 'Enter' || event.key === ' ') && !(event.target as HTMLElement).closest('.tab-close')) { event.preventDefault(); void switchDocument(doc.id); } }); const close = tab.querySelector<HTMLButtonElement>('.tab-close'); close?.addEventListener('click', event => { event.stopPropagation(); void closeTab(doc.id); }); root.append(tab); }); }
-async function switchDocument(id: string) { if (id === active) return; await cancelActive(); active = id; clearError(); clearResultPane(); renderedViewKey = ''; renderTabs(); renderShell(); setStatus('Document ready'); }
-async function closeTab(id: string) { if (id === active) await cancelActive(); try { await closeDocument(id); } catch (error) { fail(error instanceof Error ? error.message : String(error)); return; } docs.delete(id); if (active === id) active = docs.keys().next().value ?? null; renderedViewKey = ''; renderTabs(); renderShell(); }
-
-function renderShell() { const manifest = currentManifest(); const view = currentView(); const document = currentDocument(); const custom = view?.sourceMode === 'custom'; $('#active-tool-label').textContent = (manifest?.label ?? 'Tool unavailable').toUpperCase(); $('#active-tool-title').textContent = manifest?.label ?? 'Tool unavailable'; $('#active-tool-subtitle').textContent = view ? 'Choose an operation from the toolbar or command palette.' : 'This tool is registered but unavailable in this build.'; $('#empty-state').hidden = !!document || custom; preview.hidden = !document || custom; sourceHost.hidden = !custom; if (document && !custom) { preview.value = document.preview; $('#preview-meta').textContent = `${document.truncated ? 'First 64 KiB · ' : ''}${bytes(document.size)} · ${document.format.toUpperCase()}`; $('#preview-limit').textContent = document.truncated ? 'Preview limited to 64 KiB · Full-file processing' : 'Bounded preview · Full-file processing'; $('#encoding').textContent = `${document.encoding} · Read only`; $('#source-name').textContent = document.name; $('#source-size').textContent = bytes(document.size); $('#source-format').textContent = document.format.toUpperCase(); } else if (!custom) { preview.value = ''; $('#preview-meta').textContent = 'Open a JSON, CSV, or text file'; $('#source-name').textContent = 'No document open'; $('#source-size').textContent = '—'; $('#source-format').textContent = '—'; $('#encoding').textContent = '—'; } const key = `${activeToolId}:${active ?? ''}:${custom ? 'custom' : 'document'}`; if (view && key !== renderedViewKey) { optionsHost.innerHTML = ''; actionsHost.innerHTML = ''; sourceHost.innerHTML = ''; view.render(runtimeFor(manifest!)); renderedViewKey = key; } else if (!view) { optionsHost.innerHTML = ''; actionsHost.innerHTML = ''; sourceHost.innerHTML = ''; renderedViewKey = ''; } syncViewControls(); if (!current) { $('#result-empty').hidden = false; $('#result-content').hidden = true; } }
-async function openPath(path: string) { if (!native) { fail('The native Rust engine is unavailable in this browser preview. Open the desktop app to choose a file.'); return; } try { await cancelActive(); setStatus('Reading bounded preview…'); const document = await openDocument(path); docs.set(document.id, document); active = document.id; activeToolId = document.format === 'json' ? 'structured.json' : document.format === 'csv' ? 'structured.csv' : 'text.inspect'; renderedViewKey = ''; renderTabs(); renderShell(); setStatus('Loaded · formatting the complete file…'); const view = currentView(); if (view) void view.run(runtimeFor(currentManifest()!), document.format === 'json' ? 'format' : 'inspect'); } catch (error) { fail(error instanceof Error ? error.message : String(error)); } }
-async function openFile() { if (!native) { fail('The native Rust engine is unavailable in this browser preview. Open the desktop app to choose a file.'); return; } const path = await chooseFile(); if (path) await openPath(path); }
-function progress(event: JobProgress) { if (!lifecycle.accepts(event.jobId)) return; const percent = event.totalBytes ? Math.min(100, event.bytesProcessed / event.totalBytes * 100) : 0; const bar = $('#job-progress') as HTMLProgressElement; bar.value = percent; bar.setAttribute('aria-valuetext', `${Math.round(percent)} percent complete`); $('#job-phase').textContent = event.phase; $('#job-bytes').textContent = `${bytes(event.bytesProcessed)} of ${bytes(event.totalBytes)}`; $('#job-percent').textContent = `${Math.round(percent)}%`; }
-function finished(event: JobFinished) { if (lifecycle.isFinished(event.jobId)) return; if (!lifecycle.accepts(event.jobId)) { const list = pendingEvents.get(event.jobId) ?? []; list.push({ kind: 'finished', event }); pendingEvents.set(event.jobId, list.slice(-4)); return; } lifecycle.finish(event.jobId); renderShell(); void showFinished(event); }
-function drain(jobId: string) { const list = pendingEvents.get(jobId) ?? []; pendingEvents.delete(jobId); for (const item of list) item.kind === 'progress' ? progress(item.event as JobProgress) : void showFinished(item.event as JobFinished); }
-function startPoll(jobId: string) { if (poll !== null) clearInterval(poll); poll = window.setInterval(() => { if (lifecycle.activeJobId() !== jobId) return; void jobStatus(jobId).then(event => { if (event) finished(event); }).catch(() => undefined); }, 180); }
-
-function renderDiff(value: string) { const host = document.createElement('div'); host.id = 'diff-renderer'; host.className = 'diff-renderer'; host.setAttribute('aria-label', 'Text diff hunks'); try { const parsed = JSON.parse(value) as { summary?: Record<string, unknown>; hunks?: Array<{ oldStart: number; oldLines: number; newStart: number; newLines: number; lines: Array<{ kind: string; text: string; oldLine?: number | null; newLine?: number | null }> }> }; const summary = parsed.summary ?? {}; const summaryNode = document.createElement('div'); summaryNode.className = 'diff-summary'; summaryNode.innerHTML = `<strong>${summary.identical ? 'No differences' : `${summary.changedHunks ?? 0} changed hunk${summary.changedHunks === 1 ? '' : 's'}`}</strong><span>${summary.addedLines ?? 0} additions · ${summary.removedLines ?? 0} deletions${summary.newlineOnly ? ' · newline style only' : ''}</span>`; host.append(summaryNode); for (const hunk of (parsed.hunks ?? []).slice(0, 200)) { const section = document.createElement('section'); section.className = 'diff-hunk'; const heading = document.createElement('div'); heading.className = 'diff-hunk-head'; heading.textContent = `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`; section.append(heading); for (const line of hunk.lines.slice(0, 2000)) { const row = document.createElement('div'); row.className = `diff-line ${line.kind.toLowerCase()}`; row.innerHTML = `<span class="diff-num">${line.oldLine ?? ''}</span><span class="diff-num">${line.newLine ?? ''}</span><span class="diff-sign">${line.kind === 'added' ? '+' : line.kind === 'removed' ? '-' : ' '}</span><code>${esc(line.text).replace(/\n$/, '')}</code>`; section.append(row); } host.append(section); } if (!(parsed.hunks ?? []).length) { const empty = document.createElement('p'); empty.className = 'diff-empty'; empty.textContent = 'The selected documents are identical.'; host.append(empty); } } catch { const empty = document.createElement('p'); empty.className = 'diff-empty'; empty.textContent = 'Diff preview unavailable.'; host.append(empty); } return host; }
-
-async function showFinished(event: JobFinished) { const token: ResultReadToken | null = event.ok && event.resultDocumentId ? lifecycle.resultToken(event.jobId, event.resultDocumentId) : null; if (!lifecycle.accepts(event.jobId)) return; if (poll !== null) { clearInterval(poll); poll = null; } current = event; currentScope = token ? { toolId: token.toolId, sourceDocumentId: token.sourceDocumentId, operationId: token.operationId, renderer: token.renderer } : null; $('#job-panel').hidden = true; $('#result-empty').hidden = true; $('#result-content').hidden = false; const state = $('#result-state'); state.className = `result-state ${event.ok ? 'ok' : event.cancelled ? 'cancelled' : 'failed'}`; state.textContent = event.ok ? '✓ Completed successfully' : event.cancelled ? '○ Cancelled' : `● ${event.error ?? 'Operation failed'}`; const rows: Array<[string, string]> = [['Elapsed', `${event.elapsedMs} ms`], ['Input', bytes(event.inputBytes)]]; if (typeof event.outputBytes === 'number') rows.push(['Output', bytes(event.outputBytes)]); rows.push(['Status', event.ok ? (event.resultDocumentId ? 'Ready to review' : 'Saved') : 'No output']); $('#result-metrics').innerHTML = rows.map(row => `<div><dt>${row[0]}</dt><dd>${esc(row[1])}</dd></div>`).join(''); $('#result-summary').textContent = typeof event.summary === 'string' ? event.summary : JSON.stringify(event.summary ?? {}, null, 2); const view = currentView(); const save = $('#save-result') as HTMLButtonElement; save.hidden = !event.ok || !event.resultDocumentId; save.textContent = view && currentManifest() ? view.savePresentation(currentManifest()!, event.operationId ?? currentScope?.operationId ?? 'result', event.resultMime ?? null).label : 'Save result…'; const copy = $('#copy-result') as HTMLButtonElement; copy.hidden = !event.ok || !event.resultDocumentId || event.renderer === 'binary' || event.resultMime?.startsWith('image/') === true; output.hidden = true; document.querySelector('#binary-preview')?.remove(); document.querySelector('#diff-renderer')?.remove(); if (token) { try { if (token.renderer === 'binary' || event.resultMime?.startsWith('image/')) { const binary = await readBinaryPreview(token.resultDocumentId); if (!lifecycle.isCurrent(token)) return; const image = document.createElement('img'); image.id = 'binary-preview'; image.className = 'binary-preview'; image.alt = `Decoded ${binary.mime} · ${bytes(binary.bytes)}${binary.truncated ? ' (preview limited)' : ''}`; image.src = binary.data; document.querySelector('.result-preview-block')?.prepend(image); $('#result-output-meta').textContent = binary.truncated ? 'Image preview · first 4 MiB' : 'Decoded image preview'; } else { const result = await readPreview(token.resultDocumentId, 0); if (!lifecycle.isCurrent(token)) return; resultText = result.preview.slice(0, 65536); if (token.renderer === 'diff') { document.querySelector('.result-preview-block')?.prepend(renderDiff(resultText)); $('#result-output-meta').textContent = 'Structured diff hunks'; } else { output.value = resultText; output.hidden = false; $('#result-output-meta').textContent = result.truncated ? 'Formatted preview · first 64 KiB' : 'Formatted output'; } } } catch (error) { if (lifecycle.isCurrent(token)) fail(error instanceof Error ? error.message : String(error)); } } setStatus(event.ok ? 'Ready · result shown on the right' : event.cancelled ? 'Cancelled' : 'Operation failed'); }
-
-function renderTools() { const nav = $('.tool-nav'); const query = ($('#tool-search') as HTMLInputElement).value.trim().toLowerCase(); const visible = [...manifests.values()].filter(manifest => !query || `${manifest.label} ${manifest.id}`.toLowerCase().includes(query)); nav.innerHTML = ''; if (!visible.length) { const empty = document.createElement('p'); empty.className = 'search-empty'; empty.textContent = 'No tools match your search.'; nav.append(empty); return; } const groups = new Map<string, ToolManifest[]>(); for (const manifest of visible) { const view = views.resolve(manifest).view; const group = view?.group ?? 'OTHER TOOLS'; if (!groups.has(group)) groups.set(group, []); groups.get(group)!.push(manifest); } groups.forEach((items, group) => { const section = document.createElement('div'); section.className = 'tool-group'; const label = document.createElement('div'); label.className = 'group-label'; label.textContent = group; section.append(label); items.forEach(manifest => { const view = views.resolve(manifest).view; const item = document.createElement('button'); item.className = `tool-item${manifest.id === activeToolId ? ' active' : ''}`; item.title = view ? manifest.label : `${manifest.label} unavailable`; item.setAttribute('aria-label', item.title); item.setAttribute('aria-current', String(manifest.id === activeToolId)); item.innerHTML = `<span class="tool-item-icon" aria-hidden="true">${esc(view?.icon ?? '⌁')}</span><span><strong>${esc(manifest.label)}</strong><small>${esc(manifest.operations.map(operation => operation.label).join(' · '))}</small></span>`; item.addEventListener('click', () => { void cancelActive(); activeToolId = manifest.id; renderedViewKey = ''; clearResultPane(); renderTools(); renderShell(); if (!view) fail(`${manifest.label} is currently unavailable in this desktop build.`); }); section.append(item); }); nav.append(section); }); }
-type Command = { label: string; description: string; action: () => void }; let commands: Command[] = []; let paletteIndex = -1;
-function rebuildCommands() {
-  commands = [{ label: 'Open file', description: 'Choose a local document', action: () => void openFile() }];
-  manifests.forEach(manifest => manifest.operations.forEach(operation => {
-    commands.push({
-      label: `${manifest.label}: ${operation.label}`,
-      description: views.has(manifest.id) ? `Run ${operation.label.toLowerCase()} on the active document` : 'Registered tool · unavailable in this build',
-      action: () => {
-        const view = views.resolve(manifest).view;
-        if (!view) { fail(`${manifest.label} is currently unavailable in this desktop build.`); return; }
-        void cancelActive(); activeToolId = manifest.id; renderedViewKey = ''; renderTools(); renderShell(); void view.run(runtimeFor(manifest), operation.id);
-      },
+function renderTabs() {
+  const root = $("#tabs");
+  root.innerHTML = "";
+  if (!state.tabs.length) {
+    root.innerHTML = '<span class="empty-tab">Your workspace</span>';
+    return;
+  }
+  for (const tab of state.tabs) {
+    const item = document.createElement("div");
+    item.className = `tab-wrap${tab.id === state.activeId ? " active" : ""}`;
+    const button = document.createElement("button");
+    button.className = "tab";
+    button.type = "button";
+    button.role = "tab";
+    button.ariaSelected = String(tab.id === state.activeId);
+    button.tabIndex = tab.id === state.activeId ? 0 : -1;
+    button.title = tab.source?.path ?? tab.name;
+    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tab.name)}</span>${tab.dirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
+    button.onclick = () => controller.activate(tab.id);
+    button.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        controller.activate(tab.id);
+      }
+    };
+    const close = document.createElement("button");
+    close.className = "tab-close";
+    close.type = "button";
+    close.setAttribute("aria-label", `Close ${tab.name}`);
+    close.textContent = "×";
+    close.onclick = (event) => {
+      event.stopPropagation();
+      void controller.close(tab.id);
+    };
+    item.append(button, close);
+    root.append(item);
+  }
+}
+function renderTools() {
+  const nav = $(".tool-nav");
+  const query = ($("#tool-search") as HTMLInputElement).value
+    .trim()
+    .toLowerCase();
+  nav.innerHTML = "";
+  const visible = bundledTools.filter(
+    (tool) =>
+      !query || `${tool.label} ${tool.id}`.toLowerCase().includes(query),
+  );
+  if (!visible.length) {
+    nav.innerHTML =
+      '<p class="search-empty" role="status">No tools match your search.</p>';
+    return;
+  }
+  const groups = new Map<string, ToolDefinition[]>();
+  for (const tool of visible) {
+    const list = groups.get(tool.group) ?? [];
+    list.push(tool);
+    groups.set(tool.group, list);
+  }
+  for (const [group, tools] of groups) {
+    const section = document.createElement("section");
+    section.className = "tool-group";
+    const heading = document.createElement("div");
+    heading.className = "group-label";
+    heading.textContent = group;
+    section.append(heading);
+    for (const tool of tools) {
+      const active =
+        state.tabs.find((tab) => tab.id === state.activeId)?.toolId === tool.id;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = `tool-item${active ? " active" : ""}`;
+      button.setAttribute("aria-current", String(active));
+      button.setAttribute("aria-label", tool.label);
+      button.innerHTML = `<span class="tool-item-icon" aria-hidden="true">${esc(tool.icon)}</span><span><strong>${esc(tool.label)}</strong><small>${esc(tool.operations.map((operation) => operation.label).join(" · ") || "New document")}</small></span>`;
+      button.onclick = () => {
+        if (!state.activeId) {
+          if (tool.input === "image") { void controller.chooseFile(); return; }
+          controller.newDocument();
+        }
+        if (state.activeId) controller.selectTool(state.activeId, tool.id);
+      };
+      section.append(button);
+    }
+    nav.append(section);
+  }
+}
+function renderOptions(tab: TabState, tool: ReturnType<typeof definition>) {
+  const host = $(".format-control");
+  host.innerHTML = "";
+  if (!tool?.operations.length) return;
+  if (tool.operations.length > 1) {
+    const label = document.createElement("label");
+    label.className = "dynamic-option";
+    label.textContent = "Operation";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", `${tool.label} operation`);
+    for (const operation of tool.operations) {
+      const option = document.createElement("option");
+      option.value = operation.id;
+      option.textContent = operation.label;
+      option.selected = operation.id === tab.operation;
+      select.append(option);
+    }
+    select.onchange = () =>
+      controller.options(tab.id, select.value, { ...tab.options });
+    label.append(select);
+    host.append(label);
+  }
+  if (tool.id === "text.compare") {
+    const label = document.createElement("label");
+    label.className = "dynamic-option";
+    label.textContent = "Newlines";
+    const select = document.createElement("select");
+    select.setAttribute("aria-label", "Compare newline handling");
+    for (const value of ["preserve", "lf", "cr_lf", "ignore"]) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent =
+        value === "cr_lf"
+          ? "Normalize CRLF"
+          : value[0].toUpperCase() + value.slice(1);
+      option.selected = value === tab.options.newline;
+      select.append(option);
+    }
+    select.onchange = () =>
+      controller.options(tab.id, tab.operation, {
+        ...tab.options,
+        newline: select.value,
+      });
+    label.append(select);
+    host.append(label);
+  }
+}
+function renderSources(tab: TabState, tool: ReturnType<typeof definition>) {
+  const host = $("#tool-source");
+  if (!tool?.compare) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  const left = $("#compare-left") as HTMLTextAreaElement;
+  const leftText = tab.text ?? tab.source?.preview ?? "";
+  if (left.value !== leftText) left.value = leftText;
+  left.readOnly = tab.text === null;
+  left.oninput = () => controller.edit(tab.id, left.value);
+  const right = $("#compare-right") as HTMLTextAreaElement;
+  if (right.value !== tab.rightText) right.value = tab.rightText;
+  right.oninput = () => controller.right(tab.id, right.value);
+  $("#compare-open-right").onclick = () => void controller.openRight(tab.id);
+}
+function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
+  const image = $("#input-image") as HTMLImageElement;
+  const wrap = $("#input-image-wrap");
+  const input = $("#preview") as HTMLTextAreaElement;
+  const message = $("#input-message");
+  const empty = $("#empty-state");
+  const imageInput = tab.source?.contentKind === "image";
+  const binaryInput = tab.source?.contentKind === "binary";
+  empty.hidden = true;
+  $("#editor-host").hidden = !!tool?.compare;
+  wrap.hidden = !imageInput;
+  input.hidden = imageInput || binaryInput || !!tool?.compare;
+  message.hidden = !binaryInput;
+  if (binaryInput) message.textContent = "Binary file · Choose a compatible tool such as Hash generator. Text editing is unavailable for this file.";
+  $("#source-mode").textContent =
+    tab.text !== null
+      ? tab.dirty
+        ? "EDITING"
+        : "TEXT"
+      : tab.source
+        ? "READ ONLY"
+        : "NEW";
+  if (imageInput) {
+    input.value = "";
+    if (tab.image) {
+      if (image.getAttribute("src") !== tab.image.data) image.src = tab.image.data;
+      image.alt = `${tab.image.mime} image preview`;
+      message.hidden = true;
+    } else {
+      image.removeAttribute("src");
+      message.hidden = false;
+      message.textContent = tab.imageError ?? "Loading image preview…";
+    }
+  } else if (!tool?.compare) {
+    const text = tab.text ?? tab.source?.preview ?? "";
+    if (input.value !== text) input.value = text;
+    input.readOnly = tab.text === null;
+    input.disabled = false;
+    input.oninput = () => controller.edit(tab.id, input.value);
+  }
+  $("#preview-heading").textContent = tab.text !== null ? "Document" : "Input";
+  $("#preview-meta").textContent = tab.source
+    ? `${bytes(tab.source.size)} · ${tab.source.mime ?? tab.source.format.toUpperCase()}`
+    : "Unsaved document";
+  $("#preview-limit").textContent = tab.source?.editable
+    ? "Editable UTF-8 document · Ctrl+S to save"
+    : tab.source
+      ? "Read-only bounded preview · Full-file processing"
+      : "Editable blank document";
+  $("#encoding").textContent = tab.source?.encoding ?? "UTF-8";
+  $("#source-name").textContent = tab.name;
+  $("#source-size").textContent = tab.source ? bytes(tab.source.size) : "—";
+  $("#source-format").textContent = tab.source?.contentKind === 'text' ? tab.source.format.toUpperCase() : tab.source?.contentKind.toUpperCase() ?? "TEXT";
+}
+function renderActions(tab: TabState, tool: ReturnType<typeof definition>) {
+  const host = $(".toolbar-actions");
+  host.innerHTML = "";
+  if (!tool?.operations.length) return;
+  for (const operation of tool.operations) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className =
+      operation.id === tab.operation ? "primary-button" : "outline-button";
+    button.textContent = operation.label;
+    button.disabled = tab.phase === "queued" || tab.phase === "running";
+    button.onclick = () =>
+      controller.options(tab.id, operation.id, { ...tab.options });
+    host.append(button);
+  }
+}
+function renderResult(tab: TabState) {
+  const result = tab.result;
+  const empty = $("#result-empty");
+  const content = $("#result-content");
+  if (!result) {
+    empty.hidden = false;
+    content.hidden = true;
+    return;
+  }
+  empty.hidden = true;
+  content.hidden = false;
+  const event = result.event;
+  const stateNode = $("#result-state");
+  stateNode.className = `result-state ${event.ok ? "ok" : event.cancelled ? "cancelled" : "failed"}`;
+  stateNode.textContent = event.ok
+    ? "✓ Completed successfully"
+    : event.cancelled
+      ? "○ Cancelled"
+      : `● ${event.error ?? "Operation failed"}`;
+  $("#result-summary").textContent =
+    typeof event.summary === "string"
+      ? event.summary
+      : JSON.stringify(event.summary ?? {}, null, 2);
+  $("#result-metrics").innerHTML = [
+    ["Elapsed", `${event.elapsedMs} ms`],
+    ["Input", bytes(event.inputBytes)],
+    ["Output", bytes(event.outputBytes)],
+    ["Status", event.ok ? "Ready to review" : "No output"],
+  ]
+    .map(([key, value]) => `<div><dt>${key}</dt><dd>${esc(value)}</dd></div>`)
+    .join("");
+  const media = $("#result-media");
+  media.innerHTML = "";
+  const output = $("#result-output") as HTMLTextAreaElement;
+  const binary = !!result.image;
+  media.hidden = !binary;
+  if (result.image) {
+    const image = document.createElement("img");
+    image.className = "binary-preview";
+    image.src = result.image.data;
+    image.alt = `${result.image.mime} result preview`;
+    media.append(image);
+  }
+  output.hidden = binary;
+  if (output.value !== result.text) output.value = result.text;
+  $("#result-output-meta").textContent =
+    result.previewError ??
+    (result.truncated
+      ? "Bounded preview · save for complete output"
+      : event.ok
+        ? "Complete result"
+        : "No result");
+  $("#copy-result").hidden = !event.ok || binary || !result.text || result.truncated;
+  $("#save-result").hidden = !event.ok || !event.resultDocumentId;
+}
+function render() {
+  const tab = activeTab(state);
+  renderTabs();
+  renderTools();
+  const tool = tab ? definition(tab.toolId) : undefined;
+  $("#active-tool-icon").textContent = tool?.icon ?? "Aa";
+  $("#active-tool-label").textContent = (
+    tool?.group ?? "WORKSPACE"
+  ).toUpperCase();
+  $("#active-tool-title").textContent =
+    tool?.label ?? "Create or open a document";
+  $("#active-tool-subtitle").textContent = tool
+    ? "Choose an operation or edit the document in place."
+    : "Press Ctrl+N for a blank document or choose a file.";
+  $("#error").hidden = !tab?.error;
+  $("#error").textContent = tab?.error ?? "";
+  const save = $("#save-document") as HTMLButtonElement;
+  save.disabled = !tab;
+  $("#job-panel").hidden =
+    !tab || (tab.phase !== "queued" && tab.phase !== "running");
+  if (tab) {
+    renderOptions(tab, tool);
+    renderSources(tab, tool);
+    renderInput(tab, tool);
+    renderActions(tab, tool);
+    renderResult(tab);
+    $("#job-title").textContent =
+      `${tool?.label ?? "Processing"} · ${tab.name}`;
+    $("#job-phase").textContent =
+      tab.phase === "queued"
+        ? "Queued…"
+        : (tab.progress?.phase ?? "Processing…");
+    const progress = $("#job-progress") as HTMLProgressElement;
+    progress.value = tab.progress?.totalBytes
+      ? Math.min(
+          100,
+          (tab.progress.bytesProcessed / tab.progress.totalBytes) * 100,
+        )
+      : 0;
+    $("#job-bytes").textContent = tab.progress
+      ? `${bytes(tab.progress.bytesProcessed)} of ${bytes(tab.progress.totalBytes)}`
+      : "Starting…";
+    $("#job-percent").textContent = tab.progress?.totalBytes
+      ? `${Math.round((tab.progress.bytesProcessed / tab.progress.totalBytes) * 100)}%`
+      : "—";
+  } else {
+    $("#editor-host").hidden = false;
+    $("#tool-source").hidden = true;
+    $(".format-control").replaceChildren();
+    $(".toolbar-actions").replaceChildren();
+    $("#empty-state").hidden = false;
+    $("#preview").hidden = true;
+    $("#input-image-wrap").hidden = true;
+    $("#input-message").hidden = true;
+    $("#result-empty").hidden = false;
+    $("#result-content").hidden = true;
+  }
+}
+function commands() {
+  const list = $("#command-list");
+  list.innerHTML = "";
+  const actions = [
+    { label: "New document", run: () => controller.newDocument() },
+    { label: "Open file", run: () => void controller.chooseFile() },
+    ...state.tabs.flatMap((tab) =>
+      bundledTools
+        .filter((tool) => tool.id !== "editor.text")
+        .map((tool) => ({
+          label: `${tool.label} · ${tab.name}`,
+          run: () => {
+            controller.activate(tab.id);
+            controller.selectTool(tab.id, tool.id);
+          },
+        })),
+    ),
+  ];
+  actions
+    .filter(
+      (action) =>
+        !paletteSearch.value ||
+        action.label.toLowerCase().includes(paletteSearch.value.toLowerCase()),
+    )
+    .forEach((action, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.role = "option";
+      button.id = `command-${index}`;
+      button.textContent = action.label;
+      button.onclick = () => {
+        closePalette();
+        action.run();
+      };
+      list.append(button);
     });
-  }));
 }
-function renderCommands() { const query = search.value.trim().toLowerCase(); const shown = commands.filter(command => `${command.label} ${command.description}`.toLowerCase().includes(query)); paletteIndex = -1; $('#command-list').innerHTML = shown.length ? shown.map((command, index) => `<button type="button" id="palette-command-${index}" data-index="${index}" role="option" aria-selected="false"><span class="command-glyph" aria-hidden="true">⌁</span><span><strong>${esc(command.label)}</strong><small>${esc(command.description)}</small></span><kbd>↵</kbd></button>`).join('') : '<p class="search-empty" role="status">No commands match your search.</p>'; $('#command-list').querySelectorAll<HTMLButtonElement>('button').forEach(button => button.addEventListener('click', () => { closePalette(); shown[Number(button.dataset.index)]?.action(); })); }
-function movePalette(delta: number) { const items = [...document.querySelectorAll<HTMLButtonElement>('#command-list button')]; if (!items.length) return; paletteIndex = (paletteIndex + delta + items.length) % items.length; items.forEach((item, index) => { const selected = index === paletteIndex; item.classList.toggle('selected', selected); item.setAttribute('aria-selected', String(selected)); }); items[paletteIndex].focus(); }
-
-const palette = $('#palette') as HTMLDialogElement; const search = $('#palette-search') as HTMLInputElement; $('#open-file').addEventListener('click', () => void openFile()); $('#empty-open').addEventListener('click', () => void openFile()); $('#save-result').addEventListener('click', async () => { if (!current?.resultDocumentId || !currentScope) return; const document = currentScope.sourceDocumentId ? docs.get(currentScope.sourceDocumentId) : currentDocument(); const manifest = manifests.get(currentScope.toolId); const view = manifest ? views.resolve(manifest).view : null; if (!document || !manifest || !view) return; try { const suggestion: SavePresentation = view.savePresentation(manifest, currentScope.operationId, current.resultMime ?? null); const path = await chooseResultOutput(document, suggestion); if (!path) return; await saveResult(current.resultDocumentId, path); $('#output-path').textContent = path; $('#saved-output').hidden = false; setStatus(suggestion.savedStatus); } catch (error) { fail(error instanceof Error ? error.message : String(error)); } }); $('#copy-result').addEventListener('click', async () => { try { await navigator.clipboard.writeText(resultText); setStatus('Copied result to clipboard'); } catch (error) { fail(`Could not copy result: ${String(error)}`); } }); $('#cancel-job').addEventListener('click', () => void cancelActive()); $('#palette-open').addEventListener('click', event => openPalette(event.currentTarget as HTMLElement)); $('#palette-close').addEventListener('click', closePalette); search.addEventListener('input', renderCommands); ($('#tool-search') as HTMLInputElement).addEventListener('input', renderTools); $('#sidebar-collapse').addEventListener('click', () => $('.sidebar').classList.toggle('collapsed'));
-const dropTarget = $('#document-panel'); dropTarget.addEventListener('dragover', event => { event.preventDefault(); dropTarget.classList.add('drag-over'); }); dropTarget.addEventListener('dragleave', () => dropTarget.classList.remove('drag-over')); dropTarget.addEventListener('drop', event => { event.preventDefault(); dropTarget.classList.remove('drag-over'); const file = event.dataTransfer?.files?.[0] as (File & { path?: string }) | undefined; if (file?.path) void openPath(file.path); else fail('The dropped file path is unavailable in this preview. Use Open file instead.'); });
-document.addEventListener('keydown', event => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); openPalette(event.target instanceof HTMLElement ? event.target : undefined); } if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'o') { event.preventDefault(); void openFile(); } if (event.key === 'Escape' && palette.open) { event.preventDefault(); closePalette(); } if (!palette.open) return; if (event.key === 'ArrowDown') { event.preventDefault(); movePalette(1); } else if (event.key === 'ArrowUp') { event.preventDefault(); movePalette(-1); } else if (event.key === 'Enter') { event.preventDefault(); (document.querySelector<HTMLButtonElement>('#command-list button.selected') ?? document.querySelector<HTMLButtonElement>('#command-list button'))?.click(); } });
-if (!native) { $('#browser-notice').hidden = false; $('#engine-dot').classList.add('offline'); $('#engine-status').textContent = 'Browser preview · native engine unavailable'; setStatus('Preview only'); } const eventsReady = subscribeJobs(progress, finished).catch(error => { if (native) fail(`Could not connect to operation events: ${String(error)}`); });
-async function loadToolRegistry() { try { const loaded = await (await import('./bridge')).listTools(); for (const manifest of loaded) manifests.set(manifest.id, manifest); } catch (error) { if (native) fail(`Could not load the tool registry: ${String(error)}`); } if (!manifests.size) for (const manifest of fallbackManifests()) manifests.set(manifest.id, manifest); rebuildCommands(); renderTools(); renderShell(); }
-palette.addEventListener('close', () => { paletteOpener?.focus(); paletteOpener = null; });
-const toolSearch = $('#tool-search') as HTMLInputElement;
-toolSearch.addEventListener('keydown', event => { if (event.key === 'ArrowDown') { event.preventDefault(); document.querySelector<HTMLButtonElement>('.tool-item')?.focus(); } else if (event.key === 'Escape' && toolSearch.value) { toolSearch.value = ''; renderTools(); } });
-const toolNavObserver = new MutationObserver(() => document.querySelectorAll<HTMLButtonElement>('.tool-item').forEach(item => { item.setAttribute('aria-label', item.title || item.textContent?.trim() || 'Tool'); item.setAttribute('aria-current', item.classList.contains('active') ? 'true' : 'false'); }));
-toolNavObserver.observe($('.tool-nav'), { childList: true, subtree: true });
-$('#sidebar-collapse').setAttribute('aria-expanded', 'true'); $('#sidebar-collapse').addEventListener('click', () => $('#sidebar-collapse').setAttribute('aria-expanded', String(!$('.sidebar').classList.contains('collapsed'))));
-renderTabs(); renderShell(); void loadToolRegistry();
+function openPalette(opener?: HTMLElement) {
+  paletteOpener = opener ?? (document.activeElement as HTMLElement);
+  commands();
+  palette.showModal();
+  paletteSearch.focus();
+}
+function closePalette() {
+  if (palette.open) palette.close();
+  paletteOpener?.focus();
+  paletteOpener = null;
+}
+const hooks = {
+  changed(next: WorkspaceState) {
+    const switched = state?.activeId !== next.activeId;
+    state = next;
+    render();
+    if (switched && activeTab(state)?.text !== null) {
+      const input = $(definition(activeTab(state)?.toolId ?? '')?.compare ? '#compare-left' : '#preview') as HTMLTextAreaElement;
+      if (!input.hidden) input.focus();
+    }
+  },
+  notify,
+  confirmClose: promptClose,
+};
+const api: WorkbenchApi = {
+  native,
+  chooseFile,
+  chooseDocumentOutput,
+  chooseResultOutput,
+  openDocument,
+  createTextDocument,
+  closeDocument,
+  readPreview,
+  readBinaryPreview,
+  saveDocument,
+  saveResult,
+  runTool,
+  runCompare,
+  cancelOperation,
+  jobStatus,
+  subscribeJobs,
+  listTools,
+};
+controller = new WorkbenchController(api, hooks);
+state = controller.state;
+$("#new-document").onclick = () => controller.newDocument();
+$("#empty-new").onclick = () => controller.newDocument();
+$("#open-file").onclick = () => void controller.chooseFile();
+$("#empty-open").onclick = () => void controller.chooseFile();
+$("#save-document").onclick = () => {
+  if (state.activeId) void controller.save(state.activeId);
+};
+$("#palette-open").onclick = (event) =>
+  openPalette(event.currentTarget as HTMLElement);
+$("#palette-close").onclick = closePalette;
+$("#cancel-job").onclick = () => {
+  if (state.activeId) controller.cancel(state.activeId);
+};
+$("#copy-result").onclick = async () => {
+  const text = activeTab(state)?.result?.text;
+  if (text) {
+    await navigator.clipboard.writeText(text);
+    notify("Copied result to clipboard");
+  }
+};
+$("#save-result").onclick = () => {
+  if (state.activeId) void controller.saveOutput(state.activeId);
+};
+$("#tool-search").oninput = () => renderTools();
+$("#sidebar-collapse").onclick = () => {
+  $(".sidebar").classList.toggle("collapsed");
+  $("#sidebar-collapse").setAttribute(
+    "aria-expanded",
+    String(!$(".sidebar").classList.contains("collapsed")),
+  );
+};
+paletteSearch.oninput = commands;
+$("#tab-new").onclick = () => controller.newDocument();
+document.addEventListener("keydown", (event) => {
+  if (palette.open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+    event.preventDefault();
+    const buttons = [...document.querySelectorAll<HTMLButtonElement>('#command-list button')];
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase()) && state.activeId && ['preview', 'compare-left'].includes((event.target as HTMLElement)?.id)) {
+    event.preventDefault();
+    controller.history(state.activeId, event.key.toLowerCase() === 'y' || event.shiftKey ? 'redo' : 'undo');
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'w' && state.activeId && !palette.open) {
+    event.preventDefault(); void controller.close(state.activeId); return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
+    event.preventDefault();
+    controller.newDocument();
+  } else if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "o"
+  ) {
+    event.preventDefault();
+    void controller.chooseFile();
+  } else if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "s"
+  ) {
+    event.preventDefault();
+    if (state.activeId) void controller.save(state.activeId);
+  } else if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "k"
+  ) {
+    event.preventDefault();
+    openPalette(event.target instanceof HTMLElement ? event.target : undefined);
+  } else if (event.key === "Escape" && palette.open) closePalette();
+  else if (palette.open && event.key === "Enter" && document.activeElement === paletteSearch) {
+    event.preventDefault();
+    (
+      document.querySelector<HTMLButtonElement>(
+        "#command-list button",
+      ) as HTMLButtonElement | null
+    )?.click();
+  }
+});
+window.addEventListener("beforeunload", (event) => {
+  if (state.tabs.some((tab) => tab.dirty)) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
+void controller.initialize();
+render();
+$("#browser-notice").hidden = native;
+$("#engine-status").textContent = native ? "Local engine" : "Browser preview";
+if (native) {
+  let closingWindow = false;
+  void getCurrentWindow().onCloseRequested(async event => {
+    event.preventDefault();
+    if (closingWindow) return;
+    closingWindow = true;
+    try {
+      for (const tab of [...state.tabs]) if (!await controller.close(tab.id)) return;
+      controller.dispose();
+      await getCurrentWindow().destroy();
+    } finally { closingWindow = false; }
+  });
+}

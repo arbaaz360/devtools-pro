@@ -22,6 +22,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
+const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
 const MAX_JOBS: usize = 2;
 const MAX_DOCUMENTS: usize = 64;
 
@@ -62,6 +63,86 @@ struct OpenedDocument {
     encoding: String,
     offset: u64,
     bytes_read: usize,
+    content_kind: String,
+    mime: Option<String>,
+    editable: bool,
+}
+
+fn create_owned_snapshot(bytes: &[u8], extension: &str, sequence: u64) -> io::Result<PathBuf> {
+    let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_nanos()).unwrap_or_default();
+    let dir = std::env::temp_dir();
+    for attempt in 0..100u32 {
+        let path = dir.join(format!("devtools-pro-{}-{nonce}-{sequence}-{attempt}.{extension}", std::process::id()));
+        match fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(mut file) => {
+                if let Err(error) = (|| { file.write_all(bytes)?; file.flush()?; file.sync_all() })() {
+                    let _ = fs::remove_file(&path);
+                    return Err(error);
+                }
+                return Ok(path);
+            }
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
+        }
+    }
+    Err(io::Error::new(io::ErrorKind::AlreadyExists, "Could not allocate a unique snapshot file."))
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ContentInfo {
+    kind: &'static str,
+    mime: Option<&'static str>,
+    utf8: bool,
+    encoding: &'static str,
+}
+
+fn content_info(path: &Path) -> io::Result<ContentInfo> {
+    let mut file = File::open(path)?;
+    let mut head = [0u8; 16];
+    let n = file.read(&mut head)?;
+    let h = &head[..n];
+    let image = if h.starts_with(b"\x89PNG\r\n\x1a\n") { Some("image/png") }
+        else if h.starts_with(b"\xff\xd8\xff") { Some("image/jpeg") }
+        else if h.starts_with(b"GIF87a") || h.starts_with(b"GIF89a") { Some("image/gif") }
+        else if h.starts_with(b"RIFF") && h.len() >= 12 && &h[8..12] == b"WEBP" { Some("image/webp") }
+        else { None };
+    if let Some(mime) = image { return Ok(ContentInfo { kind: "image", mime: Some(mime), utf8: false, encoding: "Binary" }); }
+    let known = if h.starts_with(b"%PDF-") { Some("application/pdf") }
+        else if h.starts_with(b"PK\x03\x04") { Some("application/zip") }
+        else if h.starts_with(b"\x1f\x8b") { Some("application/gzip") }
+        else if h.starts_with(b"MZ") { Some("application/vnd.microsoft.portable-executable") }
+        else if h.starts_with(b"\x7fELF") { Some("application/x-elf") }
+        else { None };
+    if let Some(mime) = known { return Ok(ContentInfo { kind: "binary", mime: Some(mime), utf8: false, encoding: "Binary" }); }
+    if h.starts_with(&[0xff, 0xfe]) || h.starts_with(&[0xfe, 0xff]) {
+        let encoding = if h.starts_with(&[0xff, 0xfe]) { "UTF-16 LE" } else { "UTF-16 BE" };
+        return Ok(ContentInfo { kind: "text", mime: Some("text/plain"), utf8: false, encoding });
+    }
+    let (utf8, encoding) = if h.starts_with(&[0xef, 0xbb, 0xbf]) { (validate_utf8_file(&mut file, true)?, "UTF-8 BOM") }
+        else { (validate_utf8_file(&mut file, false)?, "UTF-8") };
+    Ok(if utf8 { ContentInfo { kind: "text", mime: Some("text/plain"), utf8: true, encoding } }
+       else { ContentInfo { kind: "binary", mime: Some("application/octet-stream"), utf8: false, encoding: "Binary" } })
+}
+
+fn validate_utf8_file(file: &mut File, bom: bool) -> io::Result<bool> {
+    file.seek(SeekFrom::Start(if bom { 3 } else { 0 }))?;
+    let mut carry = Vec::new();
+    let mut buf = [0u8; 64 * 1024];
+    loop {
+        let n = file.read(&mut buf)?;
+        if n == 0 { return Ok(std::str::from_utf8(&carry).is_ok()); }
+        if buf[..n].contains(&0) { return Ok(false); }
+        carry.extend_from_slice(&buf[..n]);
+        match std::str::from_utf8(&carry) {
+            Ok(_) => carry.clear(),
+            Err(error) if error.error_len().is_none() => {
+                let valid = error.valid_up_to();
+                carry.drain(..valid);
+                if carry.len() > 3 { return Ok(false); }
+            }
+            Err(_) => return Ok(false),
+        }
+    }
 }
 
 /// Decode only a bounded file window. Offsets refer to original bytes.
@@ -74,19 +155,22 @@ fn preview_document(id: String, doc: &RegisteredDocument, offset: u64) -> Result
     if offset > doc.size {
         return Err("Preview offset exceeds the file size.".into());
     }
-    let mut signature = [0u8; 3];
-    let signature_len = file.read(&mut signature).map_err(|e| e.to_string())?;
-    let encoding = if signature[..signature_len].starts_with(&[0xff, 0xfe]) {
-        "UTF-16 LE"
-    } else if signature[..signature_len].starts_with(&[0xfe, 0xff]) {
-        "UTF-16 BE"
-    } else if signature == [0xef, 0xbb, 0xbf] {
-        "UTF-8 BOM"
-    } else { "UTF-8" };
+    let info = content_info(&doc.path).map_err(|e| e.to_string())?;
+    if info.kind != "text" {
+        return Ok(OpenedDocument {
+            id, name: doc.display_name.clone().unwrap_or_else(|| doc.path.file_name().unwrap_or_default().to_string_lossy().into()),
+            path: doc.path.to_string_lossy().into(), size: doc.size, preview: String::new(), truncated: doc.size > 0,
+            format: "text".into(), encoding: "Binary".into(), offset, bytes_read: 0,
+            content_kind: info.kind.into(), mime: info.mime.map(str::to_string), editable: false,
+        });
+    }
+    let encoding = info.encoding;
     file.seek(SeekFrom::Start(offset)).map_err(|e| e.to_string())?;
-    let mut buffer = Vec::with_capacity(PREVIEW_BYTES + 4);
-    file.take((PREVIEW_BYTES + 4) as u64).read_to_end(&mut buffer).map_err(|e| e.to_string())?;
-    let mut consumed = buffer.len().min(PREVIEW_BYTES);
+    let full_read = offset == 0 && doc.size <= MAX_EDITABLE_TEXT;
+    let read_limit = if full_read { doc.size } else { (PREVIEW_BYTES + 4) as u64 };
+    let mut buffer = Vec::with_capacity(read_limit as usize);
+    file.take(read_limit).read_to_end(&mut buffer).map_err(|e| e.to_string())?;
+    let mut consumed = if full_read { buffer.len() } else { buffer.len().min(PREVIEW_BYTES) };
     let (preview, encoding) = if encoding.starts_with("UTF-16") {
         consumed -= consumed % 2;
         let start = if offset == 0 { 2.min(consumed) } else { 0 };
@@ -113,6 +197,7 @@ fn preview_document(id: String, doc: &RegisteredDocument, offset: u64) -> Result
     let format = if extension == "json" || (offset == 0 && (trimmed.starts_with('{') || trimmed.starts_with('['))) {
         "json"
     } else if extension == "csv" { "csv" } else { "text" };
+    let mime = match format { "json" => "application/json", "csv" => "text/csv", _ => "text/plain" };
     Ok(OpenedDocument {
         id,
         name: doc.display_name.clone().unwrap_or_else(|| doc.path.file_name().unwrap_or_default().to_string_lossy().into()),
@@ -124,6 +209,7 @@ fn preview_document(id: String, doc: &RegisteredDocument, offset: u64) -> Result
         encoding,
         offset,
         bytes_read: consumed,
+        content_kind: "text".into(), mime: Some(mime.into()), editable: info.utf8 && doc.size <= MAX_EDITABLE_TEXT,
     })
 }
 
@@ -144,19 +230,22 @@ async fn open_document(path: String, state: tauri::State<'_, Arc<HostState>>) ->
     }).await.map_err(|e| e.to_string())?
 }
 
-/// Create a bounded, app-owned text document for tools that accept pasted input.
+/// Create a bounded, app-owned immutable text snapshot.
 /// The file is temporary and removed when its document handle is closed.
 #[tauri::command]
-async fn create_text_document(text: String, state: tauri::State<'_, Arc<HostState>>) -> Result<OpenedDocument, String> {
+async fn create_text_document(text: String, name: Option<String>, format: Option<String>, state: tauri::State<'_, Arc<HostState>>) -> Result<OpenedDocument, String> {
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        if text.len() > 1024 * 1024 { return Err("Pasted input exceeds the 1 MiB limit.".into()); }
+        if text.len() > MAX_EDITABLE_TEXT as usize { return Err("Text document exceeds the 1 MiB limit.".into()); }
+        let extension = match format.as_deref().unwrap_or("text") { "json" => "json", "csv" => "csv", "text" => "txt", _ => return Err("Unsupported input format.".into()) };
+        let display_name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| "Untitled.txt".into());
+        let display_name = Path::new(&display_name).file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or("Untitled.txt").to_string();
+        if state.documents.lock().map_err(|e| e.to_string())?.len() >= MAX_DOCUMENTS { return Err("Close a document before opening another (64-tab limit).".into()); }
         let id = state.next_id("doc");
-        let path = std::env::temp_dir().join(format!("devtools-pro-{id}.txt"));
-        fs::write(&path, text.as_bytes()).map_err(|e| e.to_string())?;
-        let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
-        let document = RegisteredDocument { path, size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some("pasted-curl.txt".into()), origin_path: None };
-        let opened = preview_document(id.clone(), &document, 0)?;
+        let path = create_owned_snapshot(text.as_bytes(), extension, state.sequence.load(Ordering::Relaxed)).map_err(|e| e.to_string())?;
+        let meta = match fs::metadata(&path) { Ok(meta) => meta, Err(error) => { let _ = fs::remove_file(&path); return Err(error.to_string()); } };
+        let document = RegisteredDocument { path, size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(display_name), origin_path: None };
+        let opened = match preview_document(id.clone(), &document, 0) { Ok(opened) => opened, Err(error) => { let _ = fs::remove_file(&document.path); return Err(error); } };
         let mut documents = state.documents.lock().map_err(|e| e.to_string())?;
         if documents.len() >= MAX_DOCUMENTS { let _ = fs::remove_file(&document.path); return Err("Close a document before opening another (64-tab limit).".into()); }
         documents.insert(id, document);
@@ -188,16 +277,15 @@ fn read_binary_preview(document_id: String, state: tauri::State<'_, Arc<HostStat
     const MAX_BINARY_PREVIEW: u64 = 4 * 1024 * 1024;
     let document = state.documents.lock().map_err(|e| e.to_string())?.get(&document_id)
         .cloned().ok_or("Result document is no longer available.")?;
-    let file = File::open(&document.path).map_err(|e| e.to_string())?;
-    let total = file.metadata().map_err(|e| e.to_string())?.len();
-    let mut bytes = Vec::with_capacity(total.min(MAX_BINARY_PREVIEW) as usize);
-    file.take(MAX_BINARY_PREVIEW + 1).read_to_end(&mut bytes).map_err(|e| e.to_string())?;
-    let truncated = bytes.len() as u64 > MAX_BINARY_PREVIEW;
-    if truncated { bytes.truncate(MAX_BINARY_PREVIEW as usize); }
-    let mime = if bytes.starts_with(b"\x89PNG\r\n\x1a\n") { "image/png" }
-        else if bytes.starts_with(b"\xff\xd8\xff") { "image/jpeg" }
-        else { "application/octet-stream" };
-    Ok(BinaryPreview { mime: mime.into(), bytes: bytes.len(), truncated, data: format!("data:{mime};base64,{}", STANDARD.encode(bytes)) })
+    let meta = fs::metadata(&document.path).map_err(|e| e.to_string())?;
+    if !meta.is_file() || meta.len() != document.size || meta.modified().ok() != document.modified {
+        return Err("This document changed on disk. Reopen it before previewing the image.".into());
+    }
+    if meta.len() > MAX_BINARY_PREVIEW { return Err("Image preview is limited to 4 MiB; the file is too large to preview safely.".into()); }
+    let info = content_info(&document.path).map_err(|e| e.to_string())?;
+    let mime = info.mime.filter(|_| info.kind == "image").ok_or("This document is not a supported image.")?;
+    let bytes = fs::read(&document.path).map_err(|e| e.to_string())?;
+    Ok(BinaryPreview { mime: mime.into(), bytes: bytes.len(), truncated: false, data: format!("data:{mime};base64,{}", STANDARD.encode(bytes)) })
 }
 
 #[tauri::command]
@@ -261,11 +349,6 @@ fn manifest_for_tool(tool_id: &str) -> Result<devtools_core::ToolManifest, devto
         .ok_or_else(|| devtools_core::ToolError::UnknownTool { tool_id: tool_id.into() })
 }
 
-fn detected_document_format(document: &RegisteredDocument) -> Result<FileFormat, String> {
-    let opened = preview_document(String::new(), document, 0)?;
-    parse_format(&opened.format)
-}
-
 /// Generic tool entry point. The host resolves a capability-scoped document
 /// handle, validates the manifest's input and operation declarations, then
 /// enters the same bounded job scheduler used by the compatibility command.
@@ -285,21 +368,20 @@ fn run_tool(
     let document = state.documents.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?
         .get(&document_id).cloned()
         .ok_or_else(|| devtools_core::ToolError::Execution { message: "Document is no longer open.".into() })?;
-    let format = detected_document_format(&document)
-        .map_err(|message| devtools_core::ToolError::Execution { message })?;
-    let (input_kind, format_name) = match format {
-        FileFormat::Json => (devtools_core::InputKind::Json, "json"),
-        FileFormat::Csv => (devtools_core::InputKind::Csv, "csv"),
-        FileFormat::Text => (devtools_core::InputKind::Text, "text"),
-    };
-    // Hashing and image encoding consume the immutable raw bytes of an open
-    // file, so they are valid even when the preview detector labels the file
-    // as text. All other tools use the detected document kind for validation.
-    let validation_kind = if matches!(tool_id.as_str(), "encoding.hash" | "encoding.image-base64") && manifest.input_kinds.contains(&InputKind::Bytes) {
-        InputKind::Bytes
-    } else { input_kind };
+    let info = content_info(&document.path)
+        .map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?;
+    if info.kind != "text" && !manifest.input_kinds.contains(&InputKind::Bytes) {
+        return Err(ToolError::UnsupportedInputKind { tool_id, input_kind: info.kind.into() });
+    }
+    if info.kind == "text" && !info.utf8 && !manifest.input_kinds.contains(&InputKind::Bytes) {
+        return Err(ToolError::UnsupportedEncoding { message: "Only UTF-8 text is supported by this tool.".into() });
+    }
+    let structured_format = match tool_id.as_str() { "structured.json" => Some("json"), "structured.csv" => Some("csv"), _ => None };
+    let validation_kind = if let Some(kind) = structured_format { if kind == "json" { InputKind::Json } else { InputKind::Csv } }
+        else if manifest.input_kinds.contains(&InputKind::Bytes) { InputKind::Bytes } else { InputKind::Text };
     manifest.supports(validation_kind, &operation_id)?;
     if matches!(tool_id.as_str(), "structured.json" | "structured.csv" | "text.inspect") {
+        let format_name = structured_format.unwrap_or("text");
         return start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
             .map_err(|message| devtools_core::ToolError::Execution { message });
     }
@@ -488,6 +570,16 @@ fn run_compare(
             .ok_or_else(|| devtools_core::ToolError::Execution { message: "Right document is no longer open.".into() })?;
         (left, right)
     };
+    for (label, document) in [("Left", &left), ("Right", &right)] {
+        let info = content_info(&document.path)
+            .map_err(|error| ToolError::Execution { message: error.to_string() })?;
+        if info.kind != "text" {
+            return Err(ToolError::UnsupportedInputKind { tool_id: "text.compare".into(), input_kind: info.kind.into() });
+        }
+        if !info.utf8 {
+            return Err(ToolError::UnsupportedEncoding { message: format!("{label} document is not UTF-8 text.") });
+        }
+    }
     let token = CancellationToken::default();
     let job_id = state.next_id("job");
     let result_document_id = state.next_id("result");
@@ -825,6 +917,23 @@ fn save_result(
     atomic_copy(&document.path, &destination)
 }
 
+/// Save any open immutable document or generated snapshot to a new path.
+/// Publication is atomic and never overwrites an existing directory entry.
+#[tauri::command]
+fn save_document(
+    document_id: String,
+    output_path: String,
+    state: tauri::State<'_, Arc<HostState>>,
+) -> Result<(), String> {
+    let document = state.documents.lock().map_err(|e| e.to_string())?
+        .get(&document_id).cloned().ok_or("Document is no longer available.")?;
+    let destination = PathBuf::from(output_path);
+    let open_documents = state.documents.lock().map_err(|e| e.to_string())?;
+    validate_save_destination(&destination, &document, &open_documents)?;
+    drop(open_documents);
+    atomic_copy(&document.path, &destination)
+}
+
 #[tauri::command]
 fn list_tools() -> Vec<devtools_core::ToolManifest> {
     devtools_core::builtin_manifests()
@@ -835,7 +944,7 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, list_tools
+            open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, save_document, list_tools
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -974,5 +1083,48 @@ mod tests {
         let error = read_bounded_document(&path, DocumentKind::Text, Some(8), &CancellationToken::default(), &|_| {}).unwrap_err();
         assert!(matches!(error, ToolError::ResourceLimit { .. }));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn content_detection_distinguishes_utf8_and_images() {
+        let dir = test_dir("content-kind");
+        let text = dir.join("draft.txt");
+        let image = dir.join("pixel.png");
+        fs::write(&text, b"hello\n").unwrap();
+        fs::write(&image, b"\x89PNG\r\n\x1a\n junk").unwrap();
+        let text_info = content_info(&text).unwrap();
+        assert_eq!(text_info.kind, "text");
+        assert!(text_info.utf8);
+        let text_meta = fs::metadata(&text).unwrap();
+        let text_doc = RegisteredDocument { path: text.clone(), size: text_meta.len(), modified: text_meta.modified().ok(), temporary: false, display_name: None, origin_path: None };
+        let opened = preview_document("text".into(), &text_doc, 0).unwrap();
+        assert!(opened.editable);
+        assert!(!opened.truncated);
+        let image_info = content_info(&image).unwrap();
+        assert_eq!(image_info.kind, "image");
+        assert_eq!(image_info.mime, Some("image/png"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn binary_preview_does_not_return_lossy_text() {
+        let dir = test_dir("binary-preview");
+        let path = dir.join("image.jpg");
+        fs::write(&path, b"\xff\xd8\xff\x00\x80").unwrap();
+        let meta = fs::metadata(&path).unwrap();
+        let doc = RegisteredDocument { path: path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: false, display_name: None, origin_path: None };
+        let opened = preview_document("doc".into(), &doc, 0).unwrap();
+        assert_eq!(opened.content_kind, "image");
+        assert!(opened.preview.is_empty());
+        assert_eq!(opened.mime.as_deref(), Some("image/jpeg"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn owned_snapshot_supports_empty_content_with_exclusive_file() {
+        let path = create_owned_snapshot(b"", "txt", 7).unwrap();
+        assert!(path_entry_exists(&path));
+        assert!(fs::read(&path).unwrap().is_empty());
+        fs::remove_file(path).unwrap();
     }
 }
