@@ -20,11 +20,11 @@ function run(command, args) {
   }
 }
 
-// The repository's large acceptance fixtures are generated locally and ignored
-// by git; library tests keep this gate deterministic on a clean checkout.
-run('cargo', ['test', '--workspace', '--lib']);
+run('node', ['scripts/generate-fixtures.mjs']);
+run('cargo', ['test', '--workspace']);
 run('pnpm', ['--dir', 'apps/desktop', 'build']);
 run('node', ['scripts/check-desktop-bundle.mjs']);
+run('cargo', ['build', '-p', 'devtools-cli']);
 run('node', ['scripts/smoke-shell.mjs']);
 run('git', ['diff', '--check']);
 

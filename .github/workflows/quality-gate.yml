@@ -6,7 +6,9 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    # The host tests compile the Windows native shell; no Linux GTK dependency
+    # workaround or library-only test omission is needed on this runner.
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
