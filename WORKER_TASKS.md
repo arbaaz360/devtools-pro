@@ -6,7 +6,8 @@ This file is a queue of self-contained tasks for lower-cost worker models. Each 
 
 - Completed and pushed: Tasks 00A, 00, 01–15, 16, 17, 18, and the quality-gate portion of 21.
 - Core compare hardening is also merged in `8a19d05`, with explicit input, line, hunk, output, and cancellation checks.
-- In progress: Task 20 (image codec and preview coverage), assigned to a Terra medium worker.
+- Completed and pushed: Task 20 image codec and preview coverage (`d4a1b13`), with PNG/JPEG-only MIME metadata and strict validation.
+- In progress: final review of the quality-gate and extension documentation queue.
 - Still queued: the benchmark report and extension/release documentation. Keep those tasks separate from feature work so their measurements and guidance remain reproducible.
 
 ## Shared worker contract
