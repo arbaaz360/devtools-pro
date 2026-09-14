@@ -48,6 +48,8 @@ The Rust core, CLI, and Tauri host are meaningfully decoupled and can be tested 
 
 The desktop UI is **not yet a dynamic plugin system**. Tool navigation, command-palette entries, and views are currently registered in `main.ts`, while the backend registry is only partially surfaced. Adding a tool today therefore requires a small amount of deliberate wiring in both Rust and TypeScript; it is not yet “drop a folder in and it appears.”
 
+The desktop shell keeps this boundary explicit through `apps/desktop/src/toolViews/registry.ts`: each manifest resolves to an isolated `ToolView`, or to a safe unavailable state when no view is bundled. JSON, text, hash, image, cURL, and diff controls live in separate view modules. `resultLifecycle.ts` binds each job to its source document, operation, tool, renderer, and revision. Tool and tab transitions invalidate that revision, so late progress events and bounded preview reads cannot repaint a newer workspace. Result rendering follows `RendererKind` and MIME metadata; binary image output uses the binary preview command and never decodes bytes as text, while copy is hidden for binary results. Save dialogs receive a view-provided suggestion rather than a shell switch on tool ids.
+
 The next architectural step is a generic tool runner that consumes `ToolManifest`, typed document handles, and an options payload, plus a renderer registry keyed by `ViewKind`. That would reduce each new tool to a core implementation, manifest, and isolated view. Until then, new tools should follow the boundaries above and avoid importing or mutating another tool's state.
 
 ## Non-negotiable extension rules

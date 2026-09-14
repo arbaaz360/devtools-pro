@@ -76,30 +76,18 @@ export async function chooseFile(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null;
 }
 
+export interface SaveSuggestion { title: string; suffix: string; filterName: string; extensions: string[]; }
+export async function chooseResultOutput(document: FileDocument, suggestion: SaveSuggestion): Promise<string | null> {
+  const path = document.path.replace(/(\.[^./\\]+)?$/, suggestion.suffix);
+  return save({ title: suggestion.title, defaultPath: path, filters: [{ name: suggestion.filterName, extensions: suggestion.extensions }] });
+}
+
+/** Compatibility adapter for older callers; new views should pass SaveSuggestion. */
 export async function chooseOutput(document: FileDocument, operation: Operation | TextUtilityOperation | 'hash' | 'image-base64' | 'base64-image' | 'compare', resultMime?: string | null): Promise<string | null> {
-  if (operation === 'hash') {
-    const path = document.path.replace(/(\.[^./\\]+)?$/, '.sha.txt');
-    return save({ title: 'Save hash to a new file', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
-  }
-  if (operation === 'encode' || operation === 'decode' || operation === 'escape' || operation === 'unescape') {
-    const path = document.path.replace(/(\.[^./\\]+)?$/, `.${operation}.txt`);
-    return save({ title: 'Save text result', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
-  }
-  if (operation === 'image-base64') {
-    const path = document.path.replace(/(\.[^./\\]+)?$/, '.base64.txt');
-    return save({ title: 'Save Base64 result', defaultPath: path, filters: [{ name: 'Text', extensions: ['txt'] }] });
-  }
-  if (operation === 'base64-image') {
-    const extension = resultMime === 'image/jpeg' ? 'jpg' : 'png';
-    const path = document.path.replace(/(\.[^./\\]+)?$/, `.decoded.${extension}`);
-    return save({ title: 'Save decoded image', defaultPath: path, filters: [{ name: 'Image', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'] }] });
-  }
-  if (operation === 'compare') {
-    const path = document.path.replace(/(\.[^./\\]+)?$/, '.diff.json');
-    return save({ title: 'Save text diff', defaultPath: path, filters: [{ name: 'JSON', extensions: ['json'] }] });
-  }
-  const path = document.path.replace(/(\.[^./\\]+)?$/, `.${operation === 'format' ? 'formatted' : 'minified'}.json`);
-  return save({ title: 'Save JSON to a new file', defaultPath: path, filters: [{ name: 'JSON', extensions: ['json'] }] });
+  const binary = operation === 'base64-image';
+  const extension = binary ? (resultMime === 'image/jpeg' ? 'jpg' : 'png') : operation === 'compare' ? 'json' : operation === 'hash' ? 'txt' : operation === 'format' || operation === 'minify' ? 'json' : 'txt';
+  const suffix = operation === 'hash' ? '.sha.txt' : operation === 'compare' ? '.diff.json' : operation === 'image-base64' ? '.base64.txt' : binary ? `.decoded.${extension}` : `.${operation}.${extension}`;
+  return chooseResultOutput(document, { title: 'Save result', suffix, filterName: binary ? 'Image' : extension === 'json' ? 'JSON' : 'Text', extensions: binary ? ['png', 'jpg', 'jpeg'] : [extension] });
 }
 
 export function openDocument(path: string): Promise<FileDocument> {
