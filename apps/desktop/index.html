@@ -232,10 +232,18 @@
                       wrap="off"
                       aria-label="Result text"
                     ></textarea>
+                    <div
+                      id="result-structured"
+                      class="structured-result"
+                      hidden
+                      aria-label="Structured result"
+                    ></div>
                     <div id="result-media" class="image-stage" hidden></div>
                     <div class="result-actions">
                       <button id="copy-result" class="outline-button" hidden>
                         Copy result</button
+                      ><button id="open-result" class="outline-button" hidden>
+                        Open as tab</button
                       ><button id="save-result" class="primary-button" hidden>
                         Save result…
                       </button>

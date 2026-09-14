@@ -482,8 +482,8 @@ fn execute_registered_tool(
 ) -> Result<devtools_core::ToolResult, ToolError> {
     if token.is_cancelled() { return Err(ToolError::Cancelled); }
     match tool_id {
-        "text.url" | "text.html" | "text.unicode" => {
-            let kind = match tool_id { "text.url" => TextUtilityKind::Url, "text.html" => TextUtilityKind::Html, _ => TextUtilityKind::Unicode };
+        "text.url" | "text.html" | "text.unicode" | "text.json-string" => {
+            let kind = match tool_id { "text.url" => TextUtilityKind::Url, "text.html" => TextUtilityKind::Html, "text.unicode" => TextUtilityKind::Unicode, _ => TextUtilityKind::JsonString };
             let opts: TextUtilityOptions = serde_json::from_value(options.clone()).map_err(|error| ToolError::InvalidOptions { message: error.to_string() })?;
             progress(Progress { bytes_processed: 0, total_bytes: input.len() as u64, phase: "transforming".into() });
             let result = transform_text(input, kind, operation_id, &opts)?;

@@ -38,6 +38,12 @@ export interface TabState {
   jobId: string | null;
   progress: JobProgress | null;
   result: ResultView | null;
+  /** Existing output is retained while a same-tool edit is recomputing. */
+  resultStale: boolean;
+  findQuery: string;
+  findReplacement: string;
+  findCaseSensitive: boolean;
+  findWholeWord: boolean;
   image: BinaryPreview | null;
   imageError: string | null;
   error: string | null;
@@ -85,19 +91,25 @@ export function makeTab(
     jobId: null,
     progress: null,
     result: null,
+    resultStale: false,
+    findQuery: "",
+    findReplacement: "",
+    findCaseSensitive: true,
+    findWholeWord: false,
     image: null,
     imageError: null,
     error: null,
   };
 }
-function reset(tab: TabState): TabState {
+function reset(tab: TabState, preserveResult = true): TabState {
   return {
     ...tab,
     generation: tab.generation + 1,
     phase: "idle",
     jobId: null,
     progress: null,
-    result: null,
+    result: preserveResult ? tab.result : null,
+    resultStale: preserveResult && !!tab.result,
     error: null,
   };
 }
@@ -130,6 +142,19 @@ export type Action =
       options: Record<string, unknown>;
     }
   | { type: "right"; id: string; text: string }
+  | {
+      type: "find-options";
+      id: string;
+      patch: Partial<
+        Pick<
+          TabState,
+          | "findQuery"
+          | "findReplacement"
+          | "findCaseSensitive"
+          | "findWholeWord"
+        >
+      >;
+    }
   | { type: "queue" | "cancel"; id: string }
   | { type: "error"; id: string; message: string }
   | { type: "started"; token: RunToken; jobId: string }
@@ -204,7 +229,7 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         }
         case "tool":
           return {
-            ...reset(tab),
+            ...reset(tab, false),
             toolId: action.toolId,
             operation: action.operation,
             options: action.options,
@@ -217,12 +242,18 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
           };
         case "right":
           return { ...reset(tab), rightText: action.text };
+        case "find-options":
+          return { ...tab, ...action.patch };
         case "queue":
           return { ...reset(tab), phase: "queued" };
         case "cancel":
-          return { ...reset(tab), phase: "cancelled" };
+          return { ...reset(tab, false), phase: "cancelled" };
         case "error":
-          return { ...tab, error: action.message };
+          return {
+            ...reset(tab, false),
+            phase: "error",
+            error: action.message,
+          };
         case "started":
           return { ...tab, jobId: action.jobId, phase: "running" };
         case "progress":
@@ -239,10 +270,16 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
                 : "error",
             jobId: null,
             result: action.result,
+            resultStale: false,
             error: action.result.event.error ?? null,
           };
         case "failed":
-          return { ...tab, phase: "error", jobId: null, error: action.message };
+          return {
+            ...reset(tab, false),
+            phase: "error",
+            jobId: null,
+            error: action.message,
+          };
         case "image":
           return { ...tab, image: action.image, imageError: action.error };
         case "saved":

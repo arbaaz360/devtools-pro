@@ -188,6 +188,7 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
         text_manifest("text.url", "URL Encode / Decode", vec![("encode", "Encode"), ("decode", "Decode")]),
         text_manifest("text.html", "HTML Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
         text_manifest("text.unicode", "Unicode Escape / Unescape", vec![("encode", "Escape"), ("decode", "Unescape")]),
+        text_manifest("text.json-string", "JSON String Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
         crate::compare::compare_manifest(),
         ToolManifest {
             id: "web.curl-code".into(), label: "cURL to Code".into(), contract_version: 1,

@@ -94,6 +94,8 @@ export const errorText = (error: unknown): string =>
 
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
 export class WorkbenchController {
+  private api: WorkbenchApi;
+  private hooks: WorkbenchHooks;
   state: WorkspaceState = emptyWorkspace;
   manifests = new Map<string, ToolManifest>();
   private nextId = 0;
@@ -108,10 +110,10 @@ export class WorkbenchController {
   private stopEvents?: () => void;
   private saving = new Set<string>();
   private closing = new Set<string>();
-  constructor(
-    private api: WorkbenchApi,
-    private hooks: WorkbenchHooks,
-  ) {}
+  constructor(api: WorkbenchApi, hooks: WorkbenchHooks) {
+    this.api = api;
+    this.hooks = hooks;
+  }
 
   private dispatch(action: Action) {
     this.state = reduce(this.state, action);
@@ -200,6 +202,93 @@ export class WorkbenchController {
     }
     return text;
   }
+  /** Read a generated text result in bounded pages for the editable result tab. */
+  async readResultText(id: string): Promise<string> {
+    return this.readResultTextBounded(id, EDIT_LIMIT);
+  }
+  /** Read a complete textual result for clipboard use, within a safe memory bound. */
+  async readResultClipboard(id: string): Promise<string> {
+    return this.readResultTextBounded(id, 32 * 1024 * 1024);
+  }
+  private async readResultTextBounded(
+    id: string,
+    maxBytes: number,
+  ): Promise<string> {
+    const tab = this.tab(id);
+    const event = tab?.result?.event;
+    if (
+      !tab ||
+      tab.resultStale ||
+      tab.phase !== "success" ||
+      !event?.ok ||
+      !event.resultDocumentId
+    )
+      throw new Error("That result is no longer current.");
+    if (event.renderer === "binary" || event.resultMime?.startsWith("image/"))
+      throw new Error("Binary results cannot be opened as text.");
+    const token = tokenFor(tab);
+    const resultId = event.resultDocumentId;
+    this.savingResults.add(resultId);
+    try {
+      let page = await this.api.readPreview(resultId, 0);
+      let text = page.preview;
+      let offset = page.bytesRead ?? new TextEncoder().encode(text).length;
+      if (new TextEncoder().encode(text).length > maxBytes)
+        throw new Error(
+          `Result is larger than the ${Math.round(maxBytes / (1024 * 1024))} MiB limit.`,
+        );
+      while (offset < page.size) {
+        if (
+          !this.current(token) ||
+          this.tab(id)?.result?.event.resultDocumentId !== resultId ||
+          this.tab(id)?.resultStale
+        )
+          throw new Error("The result changed while it was being read.");
+        page = await this.api.readPreview(resultId, offset);
+        if (!page.bytesRead)
+          throw new Error("The result could not be read completely.");
+        text += page.preview;
+        offset += page.bytesRead;
+        if (new TextEncoder().encode(text).length > maxBytes)
+          throw new Error(
+            `Result is larger than the ${Math.round(maxBytes / (1024 * 1024))} MiB limit.`,
+          );
+      }
+      if (
+        !this.current(token) ||
+        this.tab(id)?.result?.event.resultDocumentId !== resultId ||
+        this.tab(id)?.resultStale
+      )
+        throw new Error("The result changed while it was being read.");
+      return text;
+    } finally {
+      this.savingResults.delete(resultId);
+      this.cleanup();
+    }
+  }
+  /** Open a complete generated text result as a new in-memory editable tab. */
+  async openResult(id: string): Promise<void> {
+    const source = this.tab(id);
+    const event = source?.result?.event;
+    if (
+      !source ||
+      source.resultStale ||
+      source.phase !== "success" ||
+      !event?.ok
+    )
+      throw new Error("That result is no longer current.");
+    const text = await this.readResultText(id);
+    if (this.state.tabs.length >= MAX_TABS)
+      throw new Error("Close a tab before opening another (16-tab limit).");
+    const suffix = source.operation ? `.${source.operation}` : ".result";
+    const tab = makeTab(
+      `tab-${++this.nextId}`,
+      `${source.name}${suffix}.txt`,
+      null,
+      text,
+    );
+    this.dispatch({ type: "add", tab });
+  }
   async openPath(path: string) {
     if (!this.api.native) {
       this.hooks.notify("Open the native desktop app to read local files.");
@@ -260,6 +349,8 @@ export class WorkbenchController {
     this.schedule(id, 0);
   }
   edit(id: string, text: string) {
+    const existing = this.tab(id);
+    if (!existing || existing.text === text) return;
     if (new TextEncoder().encode(text).length > EDIT_LIMIT) {
       this.hooks.notify(
         "Editable documents are limited to 1 MiB. Your previous text is unchanged.",
@@ -292,6 +383,18 @@ export class WorkbenchController {
     this.invalidate(id);
     this.dispatch({ type: "right", id, text });
     this.schedule(id);
+  }
+  findOptions(
+    id: string,
+    patch: Partial<
+      Pick<
+        TabState,
+        "findQuery" | "findReplacement" | "findCaseSensitive" | "findWholeWord"
+      >
+    >,
+  ) {
+    if (!this.tab(id)) return;
+    this.dispatch({ type: "find-options", id, patch });
   }
   async openRight(id: string) {
     let doc: FileDocument | undefined;
@@ -475,6 +578,24 @@ export class WorkbenchController {
           const preview = await this.api.readPreview(event.resultDocumentId);
           view.text = preview.preview;
           view.truncated = preview.truncated;
+          // Small generated results must be complete so ordinary selection and
+          // copy/paste round-trips do not copy only the first preview page.
+          if (preview.size <= EDIT_LIMIT && preview.truncated) {
+            let offset =
+              preview.bytesRead ??
+              new TextEncoder().encode(preview.preview).length;
+            while (offset < preview.size && this.current(task.token)) {
+              const page = await this.api.readPreview(
+                event.resultDocumentId,
+                offset,
+              );
+              if (!page.bytesRead)
+                throw new Error("The complete result could not be read.");
+              view.text += page.preview;
+              offset += page.bytesRead;
+            }
+            view.truncated = offset < preview.size;
+          }
         }
       }
     } catch (error) {
@@ -503,7 +624,8 @@ export class WorkbenchController {
           (task) =>
             task.snapshots.includes(id) ||
             task.tab.source?.id === id ||
-            task.tab.result?.event.resultDocumentId === id,
+            (task.tab.result?.event.resultDocumentId === id &&
+              !task.tab.resultStale),
         )
       )
         continue;
@@ -550,7 +672,14 @@ export class WorkbenchController {
   async saveOutput(id: string) {
     const tab = this.tab(id);
     const event = tab?.result?.event;
-    if (!tab || !event?.ok || !event.resultDocumentId) return;
+    if (
+      !tab ||
+      tab.resultStale ||
+      tab.phase !== "success" ||
+      !event?.ok ||
+      !event.resultDocumentId
+    )
+      return;
     const token = tokenFor(tab);
     const resultId = event.resultDocumentId;
     this.savingResults.add(resultId);

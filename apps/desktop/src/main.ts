@@ -1,5 +1,6 @@
 import "./styles.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
 import {
   native,
   chooseFile,
@@ -28,8 +29,10 @@ import {
 import {
   bundledTools,
   definition,
+  validation,
   type ToolDefinition,
 } from "./workbench/tools";
+import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -59,6 +62,11 @@ const bytes = (value: number | null | undefined) => {
 let state: WorkspaceState;
 let controller: WorkbenchController;
 let paletteOpener: HTMLElement | null = null;
+let renderedResult: object | null = null;
+let renderedResultStale = false;
+let renderedOptionsKey = "";
+let renderedToolsKey = "";
+let renderedActionsKey = "";
 const palette = $("#palette") as HTMLDialogElement;
 const paletteSearch = $("#palette-search") as HTMLInputElement;
 const notify = (message: string) => {
@@ -77,7 +85,10 @@ function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
     $("#unsaved-save").onclick = () => finish("save");
     $("#unsaved-discard").onclick = () => finish("discard");
     $("#unsaved-cancel").onclick = () => finish("cancel");
-    dialog.oncancel = (event) => { event.preventDefault(); finish("cancel"); };
+    dialog.oncancel = (event) => {
+      event.preventDefault();
+      finish("cancel");
+    };
   });
 }
 function renderTabs() {
@@ -123,6 +134,9 @@ function renderTools() {
   const query = ($("#tool-search") as HTMLInputElement).value
     .trim()
     .toLowerCase();
+  const toolsKey = `${query}|${state.activeId}|${state.tabs.map((tab) => `${tab.id}:${tab.toolId}`).join(",")}`;
+  if (toolsKey === renderedToolsKey) return;
+  renderedToolsKey = toolsKey;
   nav.innerHTML = "";
   const visible = bundledTools.filter(
     (tool) =>
@@ -157,7 +171,10 @@ function renderTools() {
       button.innerHTML = `<span class="tool-item-icon" aria-hidden="true">${esc(tool.icon)}</span><span><strong>${esc(tool.label)}</strong><small>${esc(tool.operations.map((operation) => operation.label).join(" · ") || "New document")}</small></span>`;
       button.onclick = () => {
         if (!state.activeId) {
-          if (tool.input === "image") { void controller.chooseFile(); return; }
+          if (tool.input === "image") {
+            void controller.chooseFile();
+            return;
+          }
           controller.newDocument();
         }
         if (state.activeId) controller.selectTool(state.activeId, tool.id);
@@ -169,25 +186,105 @@ function renderTools() {
 }
 function renderOptions(tab: TabState, tool: ReturnType<typeof definition>) {
   const host = $(".format-control");
+  const optionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${JSON.stringify(tab.options)}:${tool?.id === "text.find-replace" ? tab.revision : ""}`;
+  if (optionsKey === renderedOptionsKey) return;
+  renderedOptionsKey = optionsKey;
   host.innerHTML = "";
   if (!tool?.operations.length) return;
-  if (tool.operations.length > 1) {
-    const label = document.createElement("label");
-    label.className = "dynamic-option";
-    label.textContent = "Operation";
-    const select = document.createElement("select");
-    select.setAttribute("aria-label", `${tool.label} operation`);
-    for (const operation of tool.operations) {
-      const option = document.createElement("option");
-      option.value = operation.id;
-      option.textContent = operation.label;
-      option.selected = operation.id === tab.operation;
-      select.append(option);
-    }
-    select.onchange = () =>
-      controller.options(tab.id, select.value, { ...tab.options });
-    label.append(select);
-    host.append(label);
+  if (tool.id === "text.find-replace") {
+    const query = document.createElement("input");
+    query.type = "search";
+    query.placeholder = "Find…";
+    query.setAttribute("aria-label", "Find text");
+    query.className = "find-query";
+    query.value = tab.findQuery;
+    const replacement = document.createElement("input");
+    replacement.placeholder = "Replace with…";
+    replacement.setAttribute("aria-label", "Replace text");
+    replacement.className = "find-replacement";
+    replacement.value = tab.findReplacement;
+    const caseSensitive = document.createElement("label");
+    caseSensitive.className = "check-option";
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = tab.findCaseSensitive;
+    caseSensitive.append(check, document.createTextNode("Aa"));
+    const wholeWord = document.createElement("label");
+    wholeWord.className = "check-option";
+    const whole = document.createElement("input");
+    whole.type = "checkbox";
+    whole.checked = tab.findWholeWord;
+    wholeWord.append(whole, document.createTextNode("Whole word"));
+    const findButton = document.createElement("button");
+    findButton.className = "outline-button";
+    findButton.textContent = "Find";
+    const replaceButton = document.createElement("button");
+    replaceButton.className = "outline-button";
+    replaceButton.textContent = "Replace all";
+    const report = document.createElement("span");
+    report.className = "find-report";
+    const refresh = () => {
+      try {
+        const current = controller.tab(tab.id);
+        const source = current?.text ?? current?.source?.preview ?? "";
+        controller.findOptions(tab.id, {
+          findQuery: query.value,
+          findReplacement: replacement.value,
+          findCaseSensitive: check.checked,
+          findWholeWord: whole.checked,
+        });
+        const found = findMatches(source, query.value, {
+          caseSensitive: check.checked,
+          wholeWord: whole.checked,
+        });
+        report.textContent = `${found.matches.length}${found.truncated ? "+" : ""} match${found.matches.length === 1 ? "" : "es"}`;
+        findButton.disabled = !found.matches.length;
+        replaceButton.disabled = !found.matches.length;
+        findButton.onclick = () => {
+          const match = nextMatch(
+            found.matches,
+            (input as HTMLTextAreaElement).selectionStart,
+            (input as HTMLTextAreaElement).selectionEnd,
+          );
+          if (match) {
+            input.focus();
+            (input as HTMLTextAreaElement).setSelectionRange(
+              match.start,
+              match.end,
+            );
+          }
+        };
+        replaceButton.onclick = () => {
+          const latest = controller.tab(tab.id);
+          const result = replaceAll(
+            latest?.text ?? "",
+            query.value,
+            replacement.value,
+            { caseSensitive: check.checked, wholeWord: whole.checked },
+          );
+          if (result.count) controller.edit(tab.id, result.text);
+        };
+      } catch (error) {
+        report.textContent =
+          error instanceof Error ? error.message : String(error);
+      }
+    };
+    const input = $("#preview") as HTMLTextAreaElement;
+    query.oninput = refresh;
+    replacement.oninput = refresh;
+    check.onchange = refresh;
+    whole.onchange = refresh;
+    host.append(
+      query,
+      replacement,
+      caseSensitive,
+      wholeWord,
+      findButton,
+      replaceButton,
+      report,
+    );
+    refresh();
+    return;
   }
   if (tool.id === "text.compare") {
     const label = document.createElement("label");
@@ -242,9 +339,14 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
   empty.hidden = true;
   $("#editor-host").hidden = !!tool?.compare;
   wrap.hidden = !imageInput;
-  input.hidden = imageInput || binaryInput || !!tool?.compare;
-  message.hidden = !binaryInput;
-  if (binaryInput) message.textContent = "Binary file · Choose a compatible tool such as Hash generator. Text editing is unavailable for this file.";
+  input.hidden =
+    imageInput || binaryInput || !!tool?.compare || tool?.input === "image";
+  message.hidden = !(binaryInput || (tool?.input === "image" && !imageInput));
+  if (binaryInput)
+    message.textContent =
+      "Binary file · Choose a compatible tool such as Hash generator. Text editing is unavailable for this file.";
+  else if (tool?.input === "image" && !imageInput)
+    message.textContent = "Open a PNG or JPEG image to use Image to Base64.";
   $("#source-mode").textContent =
     tab.text !== null
       ? tab.dirty
@@ -256,7 +358,8 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
   if (imageInput) {
     input.value = "";
     if (tab.image) {
-      if (image.getAttribute("src") !== tab.image.data) image.src = tab.image.data;
+      if (image.getAttribute("src") !== tab.image.data)
+        image.src = tab.image.data;
       image.alt = `${tab.image.mime} image preview`;
       message.hidden = true;
     } else {
@@ -283,33 +386,120 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
   $("#encoding").textContent = tab.source?.encoding ?? "UTF-8";
   $("#source-name").textContent = tab.name;
   $("#source-size").textContent = tab.source ? bytes(tab.source.size) : "—";
-  $("#source-format").textContent = tab.source?.contentKind === 'text' ? tab.source.format.toUpperCase() : tab.source?.contentKind.toUpperCase() ?? "TEXT";
+  $("#source-format").textContent =
+    tab.source?.contentKind === "text"
+      ? tab.source.format.toUpperCase()
+      : (tab.source?.contentKind.toUpperCase() ?? "TEXT");
 }
 function renderActions(tab: TabState, tool: ReturnType<typeof definition>) {
   const host = $(".toolbar-actions");
+  const actionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${tab.phase}:${tool ? (validation(tab, tool) ?? "") : ""}`;
+  if (actionsKey === renderedActionsKey) return;
+  renderedActionsKey = actionsKey;
   host.innerHTML = "";
   if (!tool?.operations.length) return;
+  if (tool.id === "text.find-replace") return;
   for (const operation of tool.operations) {
     const button = document.createElement("button");
     button.type = "button";
     button.className =
       operation.id === tab.operation ? "primary-button" : "outline-button";
     button.textContent = operation.label;
-    button.disabled = tab.phase === "queued" || tab.phase === "running";
+    button.disabled =
+      tab.phase === "queued" ||
+      tab.phase === "running" ||
+      !!validation(tab, tool);
     button.onclick = () =>
       controller.options(tab.id, operation.id, { ...tab.options });
     host.append(button);
   }
+}
+function renderDiffResult(text: string, host: HTMLElement): boolean {
+  try {
+    const value: unknown = JSON.parse(text);
+    if (
+      !value ||
+      typeof value !== "object" ||
+      !Array.isArray((value as { hunks?: unknown }).hunks)
+    )
+      return false;
+    host.replaceChildren();
+    for (const hunk of (value as { hunks: unknown[] }).hunks) {
+      if (!hunk || typeof hunk !== "object") continue;
+      const record = hunk as {
+        oldStart?: number;
+        oldLines?: number;
+        newStart?: number;
+        newLines?: number;
+        lines?: unknown[];
+      };
+      const section = document.createElement("section");
+      section.className = "diff-hunk";
+      const heading = document.createElement("div");
+      heading.className = "diff-hunk-title";
+      heading.textContent = `Lines ${record.oldStart ?? "?"},${record.oldLines ?? 0} → ${record.newStart ?? "?"},${record.newLines ?? 0}`;
+      section.append(heading);
+      for (const line of record.lines ?? []) {
+        if (!line || typeof line !== "object") continue;
+        const item = line as {
+          kind?: string;
+          text?: string;
+          oldLine?: number | null;
+          newLine?: number | null;
+        };
+        const row = document.createElement("div");
+        row.className = `diff-line ${item.kind ?? "context"}`;
+        const number = document.createElement("span");
+        number.className = "diff-line-number";
+        number.textContent = `${item.oldLine ?? ""}  ${item.newLine ?? ""}`;
+        const body = document.createElement("span");
+        body.className = "diff-line-text";
+        body.textContent = `${item.kind === "added" ? "+" : item.kind === "removed" ? "−" : " "}${item.text ?? ""}`;
+        row.append(number, body);
+        section.append(row);
+      }
+      host.append(section);
+    }
+    return host.childElementCount > 0;
+  } catch {
+    return false;
+  }
+}
+function readableSummary(summary: unknown): string {
+  if (typeof summary !== "string")
+    return JSON.stringify(summary ?? {}, null, 2);
+  try {
+    const value = JSON.parse(summary) as unknown;
+    if (value && typeof value === "object" && !Array.isArray(value))
+      return Object.entries(value as Record<string, unknown>)
+        .map(
+          ([key, item]) =>
+            `${key}: ${typeof item === "object" ? JSON.stringify(item) : String(item)}`,
+        )
+        .join("\n");
+  } catch {
+    /* plain text summary */
+  }
+  return summary;
 }
 function renderResult(tab: TabState) {
   const result = tab.result;
   const empty = $("#result-empty");
   const content = $("#result-content");
   if (!result) {
+    renderedResult = null;
+    renderedResultStale = false;
+    $("#copy-result").hidden = true;
+    $("#open-result").hidden = true;
+    $("#save-result").hidden = true;
     empty.hidden = false;
     content.hidden = true;
     return;
   }
+  if (result === renderedResult && tab.resultStale === renderedResultStale)
+    return;
+  renderedResult = result;
+  renderedResultStale = tab.resultStale;
   empty.hidden = true;
   content.hidden = false;
   const event = result.event;
@@ -320,10 +510,8 @@ function renderResult(tab: TabState) {
     : event.cancelled
       ? "○ Cancelled"
       : `● ${event.error ?? "Operation failed"}`;
-  $("#result-summary").textContent =
-    typeof event.summary === "string"
-      ? event.summary
-      : JSON.stringify(event.summary ?? {}, null, 2);
+  if (tab.resultStale) stateNode.textContent += " · Updating…";
+  $("#result-summary").textContent = readableSummary(event.summary);
   $("#result-metrics").innerHTML = [
     ["Elapsed", `${event.elapsedMs} ms`],
     ["Input", bytes(event.inputBytes)],
@@ -334,8 +522,15 @@ function renderResult(tab: TabState) {
     .join("");
   const media = $("#result-media");
   media.innerHTML = "";
+  const structured = $("#result-structured");
+  structured.replaceChildren();
   const output = $("#result-output") as HTMLTextAreaElement;
   const binary = !!result.image;
+  const diff =
+    !binary &&
+    event.renderer === "diff" &&
+    renderDiffResult(result.text, structured);
+  structured.hidden = !diff;
   media.hidden = !binary;
   if (result.image) {
     const image = document.createElement("img");
@@ -344,7 +539,7 @@ function renderResult(tab: TabState) {
     image.alt = `${result.image.mime} result preview`;
     media.append(image);
   }
-  output.hidden = binary;
+  output.hidden = binary || diff;
   if (output.value !== result.text) output.value = result.text;
   $("#result-output-meta").textContent =
     result.previewError ??
@@ -353,14 +548,22 @@ function renderResult(tab: TabState) {
       : event.ok
         ? "Complete result"
         : "No result");
-  $("#copy-result").hidden = !event.ok || binary || !result.text || result.truncated;
-  $("#save-result").hidden = !event.ok || !event.resultDocumentId;
+  $("#copy-result").hidden =
+    tab.resultStale || !event.ok || binary || !result.text;
+  $("#open-result").hidden =
+    tab.resultStale || !event.ok || binary || !event.resultDocumentId;
+  $("#save-result").hidden =
+    tab.resultStale || !event.ok || !event.resultDocumentId;
 }
 function render() {
   const tab = activeTab(state);
   renderTabs();
   renderTools();
   const tool = tab ? definition(tab.toolId) : undefined;
+  $("#document-panel").classList.toggle(
+    "single-pane",
+    tool?.id === "editor.text" || tool?.id === "text.find-replace",
+  );
   $("#active-tool-icon").textContent = tool?.icon ?? "Aa";
   $("#active-tool-label").textContent = (
     tool?.group ?? "WORKSPACE"
@@ -468,7 +671,11 @@ const hooks = {
     state = next;
     render();
     if (switched && activeTab(state)?.text !== null) {
-      const input = $(definition(activeTab(state)?.toolId ?? '')?.compare ? '#compare-left' : '#preview') as HTMLTextAreaElement;
+      const input = $(
+        definition(activeTab(state)?.toolId ?? "")?.compare
+          ? "#compare-left"
+          : "#preview",
+      ) as HTMLTextAreaElement;
       if (!input.hidden) input.focus();
     }
   },
@@ -510,11 +717,23 @@ $("#cancel-job").onclick = () => {
   if (state.activeId) controller.cancel(state.activeId);
 };
 $("#copy-result").onclick = async () => {
-  const text = activeTab(state)?.result?.text;
-  if (text) {
+  const id = state.activeId;
+  if (!id) return;
+  try {
+    const text = await controller.readResultClipboard(id);
     await navigator.clipboard.writeText(text);
-    notify("Copied result to clipboard");
+    notify("Copied complete result to clipboard");
+  } catch (error) {
+    notify(error instanceof Error ? error.message : String(error));
   }
+};
+$("#open-result").onclick = () => {
+  if (state.activeId)
+    void controller
+      .openResult(state.activeId)
+      .catch((error: unknown) =>
+        notify(error instanceof Error ? error.message : String(error)),
+      );
 };
 $("#save-result").onclick = () => {
   if (state.activeId) void controller.saveOutput(state.activeId);
@@ -530,20 +749,40 @@ $("#sidebar-collapse").onclick = () => {
 paletteSearch.oninput = commands;
 $("#tab-new").onclick = () => controller.newDocument();
 document.addEventListener("keydown", (event) => {
-  if (palette.open && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+  if (palette.open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
     event.preventDefault();
-    const buttons = [...document.querySelectorAll<HTMLButtonElement>('#command-list button')];
+    const buttons = [
+      ...document.querySelectorAll<HTMLButtonElement>("#command-list button"),
+    ];
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    buttons[(index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus();
+    buttons[
+      (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
+        buttons.length
+    ]?.focus();
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && ['z', 'y'].includes(event.key.toLowerCase()) && state.activeId && ['preview', 'compare-left'].includes((event.target as HTMLElement)?.id)) {
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    ["z", "y"].includes(event.key.toLowerCase()) &&
+    state.activeId &&
+    ["preview", "compare-left"].includes((event.target as HTMLElement)?.id)
+  ) {
     event.preventDefault();
-    controller.history(state.activeId, event.key.toLowerCase() === 'y' || event.shiftKey ? 'redo' : 'undo');
+    controller.history(
+      state.activeId,
+      event.key.toLowerCase() === "y" || event.shiftKey ? "redo" : "undo",
+    );
     return;
   }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'w' && state.activeId && !palette.open) {
-    event.preventDefault(); void controller.close(state.activeId); return;
+  if (
+    (event.ctrlKey || event.metaKey) &&
+    event.key.toLowerCase() === "w" &&
+    state.activeId &&
+    !palette.open
+  ) {
+    event.preventDefault();
+    void controller.close(state.activeId);
+    return;
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
     event.preventDefault();
@@ -567,7 +806,11 @@ document.addEventListener("keydown", (event) => {
     event.preventDefault();
     openPalette(event.target instanceof HTMLElement ? event.target : undefined);
   } else if (event.key === "Escape" && palette.open) closePalette();
-  else if (palette.open && event.key === "Enter" && document.activeElement === paletteSearch) {
+  else if (
+    palette.open &&
+    event.key === "Enter" &&
+    document.activeElement === paletteSearch
+  ) {
     event.preventDefault();
     (
       document.querySelector<HTMLButtonElement>(
@@ -588,14 +831,44 @@ $("#browser-notice").hidden = native;
 $("#engine-status").textContent = native ? "Local engine" : "Browser preview";
 if (native) {
   let closingWindow = false;
-  void getCurrentWindow().onCloseRequested(async event => {
+  void getCurrentWindow().onCloseRequested(async (event) => {
     event.preventDefault();
     if (closingWindow) return;
     closingWindow = true;
     try {
-      for (const tab of [...state.tabs]) if (!await controller.close(tab.id)) return;
+      for (const tab of [...state.tabs])
+        if (!(await controller.close(tab.id))) return;
       controller.dispose();
       await getCurrentWindow().destroy();
-    } finally { closingWindow = false; }
+    } finally {
+      closingWindow = false;
+    }
+  });
+  void listen<{ paths?: string[] } | string[]>("tauri://drag-drop", (event) => {
+    const payload = event.payload;
+    const path = Array.isArray(payload) ? payload[0] : payload.paths?.[0];
+    if (path) void controller.openPath(path);
   });
 }
+const dropTarget = $("#editor-host");
+dropTarget.addEventListener("dragover", (event) => {
+  event.preventDefault();
+  dropTarget.classList.add("drag-over");
+});
+dropTarget.addEventListener("dragleave", () =>
+  dropTarget.classList.remove("drag-over"),
+);
+dropTarget.addEventListener("drop", (event) => {
+  event.preventDefault();
+  dropTarget.classList.remove("drag-over");
+  const file = event.dataTransfer?.files[0] as
+    | (File & { path?: string })
+    | undefined;
+  if (file?.path) void controller.openPath(file.path);
+  else if (file)
+    void file.text().then((text) => {
+      controller.newDocument();
+      const id = state.activeId;
+      if (id) controller.edit(id, text);
+    });
+});

@@ -73,6 +73,25 @@ export const bundledTools: readonly ToolDefinition[] = [
     "text",
     [op("decode", "Decode")],
   ),
+  define(
+    "text.json-string",
+    "JSON escape / unescape",
+    "TEXT & ENCODING",
+    "{}",
+    "text",
+    [op("escape", "Escape"), op("unescape", "Unescape")],
+  ),
+  {
+    ...define(
+      "text.find-replace",
+      "Find & Replace",
+      "TEXT & ENCODING",
+      "⌕",
+      "text",
+      [op("find", "Find"), op("replace", "Replace")],
+    ),
+    auto: false,
+  },
   define("encoding.hash", "Hash generator", "TEXT & ENCODING", "#", "bytes", [
     op("sha256", "SHA-256"),
     op("sha512", "SHA-512"),

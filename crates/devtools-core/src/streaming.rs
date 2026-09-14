@@ -74,17 +74,118 @@ pub fn inspect_file(path: &Path, format: FileFormat, cancel: &CancellationToken,
     let started = Instant::now(); let total = metadata_len(path)?; let mut file = File::open(path)?;
     let bom = detect_bom(&mut file)?; file.seek(SeekFrom::Start(0))?;
     let mut vr = new_reader(file, total, cancel, progress, bom, matches!(format, FileFormat::Json));
+    if matches!(format, FileFormat::Text) {
+        let summary = scan_text(&mut vr, total, bom > 0)?;
+        check_cancel(cancel)?;
+        let summary = serde_json::to_string(&summary).map_err(|e| crate::ToolError::Execution { message: e.to_string() })?;
+        return Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary });
+    }
     let result = match format {
         FileFormat::Json => { let mut br = BufReader::with_capacity(CHUNK, &mut vr); let r = parse_json(&mut br); drop(br); if let Some(e) = vr.failed.take() { return Err(e); } r },
-        FileFormat::Csv => scan_csv(&mut vr), FileFormat::Text => scan_text(&mut vr)
+        FileFormat::Csv => scan_csv(&mut vr), FileFormat::Text => unreachable!()
     };
     check_cancel(cancel)?; result?;
-    Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary: match format { FileFormat::Json => "valid JSON".into(), FileFormat::Csv => "valid CSV".into(), FileFormat::Text => "valid UTF-8 text".into() } })
+    Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary: match format { FileFormat::Json => "valid JSON".into(), FileFormat::Csv => "valid CSV".into(), FileFormat::Text => unreachable!() } })
 }
 
 fn detect_bom(file: &mut File) -> Result<usize, crate::ToolError> { let mut b = [0u8; 3]; let n = file.read(&mut b)?; file.seek(SeekFrom::Start(0))?; Ok(if n >= 3 && b == [0xEF,0xBB,0xBF] { 3 } else { 0 }) }
 
-fn scan_text<R: Read>(reader: &mut R) -> Result<(), crate::ToolError> { let mut b = [0u8; CHUNK]; while reader.read(&mut b).map_err(crate::ToolError::from)? != 0 {} Ok(()) }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextInspectionSummary {
+    pub encoding: String,
+    pub utf8_bom: bool,
+    pub bytes: u64,
+    pub content_bytes: u64,
+    pub characters: u64,
+    pub code_points: u64,
+    pub lines: u64,
+    pub words: u64,
+    pub tabs: u64,
+    pub control_characters: u64,
+    pub replacement_characters: u64,
+    pub newline: TextNewlineSummary,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TextNewlineSummary {
+    pub style: String,
+    pub total: u64,
+    pub lf: u64,
+    pub crlf: u64,
+    pub cr: u64,
+}
+
+struct TextStats {
+    summary: TextInspectionSummary,
+    carry: Vec<u8>,
+    pending_cr: bool,
+    in_word: bool,
+}
+
+impl TextStats {
+    fn new(bytes: u64, utf8_bom: bool) -> Self {
+        Self { summary: TextInspectionSummary {
+            encoding: "UTF-8".into(), utf8_bom, bytes,
+            content_bytes: bytes.saturating_sub(if utf8_bom { 3 } else { 0 }),
+            characters: 0, code_points: 0, lines: 0, words: 0, tabs: 0,
+            control_characters: 0, replacement_characters: 0,
+            newline: TextNewlineSummary { style: "none".into(), total: 0, lf: 0, crlf: 0, cr: 0 },
+        }, carry: Vec::new(), pending_cr: false, in_word: false }
+    }
+    fn newline_cr(&mut self) { self.summary.newline.total += 1; self.summary.newline.cr += 1; }
+    fn newline_lf(&mut self) { self.summary.newline.total += 1; self.summary.newline.lf += 1; }
+    fn push_char(&mut self, c: char) {
+        let mut part_of_crlf = false;
+        if self.pending_cr {
+            if c == '\n' { self.summary.newline.total += 1; self.summary.newline.crlf += 1; self.pending_cr = false; part_of_crlf = true; }
+            else {
+            self.newline_cr(); self.pending_cr = false;
+            }
+        }
+        self.summary.characters += 1; self.summary.code_points += 1;
+        if c == '\r' { self.pending_cr = true; } else if c == '\n' && !part_of_crlf { self.newline_lf(); }
+        if c == '\t' { self.summary.tabs += 1; }
+        if c.is_control() { self.summary.control_characters += 1; }
+        if c == '\u{FFFD}' { self.summary.replacement_characters += 1; }
+        if c.is_whitespace() { self.in_word = false; }
+        else if !self.in_word { self.summary.words += 1; self.in_word = true; }
+    }
+    fn push(&mut self, bytes: &[u8]) -> Result<(), crate::ToolError> {
+        self.carry.extend_from_slice(bytes);
+        let valid = match std::str::from_utf8(&self.carry) {
+            Ok(_) => {
+                let complete = String::from_utf8(std::mem::take(&mut self.carry)).map_err(|_| crate::ToolError::InvalidUtf8)?;
+                for c in complete.chars() { self.push_char(c); }
+                return Ok(())
+            }
+            Err(e) if e.error_len().is_none() => e.valid_up_to(),
+            Err(_) => return Err(crate::ToolError::InvalidUtf8),
+        };
+        let complete = String::from_utf8(self.carry[..valid].to_vec()).map_err(|_| crate::ToolError::InvalidUtf8)?;
+        for c in complete.chars() { self.push_char(c); }
+        self.carry.drain(..valid);
+        if self.carry.len() > 3 { return Err(crate::ToolError::InvalidUtf8); }
+        Ok(())
+    }
+    fn finish(mut self) -> Result<TextInspectionSummary, crate::ToolError> {
+        if !self.carry.is_empty() { return Err(crate::ToolError::InvalidUtf8); }
+        if self.pending_cr { self.newline_cr(); }
+        self.summary.lines = if self.summary.characters == 0 { 0 } else { self.summary.newline.total + 1 };
+        self.summary.newline.style = match (self.summary.newline.lf > 0, self.summary.newline.crlf > 0, self.summary.newline.cr > 0) {
+            (false, false, false) => "none", (true, false, false) => "lf", (false, true, false) => "crlf",
+            (false, false, true) => "cr", _ => "mixed",
+        }.into();
+        Ok(self.summary)
+    }
+}
+
+fn scan_text<R: Read>(reader: &mut R, total: u64, utf8_bom: bool) -> Result<TextInspectionSummary, crate::ToolError> {
+    let mut stats = TextStats::new(total, utf8_bom); let mut b = [0u8; CHUNK];
+    loop { let n = reader.read(&mut b).map_err(crate::ToolError::from)?; if n == 0 { break; } stats.push(&b[..n])?; }
+    stats.finish()
+}
 
 fn scan_csv<R: Read>(reader: &mut R) -> Result<(), crate::ToolError> {
     let mut b = [0u8; CHUNK]; let mut quoted = false; let mut after_quote = false; let mut field_start = true; let mut fields = 1u64; let mut expected = None; let mut record = 1u64; let mut row_has_data = false;
@@ -149,4 +250,15 @@ pub fn preview_file(path: &Path, offset: u64, max_bytes: usize) -> Result<FilePr
     #[test] fn cancel_token() { let t=CancellationToken::default(); t.cancel(); assert!(t.is_cancelled()); }
     #[test] fn json_stream_preserves_lexemes() { let i=file("j",r#"{"a":1.2300,"a":2}"#); let o=i.with_extension("out"); let t=CancellationToken::default(); transform_json_file(&i,&o,JsonLayout::Minify,&t, |_|{}).unwrap(); assert_eq!(std::fs::read_to_string(&o).unwrap(),r#"{"a":1.2300,"a":2}"#); let _=std::fs::remove_file(i); let _=std::fs::remove_file(o); }
     #[test] fn invalid_and_csv_ragged() { let i=file("bad", "{bad"); assert!(inspect_file(&i,FileFormat::Json,&CancellationToken::default(), |_|{}).is_err()); let c=file("csv","a,b\n1\n"); assert!(inspect_file(&c,FileFormat::Csv,&CancellationToken::default(), |_|{}).is_err()); }
+    #[test] fn text_inspection_reports_explicit_unicode_and_newline_stats() {
+        let i=file("text-stats", "one\r\ntwo\nthree\rfour\t\u{FFFD}");
+        let result=inspect_file(&i,FileFormat::Text,&CancellationToken::default(), |_|{}).unwrap();
+        let summary: TextInspectionSummary=serde_json::from_str(&result.summary).unwrap();
+        assert_eq!(summary.bytes, "one\r\ntwo\nthree\rfour\t\u{FFFD}".as_bytes().len() as u64);
+        assert_eq!(summary.characters, 21); assert_eq!(summary.code_points, 21);
+        assert_eq!(summary.words, 5); assert_eq!(summary.tabs, 1); assert_eq!(summary.replacement_characters, 1);
+        assert_eq!(summary.newline.style, "mixed"); assert_eq!(summary.newline.crlf, 1); assert_eq!(summary.newline.lf, 1); assert_eq!(summary.newline.cr, 1);
+        assert_eq!(summary.lines, 4);
+        let _=std::fs::remove_file(i);
+    }
 }
