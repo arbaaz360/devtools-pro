@@ -3,6 +3,7 @@ import type {
   FileDocument,
   JobFinished,
   JobProgress,
+  ExecutionIdentity,
 } from "../bridge";
 
 export const EDIT_LIMIT = 1024 * 1024;
@@ -46,6 +47,8 @@ export interface TabState {
     | "error"
     | "cancelled";
   jobId: string | null;
+  /** Native acceptance identity for stale-event and provenance checks. */
+  jobIdentity: ExecutionIdentity | null;
   progress: JobProgress | null;
   result: ResultView | null;
   /** Existing output is retained while a same-tool edit is recomputing. */
@@ -100,6 +103,7 @@ export function makeTab(
     redo: [],
     phase: "idle",
     jobId: null,
+    jobIdentity: null,
     progress: null,
     result: null,
     resultStale: false,
@@ -118,6 +122,7 @@ function reset(tab: TabState, preserveResult = true): TabState {
     generation: tab.generation + 1,
     phase: "idle",
     jobId: null,
+    jobIdentity: null,
     progress: null,
     result: preserveResult ? tab.result : null,
     resultStale: preserveResult && !!tab.result,
@@ -175,7 +180,7 @@ export type Action =
     }
   | { type: "queue" | "cancel"; id: string }
   | { type: "error"; id: string; message: string }
-  | { type: "started"; token: RunToken; jobId: string }
+  | { type: "started"; token: RunToken; jobId: string; identity?: ExecutionIdentity }
   | { type: "progress"; token: RunToken; progress: JobProgress }
   | { type: "result"; token: RunToken; result: ResultView }
   | { type: "failed"; token: RunToken; message: string }
@@ -291,7 +296,12 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
             error: action.message,
           };
         case "started":
-          return { ...tab, jobId: action.jobId, phase: "running" };
+          return {
+            ...tab,
+            jobId: action.jobId,
+            jobIdentity: action.identity ?? null,
+            phase: "running",
+          };
         case "progress":
           return tab.phase === "running"
             ? { ...tab, progress: action.progress }
@@ -305,6 +315,7 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
                 ? "cancelled"
                 : "error",
             jobId: null,
+            jobIdentity: null,
             result: action.result,
             resultStale: false,
             error: action.result.event.error ?? null,
@@ -314,6 +325,7 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
             ...reset(tab, false),
             phase: "error",
             jobId: null,
+            jobIdentity: null,
             error: action.message,
           };
         case "image":

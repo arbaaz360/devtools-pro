@@ -6,6 +6,7 @@ import type {
   JobProgress,
   ToolManifest,
   SaveSuggestion,
+  ExecutionIdentity,
 } from "../bridge";
 import {
   EDIT_LIMIT,
@@ -51,12 +52,12 @@ export interface WorkbenchApi {
     tool: string,
     operation: string,
     options: Record<string, unknown>,
-  ): Promise<{ jobId: string }>;
+  ): Promise<{ jobId: string; identity?: ExecutionIdentity }>;
   runCompare(
     left: string,
     right: string,
     options: Record<string, unknown>,
-  ): Promise<{ jobId: string }>;
+  ): Promise<{ jobId: string; identity?: ExecutionIdentity }>;
   cancelOperation(id: string): Promise<void>;
   jobStatus(id: string): Promise<JobFinished | null>;
   subscribeJobs(
@@ -613,6 +614,7 @@ export class WorkbenchController {
           type: "started",
           token: task.token,
           jobId: started.jobId,
+          identity: started.identity,
         });
       const early = this.earlyEvents.get(started.jobId);
       this.earlyEvents.delete(started.jobId);

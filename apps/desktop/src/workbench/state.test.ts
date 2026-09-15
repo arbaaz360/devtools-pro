@@ -65,6 +65,28 @@ test("stale completions cannot repaint a tab after an edit", () => {
   assert.equal(tab.phase, "idle");
 });
 
+test("job acceptance identity is scoped to the tab generation", () => {
+  let state = workspaceWith("one");
+  const token = tokenFor(state.tabs[0]);
+  state = reduce(state, {
+    type: "started",
+    token,
+    jobId: "job-1",
+    identity: {
+      pluginId: "legacy.builtin",
+      pluginVersion: "0.1.0",
+      toolId: "structured.json",
+      operationId: "format",
+      instanceId: "one",
+      jobId: "job-1",
+      generation: 0,
+    },
+  });
+  assert.equal(state.tabs[0].jobIdentity?.jobId, "job-1");
+  state = reduce(state, { type: "edit", id: "one", text: "{}" });
+  assert.equal(state.tabs[0].jobIdentity, null);
+});
+
 test("same-tool edits retain the previous result while marking it stale", () => {
   let state = workspaceWith("one");
   const initial = state.tabs[0];
