@@ -642,6 +642,7 @@ function renderResult(tab: TabState) {
     renderDiffResult(result.text, structured);
   structured.hidden = !diff;
   media.hidden = !binary;
+  $(".result-preview-block").classList.toggle("binary-output", binary);
   if (result.image) {
     const image = document.createElement("img");
     image.className = "binary-preview";

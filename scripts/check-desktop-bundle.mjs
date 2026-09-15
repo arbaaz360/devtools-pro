@@ -66,12 +66,15 @@ if (cssAssets.length === 0) {
 
 const css = cssAssets.map((path) => readFileSync(path, 'utf8')).join('\n');
 const requiredLayout = [
-  ['[hidden]', [['display', 'none!important']]],
   ['.app-shell', [['display', 'flex'], ['flex-direction', 'column']]],
   ['.app-body', [['display', 'flex'], ['flex', '1']]],
   ['.sidebar', [['display', 'flex'], ['flex-direction', 'column']]],
   ['.workspace', [['display', 'flex'], ['flex', '1']]],
 ];
+
+if (!/\[hidden\]\s*\{[^}]*display\s*:\s*none\s*!important/.test(css)) {
+  fail('[hidden] must include display: none !important in the built stylesheet');
+}
 
 for (const [selector, expectedDeclarations] of requiredLayout) {
   const declarations = declarationsFor(css, selector);
