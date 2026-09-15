@@ -1,0 +1,31 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "identity.uuid",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "UUID Generator and Decoder",
+  "description": "Generate UUID v1, v3, v4 and v5 values or inspect a canonical UUID.",
+  "tools": [{"id":"identity.uuid","title":"UUID Generator","category":"generator","operationIds":["identity.uuid"],"workspaceId":"generator"}],
+  "operations": [{
+    "id":"identity.uuid",
+    "title":"Generate or decode UUID",
+    "executor":{"kind":"javascriptWorker","id":"identity.uuid.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"uuid","kind":"document","required":false,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"uuid","kind":"value","multiplicity":"many","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "options":[
+      {"id":"mode","type":"enum","label":"Mode","default":"generate","choices":[{"id":"generate","label":"Generate"},{"id":"decode","label":"Decode"}],"persistence":"instance","sensitive":false},
+      {"id":"version","type":"enum","label":"Version","default":"v4","choices":[{"id":"v1","label":"Version 1"},{"id":"v3","label":"Version 3"},{"id":"v4","label":"Version 4"},{"id":"v5","label":"Version 5"}],"persistence":"instance","sensitive":false},
+      {"id":"namespace","type":"string","label":"Namespace","default":"dns","persistence":"instance","sensitive":false},
+      {"id":"name","type":"string","label":"Name","default":"","persistence":"instance","sensitive":false},
+      {"id":"count","type":"integer","label":"Count","default":"1","minimum":"1","maximum":"100","persistence":"instance","sensitive":false},
+      {"id":"case","type":"enum","label":"Case","default":"lower","choices":[{"id":"lower","label":"Lowercase"},{"id":"upper","label":"Uppercase"}],"persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","heldRepeat"],"debounceMs":"0"},
+    "limits":{"maxInputBytes":"4096","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"1000"}
+  }],
+  "workspaces":[{"id":"generator","kind":"generator","bindings":[{"id":"result","component":"editor","outputPort":"uuid"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-10"],"fixtures":["uuid-vectors","uuid-decode","uuid-invalid"],"uiScenarios":["generate-explicit","copy-complete","decode-properties"]}
+}
