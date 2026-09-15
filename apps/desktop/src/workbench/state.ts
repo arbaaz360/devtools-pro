@@ -6,6 +6,8 @@ import type {
 } from "../bridge";
 
 export const EDIT_LIMIT = 1024 * 1024;
+/** Larger clipboard input is held by the host, never in the editor/history. */
+export const TEXT_IMPORT_LIMIT = 36 * 1024 * 1024;
 export const MAX_TABS = 16;
 export interface RunToken {
   tabId: string;
@@ -22,6 +24,7 @@ export interface TabState {
   id: string;
   name: string;
   source: FileDocument | null;
+  pasted: boolean;
   text: string | null;
   savedText: string | null;
   savedPath: string | null;
@@ -34,7 +37,14 @@ export interface TabState {
   dirty: boolean;
   undo: readonly string[];
   redo: readonly string[];
-  phase: "idle" | "queued" | "running" | "success" | "error" | "cancelled";
+  phase:
+    | "idle"
+    | "importing"
+    | "queued"
+    | "running"
+    | "success"
+    | "error"
+    | "cancelled";
   jobId: string | null;
   progress: JobProgress | null;
   result: ResultView | null;
@@ -75,6 +85,7 @@ export function makeTab(
     id,
     name,
     source,
+    pasted: false,
     text,
     savedText: text,
     savedPath: null,
@@ -127,6 +138,13 @@ export type Action =
   | { type: "add"; tab: TabState }
   | { type: "activate" | "close"; id: string }
   | { type: "edit"; id: string; text: string }
+  | { type: "import-start"; id: string }
+  | {
+      type: "imported";
+      token: RunToken;
+      source: FileDocument;
+      text: string | null;
+    }
   | { type: "undo" | "redo"; id: string }
   | {
       type: "tool";
@@ -197,6 +215,22 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
       if (tab.id !== id || ("token" in action && !matches(tab, action.token)))
         return tab;
       switch (action.type) {
+        case "import-start":
+          return { ...reset(tab), phase: "importing" };
+        case "imported":
+          return {
+            ...reset(tab, false),
+            source: action.source,
+            pasted: true,
+            text: action.text,
+            savedText: null,
+            dirty: true,
+            undo: [],
+            redo: [],
+            image: null,
+            imageError: null,
+            revision: tab.revision + 1,
+          };
         case "edit":
           if (tab.text === null || tab.text === action.text) return tab;
           return {

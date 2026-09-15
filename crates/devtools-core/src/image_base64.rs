@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 pub const DEFAULT_MAX_INPUT_BYTES: usize = 25 * 1024 * 1024;
+pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 36 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -60,7 +61,7 @@ pub fn encode_image_base64(input: &Document, options: &ImageBase64Options, cance
 }
 
 pub struct ImageBase64Tool { manifest: ToolManifest }
-impl Default for ImageBase64Tool { fn default() -> Self { Self { manifest: ToolManifest { id: "encoding.image-base64".into(), label: "Image to Base64".into(), contract_version: 1, input_kinds: vec![InputKind::Bytes], limits: ToolLimits { max_input_bytes: Some(DEFAULT_MAX_INPUT_BYTES as u64), max_output_bytes: None }, capabilities: ToolCapabilities { deterministic: true, supports_preview: true, supports_streaming: true, cancellation: true, progress: true, needs_filesystem: false, needs_network: false, needs_secrets: false }, operations: vec![ToolOperation { id: "encode".into(), label: "Encode".into(), default_options: serde_json::json!({"dataUri": false}) }], renderer: RendererKind::Text } } } }
+impl Default for ImageBase64Tool { fn default() -> Self { Self { manifest: ToolManifest { id: "encoding.image-base64".into(), label: "Image to Base64".into(), contract_version: 1, input_kinds: vec![InputKind::Bytes], limits: ToolLimits { max_input_bytes: Some(DEFAULT_MAX_INPUT_BYTES as u64), max_output_bytes: Some(DEFAULT_MAX_OUTPUT_BYTES as u64) }, capabilities: ToolCapabilities { deterministic: true, supports_preview: true, supports_streaming: true, cancellation: true, progress: true, needs_filesystem: false, needs_network: false, needs_secrets: false }, operations: vec![ToolOperation { id: "encode".into(), label: "Encode".into(), default_options: serde_json::json!({"dataUri": false}) }], renderer: RendererKind::Text } } } }
 impl GenericTool for ImageBase64Tool {
     fn manifest(&self) -> &ToolManifest { &self.manifest }
     fn execute(&self, operation_id: &str, input: &Document, options: &Value) -> Result<ToolResult, ToolError> {

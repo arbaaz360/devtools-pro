@@ -13,16 +13,21 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <div class="brand">
+        <div class="brand" aria-hidden="true">
           <span class="brand-mark">⌘</span
-          ><span>DevTools <strong>Pro</strong></span
-          ><span class="badge">Desktop preview</span>
+          ><span>DevTools <strong>Pro</strong></span>
         </div>
+        <div class="app-title" aria-live="polite">DevTools Pro</div>
         <div class="topbar-actions">
           <span class="local-pill"
             ><span class="engine-dot"></span>Local only</span
-          ><button id="palette-open" class="command-button">
-            Commands <kbd>Ctrl K</kbd>
+          >
+          <button
+            id="palette-open"
+            class="command-button"
+            title="Commands (Ctrl+K)"
+          >
+            <span aria-hidden="true">⌘</span><kbd>Ctrl K</kbd>
           </button>
         </div>
       </header>
@@ -94,8 +99,6 @@
                 </p>
               </div>
             </div>
-            <div class="format-control"></div>
-            <div class="toolbar-actions"></div>
             <button
               id="save-document"
               class="outline-button"
@@ -119,7 +122,26 @@
                     >Create a document or open a file</span
                   >
                 </div>
-                <span id="source-mode" class="small-badge">INPUT</span>
+                <div class="pane-controls input-controls">
+                  <span id="source-mode" class="small-badge">INPUT</span>
+                  <div class="input-quick-actions" aria-label="Input actions">
+                    <button
+                      id="input-clipboard"
+                      class="flat-button"
+                      type="button"
+                    >
+                      Clipboard
+                    </button>
+                    <button id="input-sample" class="flat-button" type="button">
+                      Sample
+                    </button>
+                    <button id="input-clear" class="flat-button" type="button">
+                      Clear
+                    </button>
+                  </div>
+                  <div class="format-control"></div>
+                  <div class="toolbar-actions"></div>
+                </div>
               </div>
               <div id="editor-host" class="editor-host">
                 <div id="empty-state" class="empty-state">
@@ -198,7 +220,18 @@
                   <h2 id="results-heading">Result</h2>
                   <span id="result-subtitle">Results update as you work</span>
                 </div>
-                <span class="small-badge">OUTPUT</span>
+                <div class="pane-controls output-controls">
+                  <span class="small-badge">OUTPUT</span>
+                  <div class="result-actions">
+                    <button id="copy-result" class="flat-button" hidden>
+                      Copy result</button
+                    ><button id="open-result" class="flat-button" hidden>
+                      Open as tab</button
+                    ><button id="save-result" class="flat-button" hidden>
+                      Save result…
+                    </button>
+                  </div>
+                </div>
               </div>
               <div class="results-content">
                 <div id="result-empty" class="result-empty">
@@ -225,13 +258,20 @@
                       <span class="section-label">OUTPUT</span
                       ><span id="result-output-meta"></span>
                     </div>
-                    <textarea
-                      id="result-output"
-                      readonly
-                      spellcheck="false"
-                      wrap="off"
-                      aria-label="Result text"
-                    ></textarea>
+                    <div class="result-code">
+                      <pre
+                        id="result-highlight"
+                        aria-hidden="true"
+                        hidden
+                      ></pre>
+                      <textarea
+                        id="result-output"
+                        readonly
+                        spellcheck="false"
+                        wrap="off"
+                        aria-label="Result text"
+                      ></textarea>
+                    </div>
                     <div
                       id="result-structured"
                       class="structured-result"
@@ -239,15 +279,6 @@
                       aria-label="Structured result"
                     ></div>
                     <div id="result-media" class="image-stage" hidden></div>
-                    <div class="result-actions">
-                      <button id="copy-result" class="outline-button" hidden>
-                        Copy result</button
-                      ><button id="open-result" class="outline-button" hidden>
-                        Open as tab</button
-                      ><button id="save-result" class="primary-button" hidden>
-                        Save result…
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>

@@ -150,7 +150,10 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
         ToolManifest {
             id: "encoding.image-base64".into(), label: "Image to Base64".into(), contract_version: 1,
             input_kinds: vec![InputKind::Bytes],
-            limits: ToolLimits { max_input_bytes: Some(25 * 1024 * 1024), max_output_bytes: None },
+            limits: ToolLimits {
+                max_input_bytes: Some(crate::image_base64::DEFAULT_MAX_INPUT_BYTES as u64),
+                max_output_bytes: Some(crate::image_base64::DEFAULT_MAX_OUTPUT_BYTES as u64),
+            },
             capabilities: ToolCapabilities {
                 deterministic: true, supports_preview: true, supports_streaming: true, cancellation: true,
                 progress: true, needs_filesystem: false, needs_network: false, needs_secrets: false,
@@ -160,7 +163,10 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
         ToolManifest {
             id: "encoding.base64-image".into(), label: "Base64 to Image".into(), contract_version: 1,
             input_kinds: vec![InputKind::Text],
-            limits: ToolLimits { max_input_bytes: Some(32 * 1024 * 1024), max_output_bytes: Some(24 * 1024 * 1024) },
+            limits: ToolLimits {
+                max_input_bytes: Some(crate::base64_image::DEFAULT_MAX_INPUT_BYTES as u64),
+                max_output_bytes: Some(crate::base64_image::DEFAULT_MAX_DECODED_BYTES as u64),
+            },
             capabilities: ToolCapabilities { deterministic:true, supports_preview:true, supports_streaming:true, cancellation:true, progress:true, needs_filesystem:false, needs_network:false, needs_secrets:false },
             operations: vec![operation("decode", "Decode")], renderer: RendererKind::Binary,
         },

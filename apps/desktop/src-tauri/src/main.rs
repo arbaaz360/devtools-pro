@@ -23,6 +23,7 @@ use tauri::{Emitter, Manager};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
 const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
+const MAX_IMPORTED_TEXT: usize = 36 * 1024 * 1024;
 const MAX_JOBS: usize = 2;
 const MAX_DOCUMENTS: usize = 64;
 
@@ -232,25 +233,31 @@ async fn open_document(path: String, state: tauri::State<'_, Arc<HostState>>) ->
 
 /// Create a bounded, app-owned immutable text snapshot.
 /// The file is temporary and removed when its document handle is closed.
+fn register_text_document(state: &HostState, text: String, name: Option<String>, format: Option<String>) -> Result<OpenedDocument, String> {
+    if text.len() > MAX_IMPORTED_TEXT { return Err("Text document exceeds the 36 MiB import limit.".into()); }
+    let extension = match format.as_deref().unwrap_or("text") { "json" => "json", "csv" => "csv", "text" => "txt", _ => return Err("Unsupported input format.".into()) };
+    let display_name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| "Untitled.txt".into());
+    let display_name = Path::new(&display_name).file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or("Untitled.txt").to_string();
+    if state.documents.lock().map_err(|e| e.to_string())?.len() >= MAX_DOCUMENTS { return Err("Close a document before opening another (64-tab limit).".into()); }
+    let id = state.next_id("doc");
+    let path = create_owned_snapshot(text.as_bytes(), extension, state.sequence.load(Ordering::Relaxed)).map_err(|e| e.to_string())?;
+    let meta = match fs::metadata(&path) { Ok(meta) => meta, Err(error) => { let _ = fs::remove_file(&path); return Err(error.to_string()); } };
+    let document = RegisteredDocument { path, size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(display_name), origin_path: None };
+    let opened = match preview_document(id.clone(), &document, 0) { Ok(opened) => opened, Err(error) => { let _ = fs::remove_file(&document.path); return Err(error); } };
+    let mut documents = match state.documents.lock() {
+        Ok(documents) => documents,
+        Err(error) => { let _ = fs::remove_file(&document.path); return Err(error.to_string()); }
+    };
+    if documents.len() >= MAX_DOCUMENTS { let _ = fs::remove_file(&document.path); return Err("Close a document before opening another (64-tab limit).".into()); }
+    documents.insert(id, document);
+    Ok(opened)
+}
+
 #[tauri::command]
 async fn create_text_document(text: String, name: Option<String>, format: Option<String>, state: tauri::State<'_, Arc<HostState>>) -> Result<OpenedDocument, String> {
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        if text.len() > MAX_EDITABLE_TEXT as usize { return Err("Text document exceeds the 1 MiB limit.".into()); }
-        let extension = match format.as_deref().unwrap_or("text") { "json" => "json", "csv" => "csv", "text" => "txt", _ => return Err("Unsupported input format.".into()) };
-        let display_name = name.filter(|n| !n.trim().is_empty()).unwrap_or_else(|| "Untitled.txt".into());
-        let display_name = Path::new(&display_name).file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or("Untitled.txt").to_string();
-        if state.documents.lock().map_err(|e| e.to_string())?.len() >= MAX_DOCUMENTS { return Err("Close a document before opening another (64-tab limit).".into()); }
-        let id = state.next_id("doc");
-        let path = create_owned_snapshot(text.as_bytes(), extension, state.sequence.load(Ordering::Relaxed)).map_err(|e| e.to_string())?;
-        let meta = match fs::metadata(&path) { Ok(meta) => meta, Err(error) => { let _ = fs::remove_file(&path); return Err(error.to_string()); } };
-        let document = RegisteredDocument { path, size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(display_name), origin_path: None };
-        let opened = match preview_document(id.clone(), &document, 0) { Ok(opened) => opened, Err(error) => { let _ = fs::remove_file(&document.path); return Err(error); } };
-        let mut documents = state.documents.lock().map_err(|e| e.to_string())?;
-        if documents.len() >= MAX_DOCUMENTS { let _ = fs::remove_file(&document.path); return Err("Close a document before opening another (64-tab limit).".into()); }
-        documents.insert(id, document);
-        Ok(opened)
-    }).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || register_text_document(&state, text, name, format))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -288,12 +295,16 @@ fn read_binary_preview(document_id: String, state: tauri::State<'_, Arc<HostStat
     Ok(BinaryPreview { mime: mime.into(), bytes: bytes.len(), truncated: false, data: format!("data:{mime};base64,{}", STANDARD.encode(bytes)) })
 }
 
-#[tauri::command]
-fn close_document(document_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result<(), String> {
-    if let Some(document) = state.documents.lock().map_err(|e| e.to_string())?.remove(&document_id) {
+fn unregister_document(state: &HostState, document_id: &str) -> Result<(), String> {
+    if let Some(document) = state.documents.lock().map_err(|e| e.to_string())?.remove(document_id) {
         if document.temporary { let _ = fs::remove_file(document.path); }
     }
     Ok(())
+}
+
+#[tauri::command]
+fn close_document(document_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result<(), String> {
+    unregister_document(&state, &document_id)
 }
 
 #[derive(Serialize, Clone)]
@@ -1126,5 +1137,38 @@ mod tests {
         assert!(path_entry_exists(&path));
         assert!(fs::read(&path).unwrap().is_empty());
         fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn imported_large_snapshot_is_previewed_read_only_and_saved_completely() {
+        let state = HostState::default();
+        let text = "snapshot-data\n".repeat((MAX_EDITABLE_TEXT as usize / 14) + 1024);
+        assert!(text.len() > MAX_EDITABLE_TEXT as usize);
+        let opened = register_text_document(&state, text.clone(), Some("pasted.txt".into()), Some("text".into())).unwrap();
+        assert!(!opened.editable);
+        assert!(opened.truncated);
+        assert!(opened.bytes_read <= PREVIEW_BYTES);
+        assert_eq!(opened.size as usize, text.len());
+
+        let snapshot = state.documents.lock().unwrap().get(&opened.id).unwrap().clone();
+        assert_eq!(fs::read(&snapshot.path).unwrap(), text.as_bytes());
+        let destination = test_dir("large-snapshot").join("saved.txt");
+        atomic_copy(&snapshot.path, &destination).unwrap();
+        assert_eq!(fs::read(&destination).unwrap(), text.as_bytes());
+        unregister_document(&state, &opened.id).unwrap();
+        assert!(!path_entry_exists(&snapshot.path));
+        fs::remove_dir_all(destination.parent().unwrap()).unwrap();
+    }
+
+    #[test]
+    fn imported_snapshot_enforces_36_mib_limit() {
+        let state = HostState::default();
+        let text = "x".repeat(MAX_IMPORTED_TEXT + 1);
+        let error = match register_text_document(&state, text, None, None) {
+            Ok(_) => panic!("oversized text unexpectedly registered"),
+            Err(error) => error,
+        };
+        assert!(error.contains("36 MiB import limit"));
+        assert!(state.documents.lock().unwrap().is_empty());
     }
 }

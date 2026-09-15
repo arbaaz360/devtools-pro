@@ -370,19 +370,43 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
   } else if (!tool?.compare) {
     const text = tab.text ?? tab.source?.preview ?? "";
     if (input.value !== text) input.value = text;
-    input.readOnly = tab.text === null;
+    input.readOnly = tab.text === null || tab.phase === "importing";
     input.disabled = false;
     input.oninput = () => controller.edit(tab.id, input.value);
+    input.onpaste = (event) => {
+      const text = event.clipboardData?.getData("text/plain");
+      if (text === undefined) return;
+      event.preventDefault();
+      const start = input.selectionStart;
+      const end = input.selectionEnd;
+      const previous = tab.text;
+      void controller.paste(tab.id, text, start, end).then(() => {
+        const current = controller.tab(tab.id);
+        if (
+          state.activeId !== tab.id ||
+          current?.text === null ||
+          current?.text === previous
+        )
+          return;
+        const caret = Math.min(start + text.length, current?.text?.length ?? 0);
+        input.setSelectionRange(caret, caret);
+      });
+    };
   }
   $("#preview-heading").textContent = tab.text !== null ? "Document" : "Input";
   $("#preview-meta").textContent = tab.source
     ? `${bytes(tab.source.size)} · ${tab.source.mime ?? tab.source.format.toUpperCase()}`
     : "Unsaved document";
-  $("#preview-limit").textContent = tab.source?.editable
-    ? "Editable UTF-8 document · Ctrl+S to save"
-    : tab.source
-      ? "Read-only bounded preview · Full-file processing"
-      : "Editable blank document";
+  $("#preview-limit").textContent =
+    tab.phase === "importing"
+      ? "Importing complete pasted input…"
+      : tab.pasted && tab.text === null
+        ? `Preview of ${bytes(tab.source?.size)} pasted input · Tools process all bytes · Ctrl+A then paste to replace`
+        : tab.source?.editable
+          ? "Editable UTF-8 document · Ctrl+S to save"
+          : tab.source
+            ? "Read-only bounded preview · Full-file processing"
+            : "Editable blank document";
   $("#encoding").textContent = tab.source?.encoding ?? "UTF-8";
   $("#source-name").textContent = tab.name;
   $("#source-size").textContent = tab.source ? bytes(tab.source.size) : "—";
@@ -407,6 +431,7 @@ function renderActions(tab: TabState, tool: ReturnType<typeof definition>) {
     button.textContent = operation.label;
     button.disabled =
       tab.phase === "queued" ||
+      tab.phase === "importing" ||
       tab.phase === "running" ||
       !!validation(tab, tool);
     button.onclick = () =>
@@ -492,6 +517,7 @@ function renderResult(tab: TabState) {
     $("#copy-result").hidden = true;
     $("#open-result").hidden = true;
     $("#save-result").hidden = true;
+    $("#result-highlight").hidden = true;
     empty.hidden = false;
     content.hidden = true;
     return;
@@ -525,6 +551,7 @@ function renderResult(tab: TabState) {
   const structured = $("#result-structured");
   structured.replaceChildren();
   const output = $("#result-output") as HTMLTextAreaElement;
+  const highlight = $("#result-highlight");
   const binary = !!result.image;
   const diff =
     !binary &&
@@ -540,16 +567,40 @@ function renderResult(tab: TabState) {
     media.append(image);
   }
   output.hidden = binary || diff;
+  output.classList.toggle(
+    "json-output",
+    !binary && !diff && event.renderer === "json",
+  );
+  if (!binary && !diff && event.renderer === "json") {
+    highlight.hidden = false;
+    highlight.innerHTML = result.text.replace(
+      /("(?:\\.|[^"\\])*"\s*:)|("(?:\\.|[^"\\])*"\s*)|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|\b(true|false|null)\b/g,
+      (token, key, string, number, literal) => {
+        const kind = key
+          ? "json-key"
+          : string
+            ? "json-string"
+            : number
+              ? "json-number"
+              : `json-${literal}`;
+        return `<span class="${kind}">${esc(token)}</span>`;
+      },
+    );
+  } else {
+    highlight.hidden = true;
+    highlight.replaceChildren();
+  }
   if (output.value !== result.text) output.value = result.text;
   $("#result-output-meta").textContent =
     result.previewError ??
     (result.truncated
-      ? "Bounded preview · save for complete output"
+      ? `Preview: ${bytes(new TextEncoder().encode(result.text).length)} of ${bytes(event.outputBytes)} · Copy button or Ctrl+A/Ctrl+C copies complete result`
       : event.ok
         ? "Complete result"
         : "No result");
   $("#copy-result").hidden =
     tab.resultStale || !event.ok || binary || !result.text;
+  $("#copy-result").textContent = "Copy complete result";
   $("#open-result").hidden =
     tab.resultStale || !event.ok || binary || !event.resultDocumentId;
   $("#save-result").hidden =
@@ -560,6 +611,7 @@ function render() {
   renderTabs();
   renderTools();
   const tool = tab ? definition(tab.toolId) : undefined;
+  $(".app-title").textContent = tool?.label ?? "DevTools Pro";
   $("#document-panel").classList.toggle(
     "single-pane",
     tool?.id === "editor.text" || tool?.id === "text.find-replace",
@@ -576,7 +628,7 @@ function render() {
   $("#error").hidden = !tab?.error;
   $("#error").textContent = tab?.error ?? "";
   const save = $("#save-document") as HTMLButtonElement;
-  save.disabled = !tab;
+  save.disabled = !tab || tab.phase === "importing";
   $("#job-panel").hidden =
     !tab || (tab.phase !== "queued" && tab.phase !== "running");
   if (tab) {
@@ -710,15 +762,39 @@ $("#empty-open").onclick = () => void controller.chooseFile();
 $("#save-document").onclick = () => {
   if (state.activeId) void controller.save(state.activeId);
 };
+$("#input-clipboard").onclick = () => {
+  const id = state.activeId;
+  const input = $("#preview") as HTMLTextAreaElement;
+  if (!id || input.hidden) return;
+  navigator.clipboard
+    .readText()
+    .then((text) =>
+      controller.paste(id, text, input.selectionStart, input.selectionEnd),
+    )
+    .catch((error) =>
+      notify(error instanceof Error ? error.message : String(error)),
+    );
+};
+$("#input-clear").onclick = () => {
+  const tab = activeTab(state);
+  if (tab && tab.text !== null) controller.edit(tab.id, "");
+};
+$("#input-sample").onclick = () => {
+  const tab = activeTab(state);
+  if (!tab || tab.text === null) return;
+  const sample =
+    tab.toolId === "structured.json"
+      ? '{"store":{"book":[{"category":"reference","title":"Sample"}]}}'
+      : "Sample text";
+  controller.edit(tab.id, sample);
+};
 $("#palette-open").onclick = (event) =>
   openPalette(event.currentTarget as HTMLElement);
 $("#palette-close").onclick = closePalette;
 $("#cancel-job").onclick = () => {
   if (state.activeId) controller.cancel(state.activeId);
 };
-$("#copy-result").onclick = async () => {
-  const id = state.activeId;
-  if (!id) return;
+async function copyCompleteResult(id: string) {
   try {
     const text = await controller.readResultClipboard(id);
     await navigator.clipboard.writeText(text);
@@ -726,7 +802,24 @@ $("#copy-result").onclick = async () => {
   } catch (error) {
     notify(error instanceof Error ? error.message : String(error));
   }
+}
+$("#copy-result").onclick = () => {
+  if (state.activeId) void copyCompleteResult(state.activeId);
 };
+// A preview is never a complete payload. Intercept Select All + Copy so the
+// natural clipboard shortcut has the same semantics as Copy complete result.
+$("#result-output").addEventListener("copy", (event) => {
+  const tab = activeTab(state);
+  const output = $("#result-output") as HTMLTextAreaElement;
+  if (
+    !tab?.result?.truncated ||
+    output.selectionStart !== 0 ||
+    output.selectionEnd !== output.value.length
+  )
+    return;
+  event.preventDefault();
+  if (!tab.resultStale) void copyCompleteResult(tab.id);
+});
 $("#open-result").onclick = () => {
   if (state.activeId)
     void controller

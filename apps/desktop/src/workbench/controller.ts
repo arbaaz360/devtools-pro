@@ -9,13 +9,14 @@ import type {
 } from "../bridge";
 import {
   EDIT_LIMIT,
+  TEXT_IMPORT_LIMIT,
   MAX_TABS,
   emptyWorkspace,
   makeTab,
   matches,
   reduce,
   tokenFor,
-} from "./state";
+} from "./state.ts";
 import type {
   Action,
   ResultView,
@@ -31,7 +32,7 @@ import {
   resultExtension,
   snapshotFormat,
   validation,
-} from "./tools";
+} from "./tools.ts";
 
 export interface WorkbenchApi {
   native: boolean;
@@ -110,6 +111,7 @@ export class WorkbenchController {
   private stopEvents?: () => void;
   private saving = new Set<string>();
   private closing = new Set<string>();
+  private disposed = false;
   constructor(api: WorkbenchApi, hooks: WorkbenchHooks) {
     this.api = api;
     this.hooks = hooks;
@@ -123,7 +125,7 @@ export class WorkbenchController {
     return this.state.tabs.find((tab) => tab.id === id);
   }
   private current(token: RunToken) {
-    return matches(this.tab(token.tabId), token);
+    return !this.disposed && matches(this.tab(token.tabId), token);
   }
   availableTools() {
     return bundledTools.filter(
@@ -208,7 +210,7 @@ export class WorkbenchController {
   }
   /** Read a complete textual result for clipboard use, within a safe memory bound. */
   async readResultClipboard(id: string): Promise<string> {
-    return this.readResultTextBounded(id, 32 * 1024 * 1024);
+    return this.readResultTextBounded(id, TEXT_IMPORT_LIMIT);
   }
   private async readResultTextBounded(
     id: string,
@@ -231,13 +233,15 @@ export class WorkbenchController {
     this.savingResults.add(resultId);
     try {
       let page = await this.api.readPreview(resultId, 0);
-      let text = page.preview;
-      let offset = page.bytesRead ?? new TextEncoder().encode(text).length;
-      if (new TextEncoder().encode(text).length > maxBytes)
+      const size = page.size;
+      const chunks = [page.preview];
+      let bytes = new TextEncoder().encode(page.preview).length;
+      let offset = page.bytesRead ?? bytes;
+      if (size > maxBytes || bytes > maxBytes)
         throw new Error(
           `Result is larger than the ${Math.round(maxBytes / (1024 * 1024))} MiB limit.`,
         );
-      while (offset < page.size) {
+      while (offset < size) {
         if (
           !this.current(token) ||
           this.tab(id)?.result?.event.resultDocumentId !== resultId ||
@@ -247,9 +251,10 @@ export class WorkbenchController {
         page = await this.api.readPreview(resultId, offset);
         if (!page.bytesRead)
           throw new Error("The result could not be read completely.");
-        text += page.preview;
+        chunks.push(page.preview);
+        bytes += new TextEncoder().encode(page.preview).length;
         offset += page.bytesRead;
-        if (new TextEncoder().encode(text).length > maxBytes)
+        if (bytes > maxBytes)
           throw new Error(
             `Result is larger than the ${Math.round(maxBytes / (1024 * 1024))} MiB limit.`,
           );
@@ -260,7 +265,7 @@ export class WorkbenchController {
         this.tab(id)?.resultStale
       )
         throw new Error("The result changed while it was being read.");
-      return text;
+      return chunks.join("");
     } finally {
       this.savingResults.delete(resultId);
       this.cleanup();
@@ -362,6 +367,89 @@ export class WorkbenchController {
     this.dispatch({ type: "edit", id, text });
     this.schedule(id);
   }
+  /** Paste is an explicit input transaction. Large input goes straight to an
+   * immutable host snapshot, with only a bounded preview retained by the tab. */
+  async paste(
+    id: string,
+    pastedText: string,
+    start: number,
+    end: number,
+  ): Promise<void> {
+    const tab = this.tab(id);
+    if (!tab || tab.phase === "importing" || this.disposed || !pastedText)
+      return;
+    if (tab.source && tab.source.contentKind !== "text") {
+      this.hooks.notify("Create a text tab before pasting text.");
+      return;
+    }
+    if (
+      tab.text === null &&
+      (start !== 0 || end !== tab.source?.preview.length)
+    ) {
+      this.hooks.notify(
+        "This is a preview. Select all (Ctrl+A) before pasting to replace the complete input.",
+      );
+      return;
+    }
+    const original = tab.text ?? "";
+    const from = Math.max(0, Math.min(original.length, start));
+    const to = Math.max(from, Math.min(original.length, end));
+    const text = original.slice(0, from) + pastedText + original.slice(to);
+    const size = new TextEncoder().encode(text).length;
+    if (size > TEXT_IMPORT_LIMIT) {
+      this.hooks.notify(
+        "Pasted input exceeds 36 MiB. Open it as a file instead. Your input is unchanged.",
+      );
+      return;
+    }
+    if (size <= EDIT_LIMIT && tab.text !== null) {
+      this.edit(id, text);
+      this.hooks.notify("Pasted complete input");
+      return;
+    }
+    if (!this.api.native) {
+      this.hooks.notify(
+        "Use the desktop app to paste input larger than the editor limit.",
+      );
+      return;
+    }
+    this.invalidate(id);
+    this.dispatch({ type: "import-start", id });
+    const token = tokenFor(this.tab(id)!);
+    this.hooks.notify("Importing complete pasted input…");
+    let source: FileDocument | undefined;
+    try {
+      source = await this.api.createTextDocument(
+        text,
+        tab.name,
+        snapshotFormat(tab),
+      );
+      if (!this.current(token)) {
+        this.retire(source.id);
+        return;
+      }
+      this.dispatch({
+        type: "imported",
+        token,
+        source,
+        text: size <= EDIT_LIMIT ? text : null,
+      });
+      if (tab.source) this.retire(tab.source.id);
+      this.hooks.notify(
+        `Pasted ${(size / (1024 * 1024)).toFixed(2)} MiB · tools use the complete input`,
+      );
+      this.schedule(id, 0);
+    } catch (error) {
+      if (source) this.retire(source.id);
+      if (this.current(token)) {
+        this.dispatch({
+          type: "failed",
+          token,
+          message: `Paste failed: ${errorText(error)} Your previous input is unchanged.`,
+        });
+      }
+    }
+  }
   history(id: string, type: "undo" | "redo") {
     this.invalidate(id);
     this.dispatch({ type, id });
@@ -419,7 +507,7 @@ export class WorkbenchController {
     if (old) clearTimeout(old);
     const tab = this.tab(id);
     const tool = tab && definition(tab.toolId);
-    if (!tab || !tool?.auto) return;
+    if (!tab || !tool?.auto || tab.phase === "importing") return;
     if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare) return;
     this.timers.set(
       id,
@@ -432,7 +520,7 @@ export class WorkbenchController {
   run(id: string) {
     const tab = this.tab(id);
     const tool = tab && definition(tab.toolId);
-    if (!tab || !tool?.auto) return;
+    if (!tab || !tool?.auto || tab.phase === "importing") return;
     const problem = validation(tab, tool, this.manifests.get(tool.id));
     if (problem) {
       this.dispatch({ type: "error", id, message: problem });
@@ -635,7 +723,7 @@ export class WorkbenchController {
   }
   async save(id: string): Promise<boolean> {
     const tab = this.tab(id);
-    if (!tab || this.saving.has(id)) return false;
+    if (!tab || tab.phase === "importing" || this.saving.has(id)) return false;
     if (!this.api.native) {
       this.hooks.notify("Use the desktop app to save a document.");
       return false;
@@ -731,6 +819,7 @@ export class WorkbenchController {
     }
   }
   dispose() {
+    this.disposed = true;
     this.stopEvents?.();
     if (this.poll) clearInterval(this.poll);
     for (const timer of this.timers.values()) clearTimeout(timer);
