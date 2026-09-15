@@ -79,6 +79,8 @@ Separate workspace/document/instance/result/view state. Replace tool-specific fi
 
 ## P05 — Shared workspaces and typed result surfaces
 
+**Current state:** the shell now derives additional catalog entries and generic text/binary/diff result behavior from host manifests, and per-tab definitions resolve through the controller. Static tool branches still exist for specialized controls and legacy result affordances; the full manifest-bound workspace composition described below remains open.
+
 **Owner:** Sol/high. **Dependencies:** P00–P04 interfaces. **Owns:** new `packages/workbench-ui/`, generic shell composition and central theme tokens. Tool algorithms belong to their packages.
 
 Implement the design's single-editor, transform, annotated, linked-field, compare, generator and media/preview compositions. Shared components provide editor models, typed input actions, forms, conditional options, diagnostics, tree/table/property/diff views and image surfaces. Specialized trusted plugin views get scoped components and SDK services, never global shell selectors. Add a placeholder contract for isolated preview documents; executable preview policy is proven by T08.
