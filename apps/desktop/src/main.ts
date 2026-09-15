@@ -27,8 +27,6 @@ import {
   type WorkspaceState,
 } from "./workbench/state";
 import {
-  bundledTools,
-  definition,
   validation,
   type ToolDefinition,
 } from "./workbench/tools";
@@ -92,7 +90,7 @@ try {
 }
 function displayTabName(tab: TabState): string {
   if (!/^Untitled-\d+\.txt$/i.test(tab.name)) return tab.name;
-  const tool = definition(tab.toolId);
+  const tool = controller.toolDefinition(tab.toolId);
   const number = tab.name.match(/\d+/)?.[0] ?? "";
   return `${tool?.label ?? "Document"}${number ? ` ${number}` : ""}`;
 }
@@ -185,7 +183,7 @@ function renderTools() {
   if (toolsKey === renderedToolsKey) return;
   renderedToolsKey = toolsKey;
   nav.innerHTML = "";
-  const visible = bundledTools.filter(
+  const visible = controller.availableTools().filter(
     (tool) =>
       !query || `${tool.label} ${tool.id}`.toLowerCase().includes(query),
   );
@@ -231,7 +229,7 @@ function renderTools() {
     nav.append(section);
   }
 }
-function renderOptions(tab: TabState, tool: ReturnType<typeof definition>) {
+function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".format-control");
   const optionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${JSON.stringify(tab.options)}:${tool?.id === "text.find-replace" ? tab.revision : ""}`;
   if (optionsKey === renderedOptionsKey) return;
@@ -358,7 +356,7 @@ function renderOptions(tab: TabState, tool: ReturnType<typeof definition>) {
     host.append(label);
   }
 }
-function renderSources(tab: TabState, tool: ReturnType<typeof definition>) {
+function renderSources(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $("#tool-source");
   if (!tool?.compare) {
     host.hidden = true;
@@ -376,7 +374,7 @@ function renderSources(tab: TabState, tool: ReturnType<typeof definition>) {
   $("#compare-open-left").onclick = () => void controller.chooseFile("text.compare");
   $("#compare-open-right").onclick = () => void controller.openRight(tab.id);
 }
-function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
+function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
   const image = $("#input-image") as HTMLImageElement;
   const wrap = $("#input-image-wrap");
   const input = $("#preview") as HTMLTextAreaElement;
@@ -480,7 +478,7 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
       ? tab.source.format.toUpperCase()
       : (tab.source?.contentKind.toUpperCase() ?? "TEXT");
 }
-function renderActions(tab: TabState, tool: ReturnType<typeof definition>) {
+function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".toolbar-actions");
   const actionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${tab.phase}:${tool ? (validation(tab, tool) ?? "") : ""}`;
   if (actionsKey === renderedActionsKey) return;
@@ -594,7 +592,7 @@ function renderResult(tab: TabState) {
     $("#result-status-message").hidden = true;
     empty.hidden = false;
     content.hidden = true;
-    const tool = definition(tab.toolId);
+    const tool = controller.toolDefinition(tab.toolId);
     const problem = tool
       ? validation(tab, tool, controller.manifests.get(tool.id))
       : null;
@@ -725,7 +723,7 @@ function updateCaretStatus(tab: TabState | undefined) {
   const lines = before.split(/\n/);
   $("#status-position").textContent = `Ln ${lines.length}, Col ${(lines.at(-1)?.length ?? 0) + 1}`;
   $("#status-encoding").textContent = tab?.source?.encoding ?? "UTF-8";
-  const tool = tab ? definition(tab.toolId) : undefined;
+  const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
   $("#status-format").textContent = tab?.source?.format?.toUpperCase() ?? (tool?.input === "image" ? "IMAGE" : "TEXT");
   const validity = tab?.error || tab?.result?.previewError
     ? "Error"
@@ -738,7 +736,7 @@ function updateCaretStatus(tab: TabState | undefined) {
           : "No document";
   $("#status-validity").textContent = validity;
 }
-function renderWorkspaceLayout(tab: TabState | undefined, tool: ReturnType<typeof definition>) {
+function renderWorkspaceLayout(tab: TabState | undefined, tool: ToolDefinition | undefined) {
   const workspace = $("#document-panel");
   const resultPane = $(".results-pane") as HTMLElement;
   const splitter = $("#workspace-splitter") as HTMLElement;
@@ -763,7 +761,7 @@ function render() {
   const tab = activeTab(state);
   renderTabs();
   renderTools();
-  const tool = tab ? definition(tab.toolId) : undefined;
+  const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
   $(".app-title").textContent = tool?.label ?? "DevTools Pro";
   $("#document-panel").classList.toggle(
     "single-pane",
@@ -832,7 +830,7 @@ function commands() {
     { label: "New document", run: () => controller.newDocument() },
     { label: "Open file", run: () => void controller.chooseFile() },
     ...state.tabs.flatMap((tab) =>
-      bundledTools
+      controller.availableTools()
         .filter((tool) => tool.id !== "editor.text")
         .map((tool) => ({
           label: `${tool.label} · ${displayTabName(tab)}`,
@@ -880,7 +878,7 @@ const hooks = {
     render();
     if (switched && activeTab(state)?.text !== null) {
       const input = $(
-        definition(activeTab(state)?.toolId ?? "")?.compare
+        controller.toolDefinition(activeTab(state)?.toolId ?? "")?.compare
           ? "#compare-left"
           : "#preview",
       ) as HTMLTextAreaElement;

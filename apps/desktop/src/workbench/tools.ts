@@ -131,8 +131,39 @@ export const bundledTools: readonly ToolDefinition[] = [
     op("python", "Python requests"),
   ]),
 ];
-export const definition = (id: string) =>
-  bundledTools.find((tool) => tool.id === id);
+function manifestTool(manifest: ToolManifest): ToolDefinition {
+  const input: ToolDefinition["input"] = manifest.inputKinds.includes("bytes")
+    ? manifest.id.includes("image") || /image/i.test(manifest.label)
+      ? "image"
+      : "bytes"
+    : "text";
+  const group = manifest.id.split(".")[0] === "structured"
+    ? "STRUCTURED DATA"
+    : manifest.id.includes("compare")
+      ? "COMPARE"
+      : "PLUGINS";
+  const icon = manifest.renderer === "binary" ? "▧" : manifest.renderer === "diff" ? "⇄" : "◇";
+  const operations = manifest.operations.map((operation) => op(operation.id, operation.label));
+  return {
+    id: manifest.id,
+    label: manifest.label,
+    group,
+    icon,
+    input,
+    operations,
+    defaultOperation: operations[0]?.id ?? "",
+    defaultOptions: manifest.operations[0]?.defaultOptions ?? {},
+    auto: operations.length > 0,
+    compare: manifest.renderer === "diff",
+  };
+}
+
+export const definition = (id: string, manifests?: ReadonlyMap<string, ToolManifest>) =>
+  bundledTools.find((tool) => tool.id === id) ?? (manifests?.get(id) ? manifestTool(manifests.get(id)!) : undefined);
+
+export function definitionFromManifest(manifest: ToolManifest): ToolDefinition {
+  return manifestTool(manifest);
+}
 export function defaultTool(document: FileDocument): string {
   if (document.contentKind === "image") return "encoding.image-base64";
   return document.contentKind === "text" && document.format === "json"

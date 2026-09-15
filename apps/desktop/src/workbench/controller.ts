@@ -33,6 +33,8 @@ import {
   resultExtension,
   snapshotFormat,
   validation,
+  definitionFromManifest,
+  type ToolDefinition,
 } from "./tools.ts";
 
 export interface WorkbenchApi {
@@ -128,8 +130,14 @@ export class WorkbenchController {
   private current(token: RunToken) {
     return !this.disposed && matches(this.tab(token.tabId), token);
   }
+  toolDefinition(id: string): ToolDefinition | undefined {
+    return definition(id, this.manifests);
+  }
   availableTools() {
-    return bundledTools.filter(
+    const dynamic = [...this.manifests.values()]
+      .filter((manifest) => !bundledTools.some((tool) => tool.id === manifest.id))
+      .map(definitionFromManifest);
+    return [...bundledTools, ...dynamic].filter(
       (tool) =>
         tool.id === editor.id ||
         this.manifests.has(tool.id) ||
@@ -309,7 +317,7 @@ export class WorkbenchController {
       if (this.state.tabs.length >= MAX_TABS)
         throw new Error("The tab limit was reached while opening this file.");
       const tab = makeTab(`tab-${++this.nextId}`, opened.name, opened, text);
-      const tool = definition(toolOverride ?? defaultTool(opened))!;
+      const tool = this.toolDefinition(toolOverride ?? defaultTool(opened))!;
       this.dispatch({
         type: "add",
         tab: {
@@ -342,7 +350,7 @@ export class WorkbenchController {
   }
   selectTool(id: string, toolId: string) {
     const tab = this.tab(id);
-    const tool = definition(toolId);
+    const tool = this.toolDefinition(toolId);
     if (!tab || !tool || tab.toolId === toolId) return;
     this.invalidate(id);
     this.dispatch({
@@ -458,7 +466,7 @@ export class WorkbenchController {
   }
   options(id: string, operation: string, options: Record<string, unknown>) {
     const tab = this.tab(id);
-    const tool = tab && definition(tab.toolId);
+    const tool = tab && this.toolDefinition(tab.toolId);
     if (!tool?.operations.some((op) => op.id === operation)) return;
     this.invalidate(id);
     this.dispatch({ type: "options", id, operation, options });
@@ -507,7 +515,7 @@ export class WorkbenchController {
     const old = this.timers.get(id);
     if (old) clearTimeout(old);
     const tab = this.tab(id);
-    const tool = tab && definition(tab.toolId);
+    const tool = tab && this.toolDefinition(tab.toolId);
     if (!tab || !tool?.auto || tab.phase === "importing") return;
     if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare) return;
     this.timers.set(
@@ -520,7 +528,7 @@ export class WorkbenchController {
   }
   run(id: string) {
     const tab = this.tab(id);
-    const tool = tab && definition(tab.toolId);
+    const tool = tab && this.toolDefinition(tab.toolId);
     if (!tab || !tool?.auto || tab.phase === "importing") return;
     const problem = validation(tab, tool, this.manifests.get(tool.id));
     if (problem) {
@@ -586,7 +594,7 @@ export class WorkbenchController {
       }
       if (!input) throw new Error("There is no input document.");
       let right: FileDocument | undefined;
-      if (definition(task.tab.toolId)?.compare) {
+      if (this.toolDefinition(task.tab.toolId)?.compare) {
         right = await this.api.createTextDocument(
           task.tab.rightText,
           "comparison.txt",
