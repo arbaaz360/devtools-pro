@@ -23,6 +23,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 mod plugin_host;
+mod native_plugins;
 use plugin_host::{ExecutionIdentity, PluginHost, RegisteredExecutor};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
@@ -71,7 +72,7 @@ impl Default for HostState {
         let plugin_catalog = embedded_plugin_catalog();
         assert!(plugin_catalog.iter().any(|plugin| plugin.id == "structured.json"), "JSON plugin must be present in generated catalog");
         let mut plugin_host = PluginHost::with_legacy(devtools_core::builtin_manifests(), execute_registered_tool);
-        plugin_host.replace_native("structured.json", execute_json_native).expect("JSON plugin must be registered");
+        native_plugins::register(&mut plugin_host).expect("native plugins must be registered");
         Self {
             sequence: AtomicU64::new(0),
             documents: Mutex::new(HashMap::new()),
@@ -858,28 +859,6 @@ fn start_operation_impl(
     Ok(StartedJob { identity: accepted_identity, job_id })
 }
 
-/// First native plugin slice. JSON format/minify now resolves through the
-/// registry and the same generic job/result publication path as other tools.
-fn execute_json_native(
-    operation_id: &str,
-    input: &Document,
-    _options: &Value,
-    token: &CancellationToken,
-    progress: &dyn Fn(Progress),
-) -> Result<devtools_core::ToolResult, ToolError> {
-    if token.is_cancelled() { return Err(ToolError::Cancelled); }
-    let text = input.as_text().map_err(|_| ToolError::InvalidUtf8)?;
-    progress(Progress { bytes_processed: 0, total_bytes: input.len() as u64, phase: "parsing JSON".into() });
-    let value: Value = serde_json::from_str(text).map_err(|error| ToolError::Execution { message: error.to_string() })?;
-    let output = match operation_id {
-        "format" => serde_json::to_string_pretty(&value).map_err(|error| ToolError::Execution { message: error.to_string() })?,
-        "minify" => serde_json::to_string(&value).map_err(|error| ToolError::Execution { message: error.to_string() })?,
-        _ => return Err(ToolError::UnsupportedOperation { tool_id: "structured.json".into(), operation_id: operation_id.into() }),
-    };
-    progress(Progress { bytes_processed: input.len() as u64, total_bytes: input.len() as u64, phase: "complete".into() });
-    Ok(devtools_core::ToolResult { output: Document::from_text(output).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
-}
-
 #[tauri::command]
 fn cancel_operation(job_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result<(), String> {
     if let Some(token) = state.jobs.lock().map_err(|e| e.to_string())?.get(&job_id) { token.cancel(); }
@@ -1176,8 +1155,8 @@ mod tests {
         let json = catalog.iter().find(|plugin| plugin.id == "structured.json").expect("generated catalog contains JSON");
         assert!(json.operation_ids.iter().any(|operation| operation == "format"));
         let input = Document::from_text(r#"{"b":2,"a":1}"#).with_kind(DocumentKind::Text);
-        let result = execute_json_native("format", &input, &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
-        assert_eq!(result.output.as_text().unwrap(), "{\n  \"a\": 1,\n  \"b\": 2\n}");
+        let result = native_plugins::execute_json("format", &input, &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "{\n  \"b\": 2,\n  \"a\": 1\n}");
     }
 
     #[test]

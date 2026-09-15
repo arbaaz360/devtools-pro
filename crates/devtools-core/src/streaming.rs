@@ -1,5 +1,5 @@
 use serde::{de::IgnoredAny, Deserialize, Serialize};
-use std::{fs::{self, File, OpenOptions}, io::{self, BufReader, BufWriter, Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, sync::{atomic::{AtomicBool, Ordering}, Arc}, time::{Duration, Instant}};
+use std::{fs::{self, File, OpenOptions}, io::{self, BufReader, BufWriter, Cursor, Read, Seek, SeekFrom, Write}, path::{Path, PathBuf}, sync::{atomic::{AtomicBool, Ordering}, Arc}, time::{Duration, Instant}};
 
 const CHUNK: usize = 64 * 1024;
 const MAX_DEPTH: usize = 256;
@@ -60,8 +60,48 @@ impl<R: Read, F: Fn(Progress)> Read for VerifiedReader<R, F> {
     }
 }
 
-fn new_reader<F: Fn(Progress)>(file: File, total: u64, token: &CancellationToken, progress: F, bom: usize, scan_structure: bool) -> VerifiedReader<File, F> {
+fn new_reader<R: Read, F: Fn(Progress)>(file: R, total: u64, token: &CancellationToken, progress: F, bom: usize, scan_structure: bool) -> VerifiedReader<R, F> {
     VerifiedReader { inner: file, token: token.clone(), progress, total, processed: 0, bom, raw_seen: 0, carry: Vec::new(), in_string: false, escaped: false, depth: 0, scan_structure, failed: None, last_progress: Instant::now() - Duration::from_secs(1) }
+}
+
+/// Transform an already bounded JSON payload with the same streaming parser
+/// and formatter used by file-backed operations. This is the native-plugin
+/// adapter: the host controls the input bytes and the plugin receives only a
+/// bounded document, while JSON semantics remain in the core engine.
+pub fn transform_json_bytes(input: &[u8], layout: JsonLayout, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<(Vec<u8>, Inspection), crate::ToolError> {
+    let started = Instant::now();
+    let total = input.len() as u64;
+    let mut validation = Cursor::new(input);
+    let bom = detect_bom(&mut validation)?;
+    validation.seek(SeekFrom::Start(0))?;
+    let mut vr = new_reader(validation, total, cancel, |p| progress(Progress { phase: "validating".into(), ..p }), bom, true);
+    let mut br = BufReader::with_capacity(CHUNK, &mut vr);
+    let validation_result = parse_json(&mut br);
+    drop(br);
+    if let Some(error) = vr.failed.take() { return Err(error); }
+    validation_result?;
+    check_cancel(cancel)?;
+
+    let mut source = Cursor::new(input);
+    source.seek(SeekFrom::Start(0))?;
+    let mut vr = new_reader(source, total, cancel, |p| progress(Progress { phase: "formatting".into(), ..p }), bom, true);
+    let mut br = BufReader::with_capacity(CHUNK, &mut vr);
+    let mut output = Vec::with_capacity(input.len());
+    let mut formatter = JsonFormatter { out: &mut output, layout, in_string: false, escaped: false, stack: Vec::new(), after_open: false };
+    let mut buffer = [0u8; CHUNK];
+    loop {
+        let read = br.read(&mut buffer).map_err(crate::ToolError::from)?;
+        if read == 0 { break; }
+        check_cancel(cancel)?;
+        formatter.write_chunk(&buffer[..read]).map_err(crate::ToolError::from)?;
+    }
+    drop(br);
+    check_cancel(cancel)?;
+    if vr.in_string || vr.depth != 0 { return Err(crate::ToolError::InvalidJson { message: "unexpected end of JSON".into(), line: 1, column: 1 }); }
+    progress(Progress { bytes_processed: total, total_bytes: total, phase: "complete".into() });
+    let output_bytes = output.len() as u64;
+    let summary = match layout { JsonLayout::Pretty => "JSON formatted", JsonLayout::Minify => "JSON minified" };
+    Ok((output, Inspection { input_bytes: total, output_bytes: Some(output_bytes), elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary: summary.into() }))
 }
 
 fn parse_json<R: Read>(reader: &mut R) -> Result<(), crate::ToolError> {
@@ -88,7 +128,7 @@ pub fn inspect_file(path: &Path, format: FileFormat, cancel: &CancellationToken,
     Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary: match format { FileFormat::Json => "valid JSON".into(), FileFormat::Csv => "valid CSV".into(), FileFormat::Text => unreachable!() } })
 }
 
-fn detect_bom(file: &mut File) -> Result<usize, crate::ToolError> { let mut b = [0u8; 3]; let n = file.read(&mut b)?; file.seek(SeekFrom::Start(0))?; Ok(if n >= 3 && b == [0xEF,0xBB,0xBF] { 3 } else { 0 }) }
+fn detect_bom<R: Read + Seek>(file: &mut R) -> Result<usize, crate::ToolError> { let mut b = [0u8; 3]; let n = file.read(&mut b)?; file.seek(SeekFrom::Start(0))?; Ok(if n >= 3 && b == [0xEF,0xBB,0xBF] { 3 } else { 0 }) }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
