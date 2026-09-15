@@ -101,7 +101,9 @@ Migrate JSON, image/Base64, diff and hash first. Then migrate current CSV/text i
 
 ## P07 — Representative tool proofs and remaining catalogue
 
-Each row is an independently bounded feature packet once its prerequisites are satisfied. **Required reading:** the named DU cards (including Required, UX and Acceptance), SDK documentation, and shared UX invariants. **Allowed files:** the listed proposed package plus its fixtures/tests/readme. Shared schema/engine dependencies need integrator review; use a proposed change or blocker note instead of editing shell internals. Final package IDs/paths are locked by P02 before dispatch.
+**Current state:** `plugins/url/`, `plugins/diff/`, and `plugins/hash/` are now implemented and discovered from the bundled catalog. URL supports RFC 3986/form transforms and query parsing; diff supports bounded UTF-8 line hunks over named left/right inputs; hash supports verified MD5 and SHA-1/224/256/384/512 outputs with streaming reads. MD2/MD4 remain intentionally omitted until a verified implementation is selected. The headless runner supports repeated named `--input` values for multi-port processors.
+
+Each row is an independently bounded feature packet once its prerequisites are satisfied. **Required reading:** the named DU cards (including Required, UX and Acceptance), SDK documentation, and shared UX invariants. **Allowed files:** the listed proposed package plus its fixtures/tests/readme. Shared schema/engine dependencies need integrator review; use a proposed change or blocker note instead of editing shell internals. Final package IDs/paths are locked by P02 before dispatch. 
 
 Every packet delivers manifest/options/samples/detection, processor(s), workspace bindings or scoped view, valid/invalid/boundary fixtures, per-tab and keyboard scenarios, complete copy/export where relevant, engine/version/limits notes, and a gap report. A backend-only implementation is not complete. No packet requires access to the user's F: drive; the requirement cards contain the working brief.
 
