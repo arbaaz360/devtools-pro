@@ -1,0 +1,11 @@
+{
+  "name": "@devtools/plugin-contract",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "check:generated": "node scripts/generate.mjs --check",
+    "test": "node --experimental-strip-types --test ts/*.test.ts"
+  }
+}

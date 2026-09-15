@@ -6,4 +6,7 @@
 node_modules/
 dist/
 /benchmarks/fixtures/*.json
+/benchmarks/fixtures/clipboard-roundtrip.png
+apps/desktop/test-results/
+apps/desktop/playwright-report/
 **/.git-nested/

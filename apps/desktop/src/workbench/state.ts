@@ -281,7 +281,9 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "queue":
           return { ...reset(tab), phase: "queued" };
         case "cancel":
-          return { ...reset(tab, false), phase: "cancelled" };
+          // Keep the last result visible and mark it stale while the cancelled
+          // job is retired; collapsing the result pane changes the workspace.
+          return { ...reset(tab, true), phase: "cancelled" };
         case "error":
           return {
             ...reset(tab, false),

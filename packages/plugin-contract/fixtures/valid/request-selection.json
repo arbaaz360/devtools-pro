@@ -1,0 +1,5 @@
+{
+  "kind":"executeRequest","apiVersion":"devtools.plugin/v2","pluginId":"examples.contract","pluginVersion":"1.2.3","toolId":"text.diff","operationId":"text.diff","instanceId":"tab-1:text.diff","jobId":"job-1","generation":"7",
+  "inputs":{"left":{"kind":"document","id":"doc-left","revision":"12","byteLength":"18446744073709551616","contentKind":"text","mime":"text/plain","encoding":"utf8","newline":"lf"},"right":{"kind":"document","id":"doc-right","revision":"13","byteLength":"8","contentKind":"text","mime":"text/plain","encoding":"utf8","newline":"lf"},"selection":{"kind":"selection","documentId":"doc-left","revision":"12","selectionEpoch":"9","startByte":"2","endByte":"14"}},
+  "options":{"mode":"word"},"trigger":{"kind":"selectionChange","changedPort":"left","origin":{"kind":"userEdit","sourceId":"doc-left"},"revisionVector":{"left":"12","right":"13"}},"context":{"locale":"en-US","timezone":"Asia/Calcutta"},"requestedLimits":{"maxOutputBytes":"1048576","maxPreviewBytes":"65536"}
+}

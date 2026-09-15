@@ -142,7 +142,6 @@
                   <div class="toolbar-actions"></div>
                 </div>
               </div>
-              <div id="error" class="editor-diagnostic" role="alert" hidden></div>
               <div id="editor-host" class="editor-host">
                 <div id="empty-state" class="empty-state">
                   <div class="empty-glyph">＋</div>
@@ -209,6 +208,7 @@
                 </div>
               </div>
               <div class="pane-footer">
+                <span id="error" class="editor-diagnostic" role="alert" hidden></span>
                 <span id="preview-limit"
                   >Editable documents · Local processing</span
                 ><span id="encoding">UTF-8</span>
@@ -291,28 +291,6 @@
               </div>
             </aside>
           </section>
-          <section
-            id="job-panel"
-            class="job-panel"
-            aria-label="Operation progress"
-            hidden
-          >
-            <div class="job-heading">
-              <div>
-                <strong id="job-title">Processing</strong
-                ><span id="job-phase">Starting…</span>
-              </div>
-              <button id="cancel-job" class="outline-button">Cancel</button>
-            </div>
-            <progress
-              id="job-progress"
-              max="100"
-              aria-label="Processing progress"
-            ></progress>
-            <div class="job-footer">
-              <span id="job-bytes"></span><span id="job-percent"></span>
-            </div>
-          </section>
           <section class="document-info" aria-label="Document information">
             <div>
               <span>Document</span
@@ -329,6 +307,13 @@
               ><span id="engine-dot" class="engine-dot"></span
               ><span id="engine-status">Connecting…</span></span
             ><span id="status" role="status" aria-live="polite">Ready</span>
+            <div class="job-slot">
+              <div id="job-panel" class="job-panel" aria-label="Operation progress" hidden>
+                <span id="job-phase">Starting…</span>
+                <progress id="job-progress" max="100" aria-label="Processing progress"></progress>
+                <button id="cancel-job" class="flat-button" type="button">Cancel</button>
+              </div>
+            </div>
             <span id="status-context" class="status-context" aria-live="polite">
               <span id="status-position">Ln 1, Col 1</span><span id="status-encoding">UTF-8</span><span id="status-format">TEXT</span><span id="status-validity">Ready</span>
             </span>

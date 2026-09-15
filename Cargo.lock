@@ -608,6 +608,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "devtools-plugin-contract"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

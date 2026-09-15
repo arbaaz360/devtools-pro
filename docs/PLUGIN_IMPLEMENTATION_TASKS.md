@@ -1,6 +1,6 @@
 # Plugin migration and worker packets
 
-Status: implementation queue, 2026-09-15. These tasks are defined; the SDK, discovery tooling and runtime they describe do **not** exist yet. No workers were dispatched as part of this design review.
+Status: implementation queue, 2026-09-15. P00 (rendered interaction baseline) and P01 (canonical plugin contract) are implemented and validated on the current base. The SDK, discovery tooling and runtime they describe do **not** exist yet. P02 onward remain queued behind the documented dependencies.
 
 Read [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md) for ownership and [DEVUTILS_REQUIREMENTS.md](DEVUTILS_REQUIREMENTS.md) for the 27 reference requirement cards. This queue supersedes historical Tasks 24–31 in [WORKER_TASKS.md](../WORKER_TASKS.md). Completed historical work must be reused where it passes the acceptance cases.
 
@@ -19,6 +19,8 @@ Each handoff must name the actual base commit, one packet, allowed files, depend
 
 ## P00 — Interaction baseline and migration guard
 
+**Current state:** browser-rendered baseline implemented in [UI_REGRESSION_BASELINE.md](UI_REGRESSION_BASELINE.md); native Windows checklist remains open.
+
 **Owner:** Sol/high. **Dependencies:** none. **Scope:** existing shell tests, `scripts/`, `apps/desktop` interaction harness; production changes only for a reproduced baseline failure.
 
 Build a repeatable rendered test path using the current app DOM and a deterministic mock of the native boundary, plus a documented native Windows smoke path for real bridge/clipboard/drop behavior. Reuse existing reducer/controller tests; a selector or source-code string check is not an interaction test. Record build identity and actual evidence separately for browser and native runs.
@@ -28,6 +30,8 @@ Build a repeatable rendered test path using the current app DOM and a determinis
 **Non-goals:** plugin protocol implementation or wholesale restyling. Failures become focused fixes, not a reason to replace the shell at once.
 
 ## P01 — Canonical versioned contract
+
+**Current state:** implemented in [packages/plugin-contract](../packages/plugin-contract/README.md). The schema generator check, five TypeScript contract tests, four Rust integration tests and workspace tests pass. The package is contract-only; it is not yet imported by the desktop bridge or runtime.
 
 **Owner:** Sol/high. **Dependencies:** none. **Owns:** new `packages/plugin-contract/`, generated Rust/TypeScript types, compatibility fixtures, protocol documentation. Changes to bridge imports only after coordination with P03.
 

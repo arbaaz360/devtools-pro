@@ -33,6 +33,7 @@ import {
   type ToolDefinition,
 } from "./workbench/tools";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
+import { delayedIndicator } from "./ui/delayedIndicator";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -73,7 +74,9 @@ const layoutStorage = {
 };
 const readNumber = (key: string, fallback: number) => {
   try {
-    const value = Number(localStorage.getItem(key));
+    const stored = localStorage.getItem(key);
+    if (stored === null || stored.trim() === "") return fallback;
+    const value = Number(stored);
     return Number.isFinite(value) ? value : fallback;
   } catch {
     return fallback;
@@ -105,6 +108,16 @@ const paletteSearch = $("#palette-search") as HTMLInputElement;
 const notify = (message: string) => {
   $("#status").textContent = message;
 };
+const jobIndicator = delayedIndicator((visible) => {
+  const panel = $("#job-panel");
+  // If a job finishes while Cancel has focus, return to its editor.
+  const returnFocus = !visible && panel.contains(document.activeElement);
+  panel.hidden = !visible;
+  if (returnFocus) {
+    const input = $("#preview") as HTMLTextAreaElement;
+    if (!input.hidden) input.focus({ preventScroll: true });
+  }
+});
 
 function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
   const dialog = $("#unsaved-dialog") as HTMLDialogElement;
@@ -612,8 +625,11 @@ function renderResult(tab: TabState) {
   content.hidden = false;
   const event = result.event;
   const stateNode = $("#result-state");
-  stateNode.className = `result-state ${event.ok ? "ok" : event.cancelled ? "cancelled" : "failed"}`;
-  stateNode.textContent = event.ok
+  const readable = event.ok && !result.previewError;
+  stateNode.className = `result-state ${readable ? "ok" : event.cancelled ? "cancelled" : "failed"}`;
+  stateNode.textContent = result.previewError
+    ? `Could not load result: ${result.previewError}`
+    : event.ok
     ? "✓ Completed successfully"
     : event.cancelled
       ? "○ Cancelled"
@@ -676,6 +692,7 @@ function renderResult(tab: TabState) {
   }
   const noOutput =
     event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
+  $(".result-code").hidden = !readable || binary || diff || noOutput;
   statusMessage.hidden = !noOutput;
   statusMessage.textContent = noOutput
     ? event.operationId === "inspect"
@@ -710,7 +727,7 @@ function updateCaretStatus(tab: TabState | undefined) {
   $("#status-encoding").textContent = tab?.source?.encoding ?? "UTF-8";
   const tool = tab ? definition(tab.toolId) : undefined;
   $("#status-format").textContent = tab?.source?.format?.toUpperCase() ?? (tool?.input === "image" ? "IMAGE" : "TEXT");
-  const validity = tab?.error
+  const validity = tab?.error || tab?.result?.previewError
     ? "Error"
     : tab?.phase === "running" || tab?.phase === "queued"
       ? "Processing"
@@ -761,19 +778,24 @@ function render() {
   $("#active-tool-subtitle").textContent = tool
     ? "Choose an operation or edit the document in place."
     : "Press Ctrl+N for a blank document or choose a file.";
-  $("#error").hidden = !tab?.error;
+  // Operation failures already have a result diagnostic. Other errors use the
+  // fixed source footer so toggling them never pushes the document down.
+  const sourceError = !!tab?.error && (!tab.result || tab.resultStale);
+  $("#error").hidden = !sourceError;
   $("#error").textContent = tab?.error ?? "";
+  $("#error").title = tab?.error ?? "";
+  $("#preview-limit").hidden = sourceError;
   const save = $("#save-document") as HTMLButtonElement;
   save.disabled = !tab || tab.phase === "importing";
-  $("#job-panel").hidden =
-    !tab || (tab.phase !== "queued" && tab.phase !== "running");
+  jobIndicator.update(tab && (tab.phase === "queued" || tab.phase === "running")
+    ? `${tab.id}:${tab.generation}` : null);
   if (tab) {
     renderOptions(tab, tool);
     renderSources(tab, tool);
     renderInput(tab, tool);
     renderActions(tab, tool);
     renderResult(tab);
-    $("#job-title").textContent =
+    $("#job-panel").title =
       `${tool?.label ?? "Processing"} · ${displayTabName(tab)}`;
     $("#job-phase").textContent =
       tab.phase === "queued"
@@ -786,12 +808,9 @@ function render() {
           (tab.progress.bytesProcessed / tab.progress.totalBytes) * 100,
         )
       : 0;
-    $("#job-bytes").textContent = tab.progress
+    progress.title = tab.progress
       ? `${bytes(tab.progress.bytesProcessed)} of ${bytes(tab.progress.totalBytes)}`
       : "Starting…";
-    $("#job-percent").textContent = tab.progress?.totalBytes
-      ? `${Math.round((tab.progress.bytesProcessed / tab.progress.totalBytes) * 100)}%`
-      : "—";
   } else {
     $("#editor-host").hidden = false;
     $("#tool-source").hidden = true;
@@ -1131,6 +1150,7 @@ if (native) {
       for (const tab of [...state.tabs])
         if (!(await controller.close(tab.id))) return;
       controller.dispose();
+      jobIndicator.dispose();
       await getCurrentWindow().destroy();
     } finally {
       closingWindow = false;

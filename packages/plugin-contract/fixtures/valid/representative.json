@@ -1,0 +1,5 @@
+{
+  "kind":"executeRequest","apiVersion":"devtools.plugin/v2","pluginId":"examples.contract","pluginVersion":"1.2.3","toolId":"security.jwt-number","operationId":"security.jwt-number","instanceId":"tab-linked","jobId":"job-linked","generation":"9007199254740993",
+  "inputs":{"token":{"kind":"document","id":"jwt","revision":"18446744073709551616","byteLength":"8","contentKind":"text","encoding":"utf8","newline":"lf"},"key":{"kind":"secret","handle":"secret:jwt-key"},"decimal":{"kind":"value","value":"90071992547409931234567890"}},
+  "options":{"algorithm":"HS256"},"trigger":{"kind":"explicit","origin":{"kind":"command","sourceId":"sign"},"revisionVector":{"token":"4","decimal":"2"}},"context":{"locale":"en-US","timezone":"UTC"},"requestedLimits":{"maxOutputBytes":"1048576"}
+}

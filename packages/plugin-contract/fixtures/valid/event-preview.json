@@ -1,0 +1,5 @@
+{
+  "kind":"completed","identity":{"apiVersion":"devtools.plugin/v2","pluginId":"examples.contract","pluginVersion":"1.2.3","toolId":"preview.html","operationId":"preview.html","instanceId":"tab-1:preview.html","jobId":"job-preview","generation":"3","sequence":"4"},
+  "outputs":{"preview":{"representation":"previewDocument","artifactRef":{"handle":"artifact-preview","byteLength":"240","contentHash":"sha256:abc"},"complete":true,"availableViews":["previewDocument"],"exportFormats":["openInBrowser"],"sensitive":false}},
+  "diagnostics":[],"stats":{"elapsedMs":"18","inputBytes":"120","outputBytes":"240"},"provenance":{"pluginId":"examples.contract","pluginVersion":"1.2.3","operationId":"preview.html","engine":"html","engineVersion":"1.0","inputRevisions":{"source":"4"},"optionsDigest":"sha256:def"}
+}

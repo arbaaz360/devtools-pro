@@ -22,5 +22,7 @@ jobs:
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - name: Install desktop dependencies
         run: pnpm --dir apps/desktop install --frozen-lockfile
+      - name: Install browser for rendered UI tests
+        run: pnpm --dir apps/desktop exec playwright install chromium
       - name: Run repository quality gate
         run: node scripts/quality-gate.mjs

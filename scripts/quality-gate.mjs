@@ -21,9 +21,12 @@ function run(command, args) {
 }
 
 run('node', ['scripts/generate-fixtures.mjs']);
+run('pnpm', ['--dir', 'packages/plugin-contract', 'check:generated']);
+run('pnpm', ['--dir', 'packages/plugin-contract', 'test']);
 run('cargo', ['test', '--workspace']);
 run('pnpm', ['--dir', 'apps/desktop', 'build']);
 run('pnpm', ['--dir', 'apps/desktop', 'test:shell']);
+run('pnpm', ['--dir', 'apps/desktop', 'test:ui']);
 run('node', ['scripts/check-desktop-bundle.mjs']);
 run('cargo', ['build', '-p', 'devtools-cli']);
 run('node', ['scripts/smoke-shell.mjs']);
