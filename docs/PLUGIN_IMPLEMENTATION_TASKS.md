@@ -55,7 +55,7 @@ Create trusted bundled package discovery under `plugins/`. Generate both fronten
 
 ## P03 — Universal host execution and services
 
-**Current state:** the native host now owns an injected `PluginHost` registry. Existing v1 tools are registered through a compatibility executor adapter, `run_tool` resolves manifests and executors through that registry, and accepted jobs return a typed execution identity. The registry has duplicate-id, dispatch, deterministic ordering, and terminal-claim tests. This is deliberately an incremental seam: the generic scheduler still uses the legacy in-process executor signature while the v2 named-port service implementation is completed in the remaining P03 work.
+**Current state:** the native host now owns an injected `PluginHost` registry. Existing v1 tools are registered through a compatibility executor adapter, `run_tool` resolves manifests and executors through that registry, and accepted jobs return a typed execution identity. The generated bundled catalog is embedded during the Tauri build, and JSON format/minify now uses a native registry executor through the generic job/result path. The registry has duplicate-id, native/legacy dispatch, deterministic ordering, and terminal-claim tests. This is deliberately an incremental seam: the generic scheduler still uses the legacy in-process executor signature while the v2 named-port service implementation is completed in the remaining P03 work.
 
 **Owner:** Sol/high. **Dependencies:** P01; integrate executor interfaces from P02. **Owns:** `apps/desktop/src-tauri/`, native bridge adapter, host service tests; coordinate generated type imports only.
 
