@@ -7,8 +7,11 @@ handles are injected per invocation. The Rust crate exposes the same boundary
 for native processors and includes memory test doubles.
 
 Input and output byte/chunk limits are enforced by the context and sinks.
-Deadline enforcement belongs to the injected host scheduler; processors should
-check cancellation between bounded operations.
+Processors that handle large inputs should use `context.readChunks(port)`;
+hosts can provide bounded range reads and the context checks cancellation between
+chunks. `context.read(port)` remains available for small values. Deadline
+enforcement belongs to the injected host scheduler; processors should check
+cancellation between bounded operations.
 
 Discovery only reads direct child packages under a trusted `plugins/` directory.
 Every package has a `plugin.json` descriptor with `apiVersion`, a canonical

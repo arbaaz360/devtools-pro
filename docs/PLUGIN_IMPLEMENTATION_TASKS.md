@@ -43,7 +43,7 @@ Define the serializable manifest, named input/output ports, options/conditional 
 
 ## P02 — Package discovery, scaffold and processor SDK
 
-**Current state:** implemented in [packages/plugin-sdk](../packages/plugin-sdk/README.md) and [packages/plugin-discovery](../packages/plugin-discovery/README.md), with the trusted example under `plugins/examples/`. SDK/discovery tests, the headless example runner, generated catalog command and workspace tests pass. This is build-time bundled discovery; runtime installation remains P09.
+**Current state:** implemented in [packages/plugin-sdk](../packages/plugin-sdk/README.md) and [packages/plugin-discovery](../packages/plugin-discovery/README.md), with the trusted example under `plugins/examples/`. SDK/discovery tests, the headless example runner, generated catalog command and workspace tests pass. The SDK now exposes bounded range-based `readChunks` with cancellation checks for large processors. This is build-time bundled discovery; runtime installation remains P09.
 
 **Owner:** Sol/high. **Dependencies:** P01. **Owns:** `packages/plugin-sdk/`, package tooling, generated composition crates/import maps, workspace bootstrap and related CI commands.
 
