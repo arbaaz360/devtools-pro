@@ -618,6 +618,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "devtools-plugin-discovery"
+version = "0.1.0"
+dependencies = [
+ "devtools-plugin-contract",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+]
+
+[[package]]
+name = "devtools-plugin-sdk"
+version = "0.1.0"
+dependencies = [
+ "devtools-plugin-contract",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "digest"
 version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"

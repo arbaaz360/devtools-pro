@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/devtools-core", "crates/devtools-cli", "apps/desktop/src-tauri", "packages/plugin-contract"]
+members = ["crates/devtools-core", "crates/devtools-cli", "apps/desktop/src-tauri", "packages/plugin-contract", "packages/plugin-sdk", "packages/plugin-discovery"]
 default-members = ["crates/devtools-core", "crates/devtools-cli"]
 
 [workspace.package]

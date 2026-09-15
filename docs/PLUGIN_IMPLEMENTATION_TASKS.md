@@ -1,6 +1,6 @@
 # Plugin migration and worker packets
 
-Status: implementation queue, 2026-09-15. P00 (rendered interaction baseline) and P01 (canonical plugin contract) are implemented and validated on the current base. The SDK, discovery tooling and runtime they describe do **not** exist yet. P02 onward remain queued behind the documented dependencies.
+Status: implementation queue, 2026-09-15. P00 (rendered interaction baseline), P01 (canonical plugin contract), and P02 (SDK and bundled discovery) are implemented and validated on the current base. The host integration, shared workbench UI, and runtime installation described below do **not** exist yet. P03 onward remain queued behind the documented dependencies.
 
 Read [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md) for ownership and [DEVUTILS_REQUIREMENTS.md](DEVUTILS_REQUIREMENTS.md) for the 27 reference requirement cards. This queue supersedes historical Tasks 24–31 in [WORKER_TASKS.md](../WORKER_TASKS.md). Completed historical work must be reused where it passes the acceptance cases.
 
@@ -42,6 +42,8 @@ Define the serializable manifest, named input/output ports, options/conditional 
 **Non-goals:** choosing a regex library, migrating production algorithms, or adding a UI framework.
 
 ## P02 — Package discovery, scaffold and processor SDK
+
+**Current state:** implemented in [packages/plugin-sdk](../packages/plugin-sdk/README.md) and [packages/plugin-discovery](../packages/plugin-discovery/README.md), with the trusted example under `plugins/examples/`. SDK/discovery tests, the headless example runner, generated catalog command and workspace tests pass. This is build-time bundled discovery; runtime installation remains P09.
 
 **Owner:** Sol/high. **Dependencies:** P01. **Owns:** `packages/plugin-sdk/`, package tooling, generated composition crates/import maps, workspace bootstrap and related CI commands.
 

@@ -1,0 +1,22 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "examples.echo",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "tools": [{ "id": "examples.echo.tool", "title": "Echo example", "category": "examples", "operationIds": ["echo"], "workspaceId": "workspace" }],
+  "operations": [{
+    "id": "echo",
+    "title": "Echo",
+    "executor": { "kind": "javascriptWorker", "id": "examples.echo.processor", "version": "0.1.0", "cancellation": "cooperative" },
+    "inputs": [{ "id": "input", "kind": "document", "required": false, "multiplicity": "one", "contentKinds": ["text"] }],
+    "outputs": [{ "id": "output", "kind": "artifact", "multiplicity": "one", "representations": ["text"], "sensitive": false, "exports": ["copyText"] }],
+    "options": [],
+    "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+    "limits": { "maxInputBytes": "1048576", "maxOutputBytes": "1048576", "maxChunkBytes": "1048576", "deadlineMs": "1000" }
+  }],
+  "workspaces": [{ "id": "workspace", "kind": "transform", "bindings": [], "commands": [], "presentationSettings": [] }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": [], "fixtures": [], "uiScenarios": [] }
+}

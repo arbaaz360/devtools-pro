@@ -23,7 +23,10 @@ function run(command, args) {
 run('node', ['scripts/generate-fixtures.mjs']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'check:generated']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'test']);
+run('pnpm', ['--dir', 'packages/plugin-sdk', 'test']);
+run('pnpm', ['--dir', 'packages/plugin-sdk', 'headless', '../../plugins']);
 run('cargo', ['test', '--workspace']);
+run('cargo', ['run', '-p', 'devtools-plugin-discovery', '--', 'generate', 'plugins', 'target/generated/plugins']);
 run('pnpm', ['--dir', 'apps/desktop', 'build']);
 run('pnpm', ['--dir', 'apps/desktop', 'test:shell']);
 run('pnpm', ['--dir', 'apps/desktop', 'test:ui']);
