@@ -67,6 +67,8 @@ Route requests through an injected executor registry. Keep old commands as norma
 
 ## P04 — Plugin instance state and effect boundary
 
+**Current state:** the reducer now stores the native acceptance identity with each tab's active job and clears it on every generation-changing transition. The controller passes the identity returned by the bridge into the reducer, with a focused stale-generation test. Full canonical revision vectors, named bindings, persistence migrations and scoped service disposal remain to be completed.
+
 **Owner:** Sol/high. **Dependencies:** P01; use P02 test doubles and P03 bridge interface. **Owns:** `apps/desktop/src/workbench/`, state SDK adapters, relevant controller tests.
 
 Separate workspace/document/instance/result/view state. Replace tool-specific fields and compare branches with named bindings and scoped plugin reducers. Reducers return effect intents; one controller executes them. Preserve editor models and undo across rendering. Implement origin/revision-vector guarded derived updates, per-tool state within tabs, state migration/version policy and instance disposal.
