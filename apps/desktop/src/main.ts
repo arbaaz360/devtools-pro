@@ -67,6 +67,39 @@ let renderedResultStale = false;
 let renderedOptionsKey = "";
 let renderedToolsKey = "";
 let renderedActionsKey = "";
+const layoutStorage = {
+  split: "devtoolspro.workspace.split",
+  sidebar: "devtoolspro.sidebar.collapsed",
+};
+const readNumber = (key: string, fallback: number) => {
+  try {
+    const value = Number(localStorage.getItem(key));
+    return Number.isFinite(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+};
+let splitRatio = Math.min(0.72, Math.max(0.28, readNumber(layoutStorage.split, 0.56)));
+const collapsedResults = new Set<string>();
+try {
+  if (localStorage.getItem(layoutStorage.sidebar) === "true")
+    document.querySelector(".sidebar")?.classList.add("collapsed");
+} catch {
+  /* local storage is optional in browser preview */
+}
+function displayTabName(tab: TabState): string {
+  if (!/^Untitled-\d+\.txt$/i.test(tab.name)) return tab.name;
+  const tool = definition(tab.toolId);
+  const number = tab.name.match(/\d+/)?.[0] ?? "";
+  return `${tool?.label ?? "Document"}${number ? ` ${number}` : ""}`;
+}
+function persistLayout() {
+  try {
+    localStorage.setItem(layoutStorage.split, String(splitRatio));
+  } catch {
+    /* optional */
+  }
+}
 const palette = $("#palette") as HTMLDialogElement;
 const paletteSearch = $("#palette-search") as HTMLInputElement;
 const notify = (message: string) => {
@@ -75,7 +108,7 @@ const notify = (message: string) => {
 
 function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
   const dialog = $("#unsaved-dialog") as HTMLDialogElement;
-  $("#unsaved-message").textContent = `${tab.name} has unsaved changes.`;
+  $("#unsaved-message").textContent = `${displayTabName(tab)} has unsaved changes.`;
   dialog.showModal();
   return new Promise((resolve) => {
     const finish = (answer: "save" | "discard" | "cancel") => {
@@ -107,8 +140,9 @@ function renderTabs() {
     button.role = "tab";
     button.ariaSelected = String(tab.id === state.activeId);
     button.tabIndex = tab.id === state.activeId ? 0 : -1;
-    button.title = tab.source?.path ?? tab.name;
-    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tab.name)}</span>${tab.dirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
+    const tabName = displayTabName(tab);
+    button.title = tab.source?.path ?? tabName;
+    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
     button.onclick = () => controller.activate(tab.id);
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -119,7 +153,7 @@ function renderTabs() {
     const close = document.createElement("button");
     close.className = "tab-close";
     close.type = "button";
-    close.setAttribute("aria-label", `Close ${tab.name}`);
+    close.setAttribute("aria-label", `Close ${tabName}`);
     close.textContent = "×";
     close.onclick = (event) => {
       event.stopPropagation();
@@ -326,6 +360,7 @@ function renderSources(tab: TabState, tool: ReturnType<typeof definition>) {
   const right = $("#compare-right") as HTMLTextAreaElement;
   if (right.value !== tab.rightText) right.value = tab.rightText;
   right.oninput = () => controller.right(tab.id, right.value);
+  $("#compare-open-left").onclick = () => void controller.chooseFile("text.compare");
   $("#compare-open-right").onclick = () => void controller.openRight(tab.id);
 }
 function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
@@ -387,6 +422,9 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
     input.readOnly = tab.text === null || tab.phase === "importing";
     input.disabled = false;
     input.oninput = () => controller.edit(tab.id, input.value);
+    input.onselect = () => updateCaretStatus(tab);
+    input.onkeyup = () => updateCaretStatus(tab);
+    input.onclick = () => updateCaretStatus(tab);
     input.onpaste = (event) => {
       const text = event.clipboardData?.getData("text/plain");
       if (text === undefined) return;
@@ -422,7 +460,7 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
             ? "Read-only bounded preview · Full-file processing"
             : "Editable blank document";
   $("#encoding").textContent = tab.source?.encoding ?? "UTF-8";
-  $("#source-name").textContent = tab.name;
+  $("#source-name").textContent = displayTabName(tab);
   $("#source-size").textContent = tab.source ? bytes(tab.source.size) : "—";
   $("#source-format").textContent =
     tab.source?.contentKind === "text"
@@ -661,6 +699,48 @@ function renderResult(tab: TabState) {
   $("#save-result").hidden =
     tab.resultStale || !event.ok || !event.resultDocumentId;
 }
+function updateCaretStatus(tab: TabState | undefined) {
+  const input = $("#preview") as HTMLTextAreaElement;
+  const value = input.value ?? "";
+  const offset = Math.max(0, Math.min(input.selectionStart ?? value.length, value.length));
+  const before = value.slice(0, offset);
+  const lines = before.split(/\n/);
+  $("#status-position").textContent = `Ln ${lines.length}, Col ${(lines.at(-1)?.length ?? 0) + 1}`;
+  $("#status-encoding").textContent = tab?.source?.encoding ?? "UTF-8";
+  const tool = tab ? definition(tab.toolId) : undefined;
+  $("#status-format").textContent = tab?.source?.format?.toUpperCase() ?? (tool?.input === "image" ? "IMAGE" : "TEXT");
+  const validity = tab?.error
+    ? "Error"
+    : tab?.phase === "running" || tab?.phase === "queued"
+      ? "Processing"
+      : tab?.result?.event.ok
+        ? "Valid"
+        : tab
+          ? "Ready"
+          : "No document";
+  $("#status-validity").textContent = validity;
+}
+function renderWorkspaceLayout(tab: TabState | undefined, tool: ReturnType<typeof definition>) {
+  const workspace = $("#document-panel");
+  const resultPane = $(".results-pane") as HTMLElement;
+  const splitter = $("#workspace-splitter") as HTMLElement;
+  const hasResult = !!tab?.result;
+  const showResult = !!tab && (hasResult || !!tool?.compare) && !collapsedResults.has(tab.id);
+  workspace.style.setProperty("--split-position", `${Math.round(splitRatio * 100)}%`);
+  workspace.classList.toggle("result-absent", !showResult);
+  workspace.classList.toggle("result-collapsed", !!tab && !showResult && hasResult);
+  resultPane.hidden = !showResult;
+  splitter.hidden = !showResult;
+  const toggle = $("#result-toggle") as HTMLButtonElement;
+  toggle.hidden = !hasResult;
+  toggle.textContent = showResult ? "Hide result" : "Show result";
+  toggle.setAttribute("aria-expanded", String(showResult));
+  const collapse = $("#result-collapse") as HTMLButtonElement;
+  collapse.setAttribute("aria-label", showResult ? "Collapse result pane" : "Show result pane");
+  collapse.title = showResult ? "Collapse result pane" : "Show result pane";
+  collapse.textContent = showResult ? "›" : "‹";
+  updateCaretStatus(tab);
+}
 function render() {
   const tab = activeTab(state);
   renderTabs();
@@ -693,7 +773,7 @@ function render() {
     renderActions(tab, tool);
     renderResult(tab);
     $("#job-title").textContent =
-      `${tool?.label ?? "Processing"} · ${tab.name}`;
+      `${tool?.label ?? "Processing"} · ${displayTabName(tab)}`;
     $("#job-phase").textContent =
       tab.phase === "queued"
         ? "Queued…"
@@ -723,6 +803,7 @@ function render() {
     $("#result-empty").hidden = false;
     $("#result-content").hidden = true;
   }
+  renderWorkspaceLayout(tab, tool);
 }
 function commands() {
   const list = $("#command-list");
@@ -734,7 +815,7 @@ function commands() {
       bundledTools
         .filter((tool) => tool.id !== "editor.text")
         .map((tool) => ({
-          label: `${tool.label} · ${tab.name}`,
+          label: `${tool.label} · ${displayTabName(tab)}`,
           run: () => {
             controller.activate(tab.id);
             controller.selectTool(tab.id, tool.id);
@@ -905,7 +986,57 @@ $("#sidebar-collapse").onclick = () => {
     "aria-expanded",
     String(!$(".sidebar").classList.contains("collapsed")),
   );
+  try {
+    localStorage.setItem(layoutStorage.sidebar, String($(".sidebar").classList.contains("collapsed")));
+  } catch {
+    /* optional */
+  }
 };
+$("#result-toggle").onclick = () => {
+  const id = state.activeId;
+  if (!id) return;
+  if (collapsedResults.has(id)) collapsedResults.delete(id);
+  else collapsedResults.add(id);
+  render();
+};
+$("#result-collapse").onclick = () => {
+  const id = state.activeId;
+  if (!id) return;
+  if (collapsedResults.has(id)) collapsedResults.delete(id);
+  else collapsedResults.add(id);
+  render();
+};
+const splitter = $("#workspace-splitter");
+let draggingSplitter = false;
+const setSplitFromClientX = (clientX: number) => {
+  const rect = $("#document-panel").getBoundingClientRect();
+  if (!rect.width) return;
+  splitRatio = Math.min(0.72, Math.max(0.28, (clientX - rect.left) / rect.width));
+  persistLayout();
+  $("#document-panel").style.setProperty("--split-position", `${Math.round(splitRatio * 100)}%`);
+};
+splitter.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  draggingSplitter = true;
+  splitter.setPointerCapture(event.pointerId);
+  document.body.classList.add("resizing");
+});
+splitter.addEventListener("pointermove", (event) => {
+  if (draggingSplitter) setSplitFromClientX(event.clientX);
+});
+splitter.addEventListener("pointerup", () => {
+  draggingSplitter = false;
+  document.body.classList.remove("resizing");
+});
+splitter.addEventListener("keydown", (event) => {
+  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  if (event.key === "Home") splitRatio = 0.28;
+  else if (event.key === "End") splitRatio = 0.72;
+  else splitRatio = Math.min(0.72, Math.max(0.28, splitRatio + (event.key === "ArrowRight" ? 0.04 : -0.04)));
+  persistLayout();
+  render();
+});
 paletteSearch.oninput = commands;
 $("#tab-new").onclick = () => controller.newDocument();
 document.addEventListener("keydown", (event) => {

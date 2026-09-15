@@ -178,10 +178,10 @@ export class WorkbenchController {
   activate(id: string) {
     this.dispatch({ type: "activate", id });
   }
-  async chooseFile() {
+  async chooseFile(toolOverride?: string) {
     try {
       const path = await this.api.chooseFile();
-      if (path) await this.openPath(path);
+      if (path) await this.openPath(path, toolOverride);
     } catch (error) {
       this.hooks.notify(errorText(error));
     }
@@ -294,7 +294,7 @@ export class WorkbenchController {
     );
     this.dispatch({ type: "add", tab });
   }
-  async openPath(path: string) {
+  async openPath(path: string, toolOverride?: string) {
     if (!this.api.native) {
       this.hooks.notify("Open the native desktop app to read local files.");
       return;
@@ -308,7 +308,7 @@ export class WorkbenchController {
       if (this.state.tabs.length >= MAX_TABS)
         throw new Error("The tab limit was reached while opening this file.");
       const tab = makeTab(`tab-${++this.nextId}`, opened.name, opened, text);
-      const tool = definition(defaultTool(opened))!;
+      const tool = definition(toolOverride ?? defaultTool(opened))!;
       this.dispatch({
         type: "add",
         tab: {

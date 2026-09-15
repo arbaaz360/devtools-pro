@@ -85,7 +85,6 @@
             Browser preview · Use the desktop app to open files and run the Rust
             tools.
           </div>
-          <div id="error" class="error-banner" role="alert" hidden></div>
           <section class="tool-header" aria-label="Active tool">
             <div class="tool-identity">
               <span id="active-tool-icon" class="tool-icon" aria-hidden="true"
@@ -99,14 +98,14 @@
                 </p>
               </div>
             </div>
-            <button
-              id="save-document"
-              class="outline-button"
-              disabled
-              title="Save document as (Ctrl+S)"
-            >
-              Save document…
-            </button>
+            <div class="tool-header-actions">
+              <button id="result-toggle" class="outline-button" type="button" hidden>
+                Show result
+              </button>
+              <button id="save-document" class="outline-button" disabled title="Save document as (Ctrl+S)">
+                Save document…
+              </button>
+            </div>
           </section>
           <section
             id="document-panel"
@@ -143,6 +142,7 @@
                   <div class="toolbar-actions"></div>
                 </div>
               </div>
+              <div id="error" class="editor-diagnostic" role="alert" hidden></div>
               <div id="editor-host" class="editor-host">
                 <div id="empty-state" class="empty-state">
                   <div class="empty-glyph">＋</div>
@@ -187,7 +187,7 @@
                 </div>
                 <div class="compare-sources">
                   <section class="compare-source">
-                    <label for="compare-left">Left / original</label
+                    <div class="compare-source-head"><label for="compare-left">Left / original</label><button id="compare-open-left" class="flat-button" type="button">Open file…</button></div
                     ><textarea
                       id="compare-left"
                       spellcheck="false"
@@ -214,12 +214,14 @@
                 ><span id="encoding">UTF-8</span>
               </div>
             </section>
+            <div id="workspace-splitter" class="pane-splitter" role="separator" aria-orientation="vertical" aria-label="Resize input and result panes" tabindex="0"></div>
             <aside class="results-pane" aria-labelledby="results-heading">
               <div class="pane-header">
                 <div>
                   <h2 id="results-heading">Result</h2>
                   <span id="result-subtitle">Results update as you work</span>
                 </div>
+                <button id="result-collapse" class="icon-button" type="button" aria-label="Collapse result pane" title="Collapse result pane">›</button>
                 <div class="pane-controls output-controls">
                   <span class="small-badge">OUTPUT</span>
                   <div class="result-actions">
@@ -327,6 +329,9 @@
               ><span id="engine-dot" class="engine-dot"></span
               ><span id="engine-status">Connecting…</span></span
             ><span id="status" role="status" aria-live="polite">Ready</span>
+            <span id="status-context" class="status-context" aria-live="polite">
+              <span id="status-position">Ln 1, Col 1</span><span id="status-encoding">UTF-8</span><span id="status-format">TEXT</span><span id="status-validity">Ready</span>
+            </span>
           </footer>
         </main>
       </div>
