@@ -7,9 +7,12 @@
 //! `tool_id` branch to the scheduler.
 
 use devtools_core::{CancellationToken, Document, Progress, ToolError, ToolManifest, ToolResult};
+use devtools_plugin_contract::{ArtifactRef, EventIdentity};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use thiserror::Error;
 
 /// The temporary compatibility signature used by the current in-process
 /// tools.  It deliberately receives a document value and named operation,
@@ -45,6 +48,96 @@ impl ExecutionIdentity {
             job_id: job_id.into(),
             generation: 0,
         }
+    }
+
+    pub fn event_identity(&self, sequence: u64) -> EventIdentity {
+        EventIdentity {
+            api_version: "devtools.plugin/v2".into(),
+            plugin_id: self.plugin_id.clone(),
+            plugin_version: self.plugin_version.clone(),
+            tool_id: self.tool_id.clone(),
+            operation_id: self.operation_id.clone(),
+            instance_id: self.instance_id.clone(),
+            job_id: self.job_id.clone(),
+            generation: self.generation.to_string(),
+            sequence: sequence.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Error, Clone, PartialEq, Eq)]
+pub enum ServiceError {
+    #[error("document `{0}` is not available")]
+    MissingDocument(String),
+    #[error("requested range exceeds the host read limit")]
+    ReadLimit,
+    #[error("artifact output exceeds the host limit")]
+    OutputLimit,
+}
+
+/// Host-owned bounded reader. A v2 processor receives this service instead of
+/// a path, so it cannot bypass source immutability or read outside its grant.
+pub trait DocumentReader {
+    fn read_range(&self, document_id: &str, offset: u64, max_bytes: u64) -> Result<Vec<u8>, ServiceError>;
+}
+
+/// A result sink supports more than one named output port and publishes only
+/// complete artifacts. The host can replace this in-memory implementation
+/// with a temporary-file sink without changing processor code.
+pub trait ArtifactSink {
+    fn write(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError>;
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone)]
+pub struct PublishedArtifact {
+    pub port_id: String,
+    pub descriptor: ArtifactRef,
+    pub bytes: Vec<u8>,
+    pub mime: Option<String>,
+}
+
+#[derive(Debug, Default)]
+pub struct MemoryArtifactSink {
+    max_output_bytes: Option<u64>,
+    total_bytes: u64,
+    next_handle: u64,
+    pub artifacts: Vec<PublishedArtifact>,
+}
+
+impl MemoryArtifactSink {
+    pub fn with_limit(max_output_bytes: Option<u64>) -> Self { Self { max_output_bytes, ..Self::default() } }
+}
+
+impl ArtifactSink for MemoryArtifactSink {
+    fn write(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError> {
+        let next_total = self.total_bytes.saturating_add(bytes.len() as u64);
+        if self.max_output_bytes.is_some_and(|limit| next_total > limit) { return Err(ServiceError::OutputLimit); }
+        let digest = Sha256::digest(bytes);
+        let descriptor = ArtifactRef { handle: format!("memory:artifact-{}", self.next_handle), byte_length: bytes.len().to_string(), content_hash: format!("{digest:x}") };
+        self.next_handle += 1;
+        self.total_bytes = next_total;
+        self.artifacts.push(PublishedArtifact { port_id: port_id.into(), descriptor: descriptor.clone(), bytes: bytes.to_vec(), mime: mime.map(str::to_owned) });
+        Ok(descriptor)
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct MemoryDocumentReader {
+    documents: HashMap<String, Vec<u8>>,
+}
+
+impl MemoryDocumentReader {
+    pub fn insert(&mut self, id: impl Into<String>, bytes: Vec<u8>) { self.documents.insert(id.into(), bytes); }
+}
+
+impl DocumentReader for MemoryDocumentReader {
+    fn read_range(&self, document_id: &str, offset: u64, max_bytes: u64) -> Result<Vec<u8>, ServiceError> {
+        let bytes = self.documents.get(document_id).ok_or_else(|| ServiceError::MissingDocument(document_id.into()))?;
+        let start = usize::try_from(offset).map_err(|_| ServiceError::ReadLimit)?;
+        let end = start.saturating_add(usize::try_from(max_bytes).map_err(|_| ServiceError::ReadLimit)?).min(bytes.len());
+        if start > bytes.len() { return Ok(Vec::new()); }
+        Ok(bytes[start..end].to_vec())
     }
 }
 
@@ -157,5 +250,30 @@ mod tests {
         assert!(guard.claim());
         assert!(!guard.claim());
         assert!(guard.is_claimed());
+    }
+
+    #[test]
+    fn bounded_reader_and_multi_port_sink_keep_host_limits() {
+        let mut reader = MemoryDocumentReader::default();
+        reader.insert("doc", b"abcdef".to_vec());
+        assert_eq!(reader.read_range("doc", 1, 3).unwrap(), b"bcd");
+        assert!(matches!(reader.read_range("missing", 0, 1), Err(ServiceError::MissingDocument(_))));
+
+        let mut sink = MemoryArtifactSink::with_limit(Some(5));
+        let first = sink.write("text", b"abc", Some("text/plain")).unwrap();
+        let second = sink.write("metadata", b"de", None).unwrap();
+        assert_eq!(sink.artifacts.len(), 2);
+        assert_eq!(first.byte_length, "3");
+        assert_eq!(second.byte_length, "2");
+        assert!(matches!(sink.write("overflow", b"f", None), Err(ServiceError::OutputLimit)));
+    }
+
+    #[test]
+    fn execution_identity_maps_to_canonical_event_identity() {
+        let identity = ExecutionIdentity::new("example.tool", "run", "job-1");
+        let event = identity.event_identity(4);
+        assert_eq!(event.api_version, "devtools.plugin/v2");
+        assert_eq!(event.tool_id, "example.tool");
+        assert_eq!(event.sequence, "4");
     }
 }
