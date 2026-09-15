@@ -24,13 +24,22 @@ Run the headless proof from the repository root with Node directly:
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins
 ```
 
+The default command runs the first discovered operation. A worker can select a
+package, operation, text input and JSON options explicitly:
+
+```text
+node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin identity.uuid --operation generate --options '{"version":"v4","count":2}'
+node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin encoding.base64-text --operation encode --input "hello" --options '{"variant":"url","padding":"omit"}'
+```
+
 If pnpm is installed, the equivalent package-script command is:
 
 ```text
 pnpm --dir packages/plugin-sdk headless ../../plugins
 ```
 
-It discovers `examples.echo`, invokes its processor, and prints the complete
-output artifact handle. Generate native/frontend composition before a build with
+It discovers all trusted packages, invokes the selected processor, and prints
+complete output artifact handles plus structured values. Generate
+native/frontend composition before a build with
 `cargo run -p devtools-plugin-discovery -- generate plugins target/generated/plugins`.
 The generated files are disposable build outputs and must not be hand edited.

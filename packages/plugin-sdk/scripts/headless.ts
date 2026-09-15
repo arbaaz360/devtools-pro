@@ -3,16 +3,31 @@ import { CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySe
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const root = resolve(process.argv[2] ?? "plugins");
+const args = process.argv.slice(2);
+const root = resolve(args[0] ?? "plugins");
+const flag = (name: string): string | undefined => {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+};
+const pluginId = flag("--plugin");
+const operationId = flag("--operation");
+const inputText = flag("--input");
+const optionsText = flag("--options");
 const packages = await discoverPlugins(root);
 if (packages.length === 0) throw new Error(`no trusted plugins found under ${root}`);
-const plugin = packages[0]!;
-const operation = plugin.manifest.operations[0]!;
-const reader = new MemoryReader().insert("input", "headless example");
+const plugin = (pluginId ? packages.find((item) => item.manifest.id === pluginId) : packages[0]);
+if (!plugin) throw new Error(`plugin ${pluginId} was not discovered under ${root}`);
+const operation = plugin.manifest.operations.find((item) => item.id === operationId) ?? plugin.manifest.operations[0]!;
+const tool = plugin.manifest.tools.find((item) => item.operationIds.includes(operation.id));
+if (!tool) throw new Error(`operation ${operation.id} is not attached to a tool in ${plugin.manifest.id}`);
+const options = optionsText ? JSON.parse(optionsText) as Record<string, unknown> : {};
+const reader = new MemoryReader();
+const inputPort = operation.inputs[0]?.id;
+if (inputPort && inputText !== undefined) reader.insert(inputPort, inputText);
 const outputs = new MemoryOutputSink();
 const cancellation = new CancellationToken();
 const context = new ProcessorContext(reader, outputs, cancellation, new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
-const processor = await import(pathToFileURL(plugin.processorPath).href) as { execute?: (request: { pluginId: string; operationId: string }, context: ProcessorContext) => unknown };
+const processor = await import(pathToFileURL(plugin.processorPath).href) as { execute?: (request: { pluginId: string; toolId: string; operationId: string; options: Record<string, unknown> }, context: ProcessorContext) => unknown };
 if (typeof processor.execute !== "function") throw new Error(`processor for ${plugin.manifest.id} does not export execute`);
-await processor.execute({ pluginId: plugin.manifest.id, operationId: operation.id }, context);
-console.log(JSON.stringify({ discovered: packages.map((item) => item.manifest.id), executed: `${plugin.manifest.id}/${operation.id}`, outputs: [...outputs.artifacts.values()] }));
+await processor.execute({ pluginId: plugin.manifest.id, toolId: tool.id, operationId: operation.id, options }, context);
+console.log(JSON.stringify({ discovered: packages.map((item) => item.manifest.id), executed: `${plugin.manifest.id}/${operation.id}`, inputPort: inputPort ?? null, outputs: [...outputs.artifacts.values()], values: [...outputs.values.entries()] }));
