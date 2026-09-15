@@ -2,9 +2,9 @@
 //!
 //! The workbench must not decide how a tool is executed.  This module is the
 //! small native seam between the job scheduler and an executor implementation.
-//! Existing tools are registered through the legacy adapter below; a future
-//! v2 executor can implement the same registry without adding another
-//! `tool_id` branch to the scheduler.
+//! Existing tools are registered through the legacy adapter below; native
+//! processors receive host-owned named ports without adding another `tool_id`
+//! branch to the scheduler.
 
 use devtools_core::{CancellationToken, Document, Progress, ToolError, ToolManifest, ToolResult};
 use devtools_plugin_contract::{ArtifactRef, EventIdentity};
@@ -26,16 +26,10 @@ pub type LegacyExecutor = fn(
     progress: &dyn Fn(Progress),
 ) -> Result<ToolResult, ToolError>;
 
-/// Native plugin entry point used while the canonical processor runtime is
-/// being introduced. It is resolved by the same registry as legacy tools, so
-/// the scheduler does not need another tool-specific dispatch table.
-pub type NativeExecutor = fn(
-    operation_id: &str,
-    input: &Document,
-    options: &Value,
-    cancellation: &CancellationToken,
-    progress: &dyn Fn(Progress),
-) -> Result<ToolResult, ToolError>;
+/// Native plugin entry point. The host supplies named inputs and a bounded
+/// artifact sink; the processor cannot access filesystem paths or publish a
+/// destination of its choosing.
+pub type NativeExecutor = for<'a> fn(&mut NativeExecutionContext<'a>) -> Result<(), ToolError>;
 
 #[derive(Clone, Copy)]
 pub enum RegisteredExecutor {
@@ -90,6 +84,39 @@ pub enum ServiceError {
     ReadLimit,
     #[error("artifact output exceeds the host limit")]
     OutputLimit,
+}
+
+/// Host-owned services exposed to a native processor for one operation.
+pub struct NativeExecutionContext<'a> {
+    operation_id: &'a str,
+    options: &'a Value,
+    cancellation: &'a CancellationToken,
+    progress: &'a dyn Fn(Progress),
+    reader: MemoryDocumentReader,
+    sink: MemoryArtifactSink,
+    input_limit: u64,
+}
+
+impl<'a> NativeExecutionContext<'a> {
+    pub fn new(
+        operation_id: &'a str,
+        options: &'a Value,
+        cancellation: &'a CancellationToken,
+        progress: &'a dyn Fn(Progress),
+        input_limit: u64,
+        output_limit: Option<u64>,
+    ) -> Self {
+        Self { operation_id, options, cancellation, progress, reader: MemoryDocumentReader::default(), sink: MemoryArtifactSink::with_limit(output_limit), input_limit }
+    }
+
+    pub fn add_input(&mut self, port_id: impl Into<String>, bytes: Vec<u8>) { self.reader.insert(port_id, bytes); }
+    pub fn operation_id(&self) -> &str { self.operation_id }
+    pub fn options(&self) -> &Value { self.options }
+    pub fn cancellation(&self) -> &CancellationToken { self.cancellation }
+    pub fn progress(&self, progress: Progress) { (self.progress)(progress); }
+    pub fn read_input(&self, port_id: &str) -> Result<Vec<u8>, ServiceError> { self.reader.read_range(port_id, 0, self.input_limit) }
+    pub fn write_output(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError> { self.sink.write(port_id, bytes, mime) }
+    pub fn take_outputs(self) -> Vec<PublishedArtifact> { self.sink.artifacts }
 }
 
 /// Host-owned bounded reader. A v2 processor receives this service instead of
@@ -233,7 +260,13 @@ impl PluginHost {
     ) -> Result<ToolResult, ToolError> {
         match self.executor(tool_id)? {
             RegisteredExecutor::Legacy(executor) => executor(tool_id, operation_id, input, options, cancellation, progress),
-            RegisteredExecutor::Native(executor) => executor(operation_id, input, options, cancellation, progress),
+            RegisteredExecutor::Native(executor) => {
+                let mut context = NativeExecutionContext::new(operation_id, options, cancellation, progress, input.len() as u64, None);
+                context.add_input("source", input.bytes().to_vec());
+                executor(&mut context)?;
+                let artifact = context.take_outputs().into_iter().next().ok_or_else(|| ToolError::Execution { message: "native plugin produced no output".into() })?;
+                Ok(ToolResult { output: Document::from_bytes(artifact.bytes).with_mime(artifact.mime.unwrap_or_else(|| "application/octet-stream".into())), diagnostics: Vec::new() })
+            }
         }
     }
 
@@ -264,8 +297,10 @@ mod tests {
         Ok(ToolResult { output: input.clone().with_kind(DocumentKind::Text), diagnostics: vec![] })
     }
 
-    fn native_executor(_: &str, input: &Document, _: &Value, _: &CancellationToken, _: &dyn Fn(Progress)) -> Result<ToolResult, ToolError> {
-        Ok(ToolResult { output: input.clone().with_kind(DocumentKind::Text), diagnostics: vec![] })
+    fn native_executor(context: &mut NativeExecutionContext<'_>) -> Result<(), ToolError> {
+        let input = context.read_input("source").map_err(|error| ToolError::Execution { message: error.to_string() })?;
+        context.write_output("result", &input, Some("text/plain")).map_err(|error| ToolError::Execution { message: error.to_string() })?;
+        Ok(())
     }
 
     #[test]

@@ -24,7 +24,7 @@ use tauri::{Emitter, Manager};
 
 mod plugin_host;
 mod native_plugins;
-use plugin_host::{ExecutionIdentity, PluginHost, RegisteredExecutor};
+use plugin_host::{ExecutionIdentity, NativeExecutionContext, PluginHost, RegisteredExecutor};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
 const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
@@ -493,7 +493,19 @@ fn start_generic_operation(
                 let input = read_bounded_document(&document.path, kind, manifest.limits.max_input_bytes, &token, &progress)?;
                 match executor {
                     RegisteredExecutor::Legacy(executor) => executor(&worker_tool_id, &worker_operation, &input, &options, &token, &progress),
-                    RegisteredExecutor::Native(executor) => executor(&worker_operation, &input, &options, &token, &progress),
+                    RegisteredExecutor::Native(executor) => {
+                        let input_limit = manifest.limits.max_input_bytes.unwrap_or(input.len() as u64);
+                        let mut context = NativeExecutionContext::new(&worker_operation, &options, &token, &progress, input_limit, manifest.limits.max_output_bytes);
+                        context.add_input("source", input.bytes().to_vec());
+                        executor(&mut context)?;
+                        let artifact = context.take_outputs().into_iter().next().ok_or_else(|| ToolError::Execution { message: "native plugin produced no output".into() })?;
+                        let kind = match artifact.mime.as_deref() {
+                            Some("application/json") => DocumentKind::Json,
+                            Some(mime) if mime.starts_with("image/") => DocumentKind::Binary,
+                            _ => DocumentKind::Text,
+                        };
+                        Ok(devtools_core::ToolResult { output: Document::from_bytes(artifact.bytes).with_kind(kind).with_mime(artifact.mime.unwrap_or_else(|| "application/octet-stream".into())), diagnostics: Vec::new() })
+                    }
                 }
             }
         })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
@@ -1154,9 +1166,14 @@ mod tests {
         let catalog = embedded_plugin_catalog();
         let json = catalog.iter().find(|plugin| plugin.id == "structured.json").expect("generated catalog contains JSON");
         assert!(json.operation_ids.iter().any(|operation| operation == "format"));
-        let input = Document::from_text(r#"{"b":2,"a":1}"#).with_kind(DocumentKind::Text);
-        let result = native_plugins::execute_json("format", &input, &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
-        assert_eq!(result.output.as_text().unwrap(), "{\n  \"b\": 2,\n  \"a\": 1\n}");
+        let options = Value::Object(Default::default());
+        let token = CancellationToken::default();
+        let progress = |_: Progress| {};
+        let mut context = NativeExecutionContext::new("format", &options, &token, &progress, 1024, None);
+        context.add_input("source", br#"{"b":2,"a":1}"#.to_vec());
+        native_plugins::execute_json(&mut context).unwrap();
+        let output = context.take_outputs().pop().unwrap();
+        assert_eq!(String::from_utf8(output.bytes).unwrap(), "{\n  \"b\": 2,\n  \"a\": 1\n}");
     }
 
     #[test]
