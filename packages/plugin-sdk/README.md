@@ -33,6 +33,7 @@ package, operation, text input and JSON options explicitly:
 ```text
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin identity.uuid --operation generate --options '{"version":"v4","count":2}'
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin encoding.base64-text --operation encode --input "hello" --options '{"variant":"url","padding":"omit"}'
+node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin text.compare --operation compare --input 'left=one\ntwo' --input 'right=one\nthree'
 ```
 
 If pnpm is installed, the equivalent package-script command is:
