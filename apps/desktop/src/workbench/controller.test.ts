@@ -120,6 +120,7 @@ async function harness(t: TestContext) {
       manifest("encoding.image-base64", "encode"),
       manifest("encoding.base64-image", "decode"),
       manifest("text.url", "encode"),
+      manifest("plugin.echo", "run"),
     ],
     chooseDocumentOutput: async () => null,
     saveDocument: async () => undefined,
@@ -203,6 +204,15 @@ test("copy complete paged Base64 then replace a 64 KiB fragment and decode the f
   assert.equal(h.creates.at(-1)?.text, BASE64);
   assert.equal(h.documents.get(decode.id)?.text, BASE64);
   assert.ok(!h.closed.includes(decode.id), "Imported source must remain live for the decoder");
+});
+
+test("host manifests add tools to the catalog without shell registration", async (t) => {
+  const h = await harness(t);
+  const custom = h.controller.availableTools().find((tool) => tool.id === "plugin.echo");
+  assert.equal(custom?.label, "plugin.echo");
+  assert.deepEqual(custom?.operations, [{ id: "run", label: "run" }]);
+  assert.equal(h.controller.toolDefinition("plugin.echo")?.defaultOperation, "run");
+  assert.equal(h.controller.availableTools().some((tool) => tool.id === "plugin.missing"), false);
 });
 
 test("a pending import stays attached to its original tab after switching tabs", async (t) => {
