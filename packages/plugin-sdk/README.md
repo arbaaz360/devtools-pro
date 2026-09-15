@@ -18,12 +18,15 @@ validated with `packages/plugin-contract`; package IDs and catalog order are
 deterministic. This is bundled/build-time discovery; it never downloads or
 installs code.
 
-Run the headless proof from a clean checkout:
+Run the headless proof from the repository root with Node directly:
 
 ```text
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins
+```
 
-# or, through the package script (which runs from packages/plugin-sdk)
+If pnpm is installed, the equivalent package-script command is:
+
+```text
 pnpm --dir packages/plugin-sdk headless ../../plugins
 ```
 
