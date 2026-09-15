@@ -6,7 +6,7 @@
 //! processors receive host-owned named ports without adding another `tool_id`
 //! branch to the scheduler.
 
-use devtools_core::{CancellationToken, Document, Progress, ToolError, ToolManifest, ToolResult};
+use devtools_core::{CancellationToken, Document, DocumentKind, Progress, ToolError, ToolManifest, ToolResult};
 use devtools_plugin_contract::{ArtifactRef, EventIdentity};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -84,6 +84,25 @@ pub enum ServiceError {
     ReadLimit,
     #[error("artifact output exceeds the host limit")]
     OutputLimit,
+    #[error("operation cancelled")]
+    Cancelled,
+    #[error("port `{0}` was bound more than once")]
+    DuplicatePort(String),
+}
+
+impl From<ServiceError> for ToolError {
+    fn from(error: ServiceError) -> Self {
+        match error {
+            ServiceError::Cancelled => Self::Cancelled,
+            ServiceError::ReadLimit | ServiceError::OutputLimit => Self::ResourceLimit { message: error.to_string() },
+            _ => Self::InvalidOptions { message: error.to_string() },
+        }
+    }
+}
+
+pub struct NativeResult {
+    pub output: ToolResult,
+    pub summary: Option<String>,
 }
 
 /// Host-owned services exposed to a native processor for one operation.
@@ -95,6 +114,7 @@ pub struct NativeExecutionContext<'a> {
     reader: MemoryDocumentReader,
     sink: MemoryArtifactSink,
     input_limit: u64,
+    summary: Option<String>,
 }
 
 impl<'a> NativeExecutionContext<'a> {
@@ -106,16 +126,46 @@ impl<'a> NativeExecutionContext<'a> {
         input_limit: u64,
         output_limit: Option<u64>,
     ) -> Self {
-        Self { operation_id, options, cancellation, progress, reader: MemoryDocumentReader::default(), sink: MemoryArtifactSink::with_limit(output_limit), input_limit }
+        Self { operation_id, options, cancellation, progress, reader: MemoryDocumentReader::default(), sink: MemoryArtifactSink::with_limit(output_limit), input_limit, summary: None }
     }
 
-    pub fn add_input(&mut self, port_id: impl Into<String>, bytes: Vec<u8>) { self.reader.insert(port_id, bytes); }
+    pub fn add_input(&mut self, port_id: impl Into<String>, bytes: Vec<u8>) -> Result<(), ServiceError> {
+        if self.cancellation.is_cancelled() { return Err(ServiceError::Cancelled); }
+        let port_id = port_id.into();
+        if self.reader.documents.contains_key(&port_id) { return Err(ServiceError::DuplicatePort(port_id)); }
+        if bytes.len() as u64 > self.input_limit { return Err(ServiceError::ReadLimit); }
+        self.reader.insert(port_id, bytes);
+        Ok(())
+    }
     pub fn operation_id(&self) -> &str { self.operation_id }
     pub fn options(&self) -> &Value { self.options }
     pub fn cancellation(&self) -> &CancellationToken { self.cancellation }
     pub fn progress(&self, progress: Progress) { (self.progress)(progress); }
-    pub fn read_input(&self, port_id: &str) -> Result<Vec<u8>, ServiceError> { self.reader.read_range(port_id, 0, self.input_limit) }
-    pub fn write_output(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError> { self.sink.write(port_id, bytes, mime) }
+    pub fn read_input(&self, port_id: &str) -> Result<Vec<u8>, ServiceError> {
+        if self.cancellation.is_cancelled() { return Err(ServiceError::Cancelled); }
+        self.reader.read_range(port_id, 0, self.input_limit)
+    }
+    pub fn write_output(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError> {
+        if self.cancellation.is_cancelled() { return Err(ServiceError::Cancelled); }
+        self.sink.write(port_id, bytes, mime)
+    }
+    pub fn set_summary(&mut self, summary: String) { self.summary = Some(summary); }
+    /// The current desktop consumes one result document. Refuse extra/missing
+    /// ports instead of silently dropping outputs until multi-output UI ships.
+    pub fn finish(self) -> Result<NativeResult, ToolError> {
+        if self.cancellation.is_cancelled() { return Err(ToolError::Cancelled); }
+        if self.sink.artifacts.len() != 1 || self.sink.artifacts[0].port_id != "result" {
+            return Err(ToolError::Execution { message: "This workspace requires exactly one output port named `result`.".into() });
+        }
+        let artifact = self.sink.artifacts.into_iter().next().unwrap();
+        let kind = match artifact.mime.as_deref() {
+            Some("application/json") => DocumentKind::Json,
+            Some(mime) if mime.starts_with("image/") => DocumentKind::Binary,
+            _ => DocumentKind::Text,
+        };
+        Ok(NativeResult { output: ToolResult { output: Document::from_bytes(artifact.bytes).with_kind(kind).with_mime(artifact.mime.unwrap_or_else(|| "application/octet-stream".into())), diagnostics: Vec::new() }, summary: self.summary })
+    }
+    #[cfg(test)]
     pub fn take_outputs(self) -> Vec<PublishedArtifact> { self.sink.artifacts }
 }
 
@@ -155,6 +205,7 @@ impl MemoryArtifactSink {
 
 impl ArtifactSink for MemoryArtifactSink {
     fn write(&mut self, port_id: &str, bytes: &[u8], mime: Option<&str>) -> Result<ArtifactRef, ServiceError> {
+        if self.artifacts.iter().any(|artifact| artifact.port_id == port_id) { return Err(ServiceError::DuplicatePort(port_id.into())); }
         let next_total = self.total_bytes.saturating_add(bytes.len() as u64);
         if self.max_output_bytes.is_some_and(|limit| next_total > limit) { return Err(ServiceError::OutputLimit); }
         let digest = Sha256::digest(bytes);
@@ -262,10 +313,9 @@ impl PluginHost {
             RegisteredExecutor::Legacy(executor) => executor(tool_id, operation_id, input, options, cancellation, progress),
             RegisteredExecutor::Native(executor) => {
                 let mut context = NativeExecutionContext::new(operation_id, options, cancellation, progress, input.len() as u64, None);
-                context.add_input("source", input.bytes().to_vec());
+                context.add_input("source", input.bytes().to_vec())?;
                 executor(&mut context)?;
-                let artifact = context.take_outputs().into_iter().next().ok_or_else(|| ToolError::Execution { message: "native plugin produced no output".into() })?;
-                Ok(ToolResult { output: Document::from_bytes(artifact.bytes).with_mime(artifact.mime.unwrap_or_else(|| "application/octet-stream".into())), diagnostics: Vec::new() })
+                Ok(context.finish()?.output)
             }
         }
     }

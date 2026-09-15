@@ -3,10 +3,10 @@
 use devtools_core::{
     encode_image_base64, decode_base64_image, hash_document, transform_text,
     parse_curl, generate_fetch, generate_python,
-    CancellationToken, CompareOptions, Document, DocumentKind, FileFormat, HashAlgorithm,
+    CancellationToken, Document, DocumentKind, FileFormat, HashAlgorithm,
     ImageBase64Options, Base64ImageOptions, TextUtilityKind, TextUtilityOptions,
     Inspection, InputKind, JsonLayout, Progress, RendererKind, ToolError, ToolManifest,
-    compare_documents, inspect_file, transform_json_file,
+    inspect_file, transform_json_file,
 };
 use serde::Serialize;
 use serde::Deserialize;
@@ -24,7 +24,7 @@ use tauri::{Emitter, Manager};
 
 mod plugin_host;
 mod native_plugins;
-use plugin_host::{ExecutionIdentity, NativeExecutionContext, PluginHost, RegisteredExecutor};
+use plugin_host::{ExecutionIdentity, NativeExecutionContext, NativeResult, PluginHost, RegisteredExecutor};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
 const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
@@ -440,13 +440,89 @@ fn run_tool(
     if tool_id == "text.compare" {
         return Err(ToolError::InvalidOptions { message: "text.compare requires two document handles; use run_compare".into() });
     }
-    start_generic_operation(document_id, tool_id, operation_id, options, manifest, executor, app, state)
+    start_generic_operation(vec![("source".into(), document_id)], tool_id, operation_id, options, manifest, executor, app, state)
+}
+
+struct JobInput {
+    port_id: String,
+    document_id: String,
+    document: RegisteredDocument,
+}
+
+fn resolve_job_inputs(state: &HostState, bindings: Vec<(String, String)>, manifest: &ToolManifest) -> Result<Vec<JobInput>, ToolError> {
+    if bindings.is_empty() || bindings.len() > MAX_DOCUMENTS {
+        return Err(ToolError::InvalidOptions { message: "Provide one or more named document inputs.".into() });
+    }
+    let documents = state.documents.lock().map_err(|e| ToolError::Execution { message: e.to_string() })?;
+    let mut seen = std::collections::HashSet::new();
+    let mut inputs = Vec::new();
+    for (port_id, document_id) in bindings {
+        if port_id.is_empty() || !seen.insert(port_id.clone()) {
+            return Err(ToolError::InvalidOptions { message: format!("Duplicate or empty input port `{port_id}`.") });
+        }
+        let document = documents.get(&document_id).cloned()
+            .ok_or_else(|| ToolError::InvalidOptions { message: format!("Input `{port_id}` is no longer open.") })?;
+        if manifest.limits.max_input_bytes.is_some_and(|max| document.size > max) {
+            return Err(ToolError::ResourceLimit { message: format!("Input `{port_id}` exceeds the tool limit.") });
+        }
+        let info = content_info(&document.path).map_err(ToolError::from)?;
+        if !manifest.input_kinds.contains(&InputKind::Bytes) {
+            if info.kind != "text" { return Err(ToolError::UnsupportedInputKind { tool_id: manifest.id.clone(), input_kind: info.kind.into() }); }
+            if !info.utf8 { return Err(ToolError::UnsupportedEncoding { message: format!("Input `{port_id}` is not UTF-8 text.") }); }
+        }
+        inputs.push(JobInput { port_id, document_id, document });
+    }
+    Ok(inputs)
+}
+
+fn check_job_input(input: &JobInput) -> Result<(), ToolError> {
+    let meta = fs::metadata(&input.document.path).map_err(ToolError::from)?;
+    if meta.len() != input.document.size || meta.modified().ok() != input.document.modified {
+        return Err(ToolError::Execution { message: format!("Input `{}` changed. Reopen it before running another operation.", input.port_id) });
+    }
+    Ok(())
+}
+
+/// The same processor runner is used by one- and many-document commands.
+fn execute_job_inputs(inputs: &[JobInput], manifest: &ToolManifest, executor: RegisteredExecutor, operation: &str, options: &Value, token: &CancellationToken, progress: &impl Fn(Progress)) -> Result<NativeResult, ToolError> {
+    if token.is_cancelled() { return Err(ToolError::Cancelled); }
+    for input in inputs { check_job_input(input)?; }
+    let result = match executor {
+        RegisteredExecutor::Native(execute) => {
+            let limit = manifest.limits.max_input_bytes.unwrap_or(64 * 1024 * 1024);
+            let mut context = NativeExecutionContext::new(operation, options, token, progress, limit, manifest.limits.max_output_bytes);
+            for input in inputs {
+                let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
+                let document = read_bounded_document(&input.document.path, kind, Some(limit), token, progress)?;
+                context.add_input(&input.port_id, document.bytes().to_vec())?;
+            }
+            execute(&mut context)?;
+            context.finish()?
+        }
+        RegisteredExecutor::Legacy(execute) => {
+            if inputs.len() != 1 || inputs[0].port_id != "source" {
+                return Err(ToolError::InvalidOptions { message: "This compatibility processor accepts only the source input.".into() });
+            }
+            let source = &inputs[0].document;
+            let output = if manifest.id == "encoding.hash" {
+                execute_hash_file(&source.path, operation, token, progress)?
+            } else {
+                let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
+                let document = read_bounded_document(&source.path, kind, manifest.limits.max_input_bytes, token, progress)?;
+                execute(&manifest.id, operation, &document, options, token, progress)?
+            };
+            NativeResult { output, summary: None }
+        }
+    };
+    for input in inputs { check_job_input(input)?; }
+    if token.is_cancelled() { return Err(ToolError::Cancelled); }
+    Ok(result)
 }
 
 /// Execute one of the registered in-process tools while keeping cancellation,
 /// progress, limits, temporary result files, and provenance in the host.
 fn start_generic_operation(
-    document_id: String,
+    bindings: Vec<(String, String)>,
     tool_id: String,
     operation_id: String,
     options: Value,
@@ -455,16 +531,14 @@ fn start_generic_operation(
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<StartedJob, ToolError> {
-    let document = state.documents.lock().map_err(|error| ToolError::Execution { message: error.to_string() })?
-        .get(&document_id).cloned()
-        .ok_or_else(|| ToolError::Execution { message: "Document is no longer open.".into() })?;
-    if let Some(max) = manifest.limits.max_input_bytes {
-        if document.size > max { return Err(ToolError::ResourceLimit { message: format!("input exceeds the {max}-byte tool limit") }); }
-    }
+    let inputs = resolve_job_inputs(&state, bindings, &manifest)?;
+    let document_id = inputs[0].document_id.clone();
+    let document = inputs[0].document.clone();
+    let input_bytes = inputs.iter().map(|input| input.document.size).sum::<u64>();
     let token = CancellationToken::default();
     let job_id = state.next_id("job");
     let result_document_id = state.next_id("result");
-    let result_path = std::env::temp_dir().join(format!("devtools-pro-{}-{}.result", std::process::id(), result_document_id));
+    let result_path = std::env::temp_dir().join(format!("devtools-pro-{}-{}-{}.result", std::process::id(), result_document_id, SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos()));
     {
         let mut jobs = state.jobs.lock().map_err(|error| ToolError::Execution { message: error.to_string() })?;
         if jobs.len() >= MAX_JOBS { return Err(ToolError::ResourceLimit { message: "Two operations are already running. Cancel or wait for one to finish.".into() }); }
@@ -474,65 +548,42 @@ fn start_generic_operation(
     let worker_id = job_id.clone();
     let worker_result_id = result_document_id.clone();
     let worker_result_path = result_path.clone();
-    let worker_tool_id = tool_id.clone();
     let worker_operation = operation_id.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let started = Instant::now();
         let progress = |p: Progress| {
             let _ = app.emit_to("main", "job-progress", JobProgress { job_id: worker_id.clone(), bytes_processed: p.bytes_processed, total_bytes: p.total_bytes, phase: p.phase });
         };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<devtools_core::ToolResult, ToolError> {
-            let meta = fs::metadata(&document.path).map_err(ToolError::from)?;
-            if meta.len() != document.size || meta.modified().ok() != document.modified {
-                return Err(ToolError::Execution { message: "The input file changed. Reopen it before running another operation.".into() });
-            }
-            if worker_tool_id == "encoding.hash" {
-                execute_hash_file(&document.path, &worker_operation, &token, &progress)
-            } else {
-                let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
-                let input = read_bounded_document(&document.path, kind, manifest.limits.max_input_bytes, &token, &progress)?;
-                match executor {
-                    RegisteredExecutor::Legacy(executor) => executor(&worker_tool_id, &worker_operation, &input, &options, &token, &progress),
-                    RegisteredExecutor::Native(executor) => {
-                        let input_limit = manifest.limits.max_input_bytes.unwrap_or(input.len() as u64);
-                        let mut context = NativeExecutionContext::new(&worker_operation, &options, &token, &progress, input_limit, manifest.limits.max_output_bytes);
-                        context.add_input("source", input.bytes().to_vec());
-                        executor(&mut context)?;
-                        let artifact = context.take_outputs().into_iter().next().ok_or_else(|| ToolError::Execution { message: "native plugin produced no output".into() })?;
-                        let kind = match artifact.mime.as_deref() {
-                            Some("application/json") => DocumentKind::Json,
-                            Some(mime) if mime.starts_with("image/") => DocumentKind::Binary,
-                            _ => DocumentKind::Text,
-                        };
-                        Ok(devtools_core::ToolResult { output: Document::from_bytes(artifact.bytes).with_kind(kind).with_mime(artifact.mime.unwrap_or_else(|| "application/octet-stream".into())), diagnostics: Vec::new() })
-                    }
-                }
-            }
-        })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
-        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| execute_job_inputs(&inputs, &manifest, executor, &worker_operation, &options, &token, &progress)))
+            .unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
         let mut finished = match result {
-            Ok(tool_result) => {
+            Ok(native_result) => {
+                let summary = native_result.summary.clone().unwrap_or_else(|| format!("{} completed.", manifest.label));
+                let tool_result = native_result.output;
                 let output = tool_result.output;
                 let output_bytes = output.bytes().to_vec();
                 let output_len = output_bytes.len() as u64;
                 let exceeds = manifest.limits.max_output_bytes.is_some_and(|max| output_len > max);
                 if exceeds {
-                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Tool output exceeds its declared limit.".into()), error_details: Some(serde_json::json!({"code":"resource_limit","message":"tool output exceeds its declared limit"})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Tool output exceeds its declared limit.".into()), error_details: Some(serde_json::json!({"code":"resource_limit","message":"tool output exceeds its declared limit"})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                } else if token.is_cancelled() {
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: true, summary: "Operation cancelled.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Operation cancelled before publishing output.".into()), error_details: Some(serde_json::json!({"code":"cancelled","message":"Operation cancelled before publishing output."})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
                 } else if let Err(error) = fs::write(&worker_result_path, &output_bytes) {
-                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"io","message":error.to_string()})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"io","message":error.to_string()})), renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
                 } else {
-                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: format!("{} completed.", manifest.label), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: Some(output_len), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None, error_details: None, renderer: Some(manifest.renderer), result_kind: Some(InputKind::from(output.kind)), result_mime: output.mime.clone(), diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
+                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes, output_bytes: Some(output_len), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None, error_details: None, renderer: Some(manifest.renderer), result_kind: Some(InputKind::from(output.kind)), result_mime: output.mime.clone(), diagnostics: tool_result.diagnostics, source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) }
                 }
             }
-            Err(error) => { let message = error.to_string(); let details = serde_json::to_value(&error).ok(); JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: document.size, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(message), error_details: details, renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) } },
+            Err(error) => { let message = error.to_string(); let details = serde_json::to_value(&error).ok(); JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(message), error_details: details, renderer: Some(manifest.renderer), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(document_id.clone()), operation_id: Some(worker_operation.clone()) } },
         };
+        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
         if finished.ok {
             if let Ok(meta) = fs::metadata(&worker_result_path) {
                 let result_doc = RegisteredDocument { path: worker_result_path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(format!("{}.{}", document.path.file_stem().unwrap_or_default().to_string_lossy(), worker_operation)), origin_path: Some(document.path.clone()) };
                 if let Ok(mut documents) = state.documents.lock() {
                     if documents.len() < MAX_DOCUMENTS { documents.insert(worker_result_id.clone(), result_doc); } else { let _ = fs::remove_file(&worker_result_path); finished.ok = false; finished.error = Some("Close an unused document before running another tool.".into()); finished.error_details = Some(serde_json::json!({"code":"resource_limit","message":"document handle limit reached"})); finished.result_document_id = None; finished.result_path = None; }
                 }
-            } else { finished.ok = false; finished.error = Some("The tool output was not created.".into()); finished.error_details = Some(serde_json::json!({"code":"execution","message":"The tool output was not created."})); finished.result_document_id = None; finished.result_path = None; }
+            } else { finished.ok = false; finished.error = Some("The tool output was not created.".into()); finished.result_document_id = None; finished.result_path = None; }
         } else { let _ = fs::remove_file(&worker_result_path); }
         if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
         let _ = app.emit_to("main", "job-finished", finished);
@@ -624,110 +675,14 @@ fn run_compare(
     options: Value,
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<HostState>>,
-) -> Result<StartedJob, devtools_core::ToolError> {
-    if !options.is_object() {
-        return Err(devtools_core::ToolError::InvalidOptions { message: "options must be a JSON object".into() });
-    }
-    let options: CompareOptions = serde_json::from_value(options)
-        .map_err(|error| devtools_core::ToolError::InvalidOptions { message: error.to_string() })?;
-    let (left, right) = {
-        let documents = state.documents.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?;
-        let left = documents.get(&left_document_id).cloned()
-            .ok_or_else(|| devtools_core::ToolError::Execution { message: "Left document is no longer open.".into() })?;
-        let right = documents.get(&right_document_id).cloned()
-            .ok_or_else(|| devtools_core::ToolError::Execution { message: "Right document is no longer open.".into() })?;
-        (left, right)
-    };
-    for (label, document) in [("Left", &left), ("Right", &right)] {
-        let info = content_info(&document.path)
-            .map_err(|error| ToolError::Execution { message: error.to_string() })?;
-        if info.kind != "text" {
-            return Err(ToolError::UnsupportedInputKind { tool_id: "text.compare".into(), input_kind: info.kind.into() });
-        }
-        if !info.utf8 {
-            return Err(ToolError::UnsupportedEncoding { message: format!("{label} document is not UTF-8 text.") });
-        }
-    }
-    let token = CancellationToken::default();
-    let job_id = state.next_id("job");
-    let result_document_id = state.next_id("result");
-    let result_path = std::env::temp_dir().join(format!("devtools-pro-{}-{}.diff.json", std::process::id(), result_document_id));
-    {
-        let mut jobs = state.jobs.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?;
-        if jobs.len() >= MAX_JOBS { return Err(devtools_core::ToolError::ResourceLimit { message: "Two operations are already running. Cancel or wait for one to finish.".into() }); }
-        jobs.insert(job_id.clone(), token.clone());
-    }
-    let state = state.inner().clone();
-    let worker_id = job_id.clone();
-    let worker_result_id = result_document_id.clone();
-    let worker_result_path = result_path.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let started = Instant::now();
-        let progress = |p: Progress| {
-            let _ = app.emit_to("main", "job-progress", JobProgress { job_id: worker_id.clone(), bytes_processed: p.bytes_processed, total_bytes: p.total_bytes, phase: p.phase });
-        };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| -> Result<(devtools_core::CompareResult, devtools_core::CompareStats), String> {
-            let left_meta = fs::metadata(&left.path).map_err(|error| error.to_string())?;
-            let right_meta = fs::metadata(&right.path).map_err(|error| error.to_string())?;
-            if left_meta.len() != left.size || left_meta.modified().ok() != left.modified || right_meta.len() != right.size || right_meta.modified().ok() != right.modified {
-                return Err("An input file changed. Reopen both documents before comparing.".into());
-            }
-            // Compare is an in-memory algorithm, so enforce its declared input
-            // limit while reading in chunks instead of buffering an unbounded
-            // source file with `fs::read`.
-            let input_limit = options.max_input_bytes.unwrap_or(devtools_core::DEFAULT_MAX_INPUT_BYTES).min(devtools_core::DEFAULT_MAX_INPUT_BYTES) as u64;
-            let left_doc = read_bounded_document(&left.path, DocumentKind::Text, Some(input_limit), &token, &progress)
-                .map_err(|error| error.to_string())?;
-            let right_doc = read_bounded_document(&right.path, DocumentKind::Text, Some(input_limit), &token, &progress)
-                .map_err(|error| error.to_string())?;
-            compare_documents(&left_doc, &right_doc, &options, &token, progress).map_err(|error| error.to_string())
-        })).unwrap_or_else(|_| Err("The compare worker failed unexpectedly; the workbench is still available.".into()));
-        if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
-        let mut finished = match result {
-            Ok((comparison, stats)) => {
-                let bytes = match serde_json::to_vec_pretty(&comparison) {
-                    Ok(bytes) => bytes,
-                    Err(error) => {
-                        let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"execution","message":error.to_string()})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
-                        if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), failed.clone()); }
-                        let _ = app.emit_to("main", "job-finished", failed);
-                        return;
-                    }
-                };
-                let output_limit = options.max_output_bytes.unwrap_or(devtools_core::DEFAULT_MAX_OUTPUT_BYTES).min(devtools_core::DEFAULT_MAX_OUTPUT_BYTES);
-                if token.is_cancelled() {
-                    let _ = fs::remove_file(&worker_result_path);
-                    let cancelled = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: true, summary: "Operation cancelled.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some("Comparison cancelled before publishing output.".into()), error_details: Some(serde_json::json!({"code":"cancelled","message":"Comparison cancelled before publishing output."})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
-                    if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), cancelled.clone()); }
-                    let _ = app.emit_to("main", "job-finished", cancelled);
-                    return;
-                }
-                if bytes.len() > output_limit {
-                    let failed = JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Comparison output exceeded its limit.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: None, result_path: None, error: Some(format!("diff output exceeds {output_limit} bytes (hunk limit enforced; preview is bounded)")), error_details: Some(serde_json::json!({"code":"resource_limit","message":format!("diff output exceeds {output_limit} bytes")})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) };
-                    if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), failed.clone()); }
-                    let _ = app.emit_to("main", "job-finished", failed);
-                    return;
-                }
-                if let Err(error) = fs::write(&worker_result_path, &bytes) {
-                    JobFinished { job_id: worker_id.clone(), ok: false, cancelled: false, summary: "Operation failed.".into(), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(error.to_string()), error_details: Some(serde_json::json!({"code":"execution","message":error.to_string()})), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) }
-                } else {
-                    JobFinished { job_id: worker_id.clone(), ok: true, cancelled: false, summary: serde_json::to_string(&comparison.summary).unwrap_or_else(|_| "Comparison completed.".into()), elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: stats.input_bytes, output_bytes: Some(bytes.len() as u64), output_path: None, result_document_id: Some(worker_result_id.clone()), result_path: Some(worker_result_path.to_string_lossy().into_owned()), error: None, error_details: None, renderer: Some(RendererKind::Diff), result_kind: Some(InputKind::Text), result_mime: Some("application/json".into()), diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) }
-                }
-            }
-            Err(error) => { let details = serde_json::json!({"code":"execution","message":error}); JobFinished { job_id: worker_id.clone(), ok: false, cancelled: token.is_cancelled(), summary: if token.is_cancelled() { "Operation cancelled.".into() } else { "Operation failed.".into() }, elapsed_ms: started.elapsed().as_millis() as u64, input_bytes: left.size.saturating_add(right.size), output_bytes: None, output_path: None, result_document_id: None, result_path: None, error: Some(details["message"].as_str().unwrap_or("Operation failed.").into()), error_details: Some(details), renderer: Some(RendererKind::Diff), result_kind: None, result_mime: None, diagnostics: Vec::new(), source_document_id: Some(left_document_id.clone()), operation_id: Some("compare".into()) } },
-        };
-        if finished.ok {
-            if let Ok(meta) = fs::metadata(&worker_result_path) {
-                let result_doc = RegisteredDocument { path: worker_result_path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: Some(format!("{} vs {}.diff.json", left.path.file_stem().unwrap_or_default().to_string_lossy(), right.path.file_stem().unwrap_or_default().to_string_lossy())), origin_path: Some(left.path.clone()) };
-                if let Ok(mut documents) = state.documents.lock() {
-                    if documents.len() < MAX_DOCUMENTS { documents.insert(worker_result_id.clone(), result_doc); } else { let _ = fs::remove_file(&worker_result_path); finished.ok = false; finished.error = Some("Close an unused document before comparing another pair.".into()); finished.result_document_id = None; finished.result_path = None; }
-                }
-            } else { finished.ok = false; finished.error = Some("The comparison output was not created.".into()); finished.result_document_id = None; finished.result_path = None; }
-        } else { let _ = fs::remove_file(&worker_result_path); }
-        if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
-        let _ = app.emit_to("main", "job-finished", finished);
-    });
-    Ok(StartedJob { identity: ExecutionIdentity::new("text.compare", "compare", job_id.clone()), job_id })
+) -> Result<StartedJob, ToolError> {
+    if !options.is_object() { return Err(ToolError::InvalidOptions { message: "options must be a JSON object".into() }); }
+    let mut manifest = state.plugin_host.lock().map_err(|e| ToolError::Execution { message: e.to_string() })?.manifest("text.compare")?;
+    let requested = native_plugins::compare_limits(&options)?;
+    manifest.limits.max_input_bytes = requested.max_input_bytes;
+    manifest.limits.max_output_bytes = requested.max_output_bytes;
+    let executor = state.plugin_host.lock().map_err(|e| ToolError::Execution { message: e.to_string() })?.executor("text.compare")?;
+    start_generic_operation(vec![("left".into(), left_document_id), ("right".into(), right_document_id)], "text.compare".into(), "compare".into(), options, manifest, executor, app, state)
 }
 
 #[tauri::command]
@@ -1170,7 +1125,7 @@ mod tests {
         let token = CancellationToken::default();
         let progress = |_: Progress| {};
         let mut context = NativeExecutionContext::new("format", &options, &token, &progress, 1024, None);
-        context.add_input("source", br#"{"b":2,"a":1}"#.to_vec());
+        context.add_input("source", br#"{"b":2,"a":1}"#.to_vec()).unwrap();
         native_plugins::execute_json(&mut context).unwrap();
         let output = context.take_outputs().pop().unwrap();
         assert_eq!(String::from_utf8(output.bytes).unwrap(), "{\n  \"b\": 2,\n  \"a\": 1\n}");
