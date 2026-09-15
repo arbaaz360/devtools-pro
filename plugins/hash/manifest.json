@@ -1,0 +1,33 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "encoding.hash",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Hash Generator",
+  "description": "Calculate compatible MD5, SHA-1, SHA-224, SHA-256, SHA-384 and SHA-512 digests from a byte stream.",
+  "tools": [{"id":"encoding.hash","title":"Hash Generator","category":"converter","operationIds":["encoding.hash"],"workspaceId":"hash"}],
+  "operations": [{
+    "id":"encoding.hash",
+    "title":"Calculate hashes",
+    "executor":{"kind":"javascriptWorker","id":"encoding.hash.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["binary","text"]}],
+    "outputs":[
+      {"id":"md5","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]},
+      {"id":"sha1","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]},
+      {"id":"sha224","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]},
+      {"id":"sha256","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]},
+      {"id":"sha384","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]},
+      {"id":"sha512","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}
+    ],
+    "options":[
+      {"id":"case","type":"enum","label":"Case","default":"lower","choices":[{"id":"lower","label":"Lowercase"},{"id":"upper","label":"Uppercase"}],"persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
+    "limits":{"maxInputBytes":"67108864","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"10000"}
+  }],
+  "workspaces":[{"id":"hash","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"md5","component":"output","outputPort":"md5"},{"id":"sha1","component":"output","outputPort":"sha1"},{"id":"sha224","component":"output","outputPort":"sha224"},{"id":"sha256","component":"output","outputPort":"sha256"},{"id":"sha384","component":"output","outputPort":"sha384"},{"id":"sha512","component":"output","outputPort":"sha512"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-23"],"fixtures":["hash-vectors","hash-unicode","hash-streaming","hash-cancellation"],"uiScenarios":["hash-explicit","case-presentation","copy-each-result"]}
+}
