@@ -1,0 +1,1173 @@
+{
+  "schemaVersion": 1,
+  "reviewedOn": "2026-09-15",
+  "sourceKind": "User-supplied local HTML archive; not a live website crawl",
+  "sourceRoot": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs",
+  "reviewedDocumentCount": 27,
+  "reviewedScreenshotCount": 51,
+  "notes": [
+    "Read each guide text and inspected all non-icon tool screenshots in the supplied pages.",
+    "Screenshot indices are zero-based image ordinals in each guide content area, including the repeated status icon.",
+    "SHA-256 hashes cover original HTML bytes and decoded embedded image bytes respectively.",
+    "Reference URLs identify the corresponding pages; review evidence is the local snapshot, not a claim about the current website.",
+    "HTML files and images are not redistributed here. Requirement paraphrases and source metadata let workers use the brief without access to the local archive.",
+    "These 27 pages are the minimum evidenced baseline, not the complete future catalogue."
+  ],
+  "documents": [
+    {
+      "id": "DU-01",
+      "slug": "unix-timestamp-converter",
+      "title": "UNIX Timestamp Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/unix-timestamp-converter/index.html",
+      "sha256": "128070458999ccf7ba8cba3ec5416245bc60021120339104282910f7f2c5f7f6",
+      "headings": [
+        "Convert UNIX timestamp",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Unix Timestamp Converter macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "1743c70fb58b9edae7bf48a273d45e3dd3d02a543267e3b4f463d968054645d7",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: Unix Timestamp Converter macOS app",
+          "width": 1116,
+          "height": 584,
+          "sha256": "7704ad9b62882684b264f27098298a65568a98a14a424395cb013e9e9cf1ced5",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/unix-timestamp-converter/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-02",
+      "slug": "json-formatter-validator",
+      "title": "JSON Formatter/Validator",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/json-formatter-validator/index.html",
+      "sha256": "8993eb603983f16a88ba14af9c781973afd84fc4c5175531b5897bfd27ab5395",
+      "headings": [
+        "Quickly format JSON strings",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: JSON Formatter/Validator macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "059b4448fb3f31c1bf4cf50f46143d10b88a547c9518efd26e68a288f046f6e9",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: JSON Formatter/Validator macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "21fee815713783f43417bff74089ecab0910bd2c83e0cdca58a12fccc82d4d40",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app: JSON Formatter/Validator macOS app",
+          "width": 1150,
+          "height": 454,
+          "sha256": "084317ac320472be3fd427a13f5e4beca03ae3605b7e0474386c4ebd4f3569ba",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/json-formatter-validator/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "DU-03",
+      "slug": "regexp-tester",
+      "title": "RegExp Tester",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/regexp-tester/index.html",
+      "sha256": "5cd27a26fe7d5beed1b9fc0d70383051762dd886eb45844212bd0d9677321a4f",
+      "headings": [
+        "Quickly test a regular expression",
+        "Input",
+        "Output",
+        "RegExp Output Expression",
+        "Group Matching",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: RegExp Tester macOS app",
+          "width": 2276,
+          "height": 1300,
+          "sha256": "6300ad3195665912ea3038626b5c83c6c6c4c223a08bcc97f4a685ae5384bd33",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils RegExp Group Matching",
+          "width": 2412,
+          "height": 1594,
+          "sha256": "2009b2345c48d9ce655b119bec4344360faa7a04bc9d4c33456167b8f338b8d6",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app: RegExp Tester Settings macOS app",
+          "width": 2412,
+          "height": 1594,
+          "sha256": "b9f20146c41724e8f9fda306b09a8dde8af98e7860f137efb8e36b07052abb65",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/regexp-tester/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "DU-04",
+      "slug": "jwt-debugger-decode-sign-verify",
+      "title": "JWT Debugger (decode, sign, and verify)",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/jwt-debugger-decode-sign-verify/index.html",
+      "sha256": "f1573242fd0003515bf4f49732c2795258c538e75e18266573265f241246cea4",
+      "headings": [
+        "Quickly debug a JWT token",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: JWT Debugger, Signer, Verifier macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "3dd1e4737737aa3dcc5e14c8435ac6bd5dcb2a3c38956f95070869c385e36eb4",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: JWT Debugger, Signer, Verifier macOS app",
+          "width": 1064,
+          "height": 518,
+          "sha256": "2b6caa64b97d17dccb8f897d5ce742610ab64dd0648fb54ae9f4df55286d7ba6",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/jwt-debugger-decode-sign-verify/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-05",
+      "slug": "url-encoder-decoder",
+      "title": "URL Encoder/Decoder",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/url-encoder-decoder/index.html",
+      "sha256": "b5a8451dd4a08c72eb0a9f26dcb12ab6d40d92707cb98201982e7ffeeb129cc7",
+      "headings": [
+        "Encode/Decode URLs",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: URL Encoder/Decoder macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "a9ce9a5b930a74455baa8160bbeb1ac83965dc13faea83d3fba6406c4c16af3a",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: URL Encoder/Decoder macOS app",
+          "width": 1100,
+          "height": 660,
+          "sha256": "cd6922366c842d0b01cb3aa6a30f53cd87e452eb4b6b3f7ce134307fd901957d",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/url-encoder-decoder/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-06",
+      "slug": "base64-encoder-decoder",
+      "title": "Base64 Encoder/Decoder",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/base64-encoder-decoder/index.html",
+      "sha256": "1cfecd5d84757b8281b3692c30d63157a29f631be1cfaceac5fabc25e567f23e",
+      "headings": [
+        "Quickly decode a Base64 string",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Base64 Encoder/Decoder macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "08cf6bd7ee1247eadf2f1c17979a1793385093fdb576fc160bda573d72f5e77d",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: Base64 Encoder/Decoder macOS app",
+          "width": 1158,
+          "height": 442,
+          "sha256": "edc8b7d7eeb0becba4435c490773d528b7e4cff6fd6d18bdf4a03751fc49958b",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/base64-encoder-decoder/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-07",
+      "slug": "query-string-parser",
+      "title": "Query String Parser",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/query-string-parser/index.html",
+      "sha256": "b29274982180588921b99a413c964705b0c9d98764d6dc1d8941c8f5da52a6c0",
+      "headings": [
+        "Quickly parse a query string",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Query String Parser macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "9c6399677e2ed65164ed0135cf0b52c73c6cd15f270f8cea8cdc4f605313ccfb",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: Query String Parser macOS app",
+          "width": 1084,
+          "height": 490,
+          "sha256": "e0ce88bba3926b1b9465c17a12ba13b3971a58f0eaddf82cc667ccc8fe36948c",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/query-string-parser/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-08",
+      "slug": "html-entity-encoder-decoder",
+      "title": "HTML Entity Encoder/Encoder",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/html-entity-encoder-decoder/index.html",
+      "sha256": "fac080d45b31cd3aed643acddeaec98b7339aabb26974fa05ae7fae58fae9d32",
+      "headings": [
+        "Quickly encode/decode HTML entities",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: HTML Entity Encoder/Encoder macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "f1ea1e01be8847c061db9b56d5a2a0f322af3a96db9bb8a63aa47b5559efe6b1",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: HTML Entity Encoder/Encoder macOS app",
+          "width": 1216,
+          "height": 1100,
+          "sha256": "0367ece891471e1d58a94c620b8ccd9c5779f44573cbff2e4c7fc05a25c6f878",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/html-entity-encoder-decoder/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-09",
+      "slug": "backslash-escaper-unescaper",
+      "title": "Backslash Escaper/Unescaper",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/backslash-escaper-unescaper/index.html",
+      "sha256": "0cdd739e8abbf28ca91f822f08605a8503364bcf2d553bf699b01c50ad9545e2",
+      "headings": [
+        "Quickly unescape special characters",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Backslash Escaper/Unescaper macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "16dbba2783608b2645effda3b7be9949bfbee993405bb136b8c1ee742125293c",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/backslash-escaper-unescaper/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-10",
+      "slug": "uuid-generator-decoder",
+      "title": "UUID Generator/Decoder",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/uuid-generator-decoder/index.html",
+      "sha256": "10f3a1d1c7b95c7f03d2bc7e09079b7d64a814001bfdccd77de1e7a9b2e1a36c",
+      "headings": [
+        "Quickly decode a UUID",
+        "Input",
+        "Output",
+        "Options",
+        "Generate UUIDs"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: UUID Generator/Decoder macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "231d6cb9776e5e58a89b6a7bbb951199fa25dbc8630988883fa8129bfa854e57",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: UUID Generator/Decoder macOS app",
+          "width": 1126,
+          "height": 494,
+          "sha256": "bab7de312e8b5391f28a42088b1012047ef9b81e67c2419b4bd3521f098b8d0a",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app: UUID Generator/Decoder macOS app",
+          "width": 978,
+          "height": 820,
+          "sha256": "8ffc03212c5909af3b8f4488d0fa6f44962d776e9934e7d326c1b65b93fa1d08",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/uuid-generator-decoder/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "DU-11",
+      "slug": "html-preview",
+      "title": "HTML Preview",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/html-preview/index.html",
+      "sha256": "5fa0d795fe0c8bae32f51bf45038a9249a90aee08740d08d76e9551a33a9b818",
+      "headings": [
+        "Quickly preview an HTML string",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: HTML Preview macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "2eb98d5c5b0ca4c25449bd61663325ede3ad1d2e8d05379a0121ee0d25f987ed",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: HTML Preview macOS app",
+          "width": 1068,
+          "height": 676,
+          "sha256": "91052d7ce32c9e3d9f4a34602a1824eba1b323697431d412d4a01c3ed1ee5f3f",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/html-preview/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-12",
+      "slug": "text-diff-checker",
+      "title": "Text Diff Checker",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/text-diff-checker/index.html",
+      "sha256": "2164dcce796a5b93a59aec5eb1f5951faf523545467e321dec48e6cdb2c99c12",
+      "headings": [
+        "Quickly compare two text strings",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Text Diff Checker macOS app",
+          "width": 2566,
+          "height": 1498,
+          "sha256": "7663a49f9994d2d7c99829428778647970c32f592ec809618e07c120b92b415f",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/text-diff-checker/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-13",
+      "slug": "html-beautifier-minifier",
+      "title": "HTML Beautifier/Minifier",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/html-beautifier-minifier/index.html",
+      "sha256": "c49846a8ccc90725edfde58554c92e0e2391de1fc936ccbda48e85a1514a369a",
+      "headings": [
+        "Quickly format, beautify, or minify an HTML source",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: HTML Beautifier/Minifier macOS app",
+          "width": 2630,
+          "height": 1522,
+          "sha256": "e84593458624d8bd4332d0e57883a99ebbfa16b9a313ed9375dd8d671458e3c5",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/html-beautifier-minifier/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-14",
+      "slug": "css-beautifier-minifier",
+      "title": "CSS Beautifier/Minifier",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/css-beautifier-minifier/index.html",
+      "sha256": "00034aee20a2e4c06f9668aa8b78bcfbf4f0ad5e4f4b3e006d80c9e8ad73cf1e",
+      "headings": [
+        "Quickly format, beautify, or minify a CSS source",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: CSS Beautifier/Minifier macOS app",
+          "width": 2630,
+          "height": 1522,
+          "sha256": "8c29a371ab554344274285f96fa4d77e6c576cb9f0c04ac8b55e418a61790764",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/css-beautifier-minifier/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-15",
+      "slug": "js-beautifier-minifier",
+      "title": "JS Beautifier/Minifier",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/js-beautifier-minifier/index.html",
+      "sha256": "cc55f4682620fc5a598c555391b2ed1c8bd92e5c10def6da59c3c444b18d67d3",
+      "headings": [
+        "Quickly format, beautify, or minify a JS source",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: JS Beautifier/Minifier macOS app",
+          "width": 2630,
+          "height": 1522,
+          "sha256": "70d27c025009ecb90a06a6f52feea9ee4e48365d738121b4c2d1563c76d84d23",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/js-beautifier-minifier/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-16",
+      "slug": "xml-beautifier-minifier",
+      "title": "XML Beautifier/Minifier",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/xml-beautifier-minifier/index.html",
+      "sha256": "13ecc6f79b3d0b61e9df08e99d49868149cca5bd65c3833e8285773f0405e78f",
+      "headings": [
+        "Quickly format, beautify, or minify an XML source",
+        "Input",
+        "Output",
+        "Options"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: XML Beautifier/Minifier macOS app",
+          "width": 2630,
+          "height": 1522,
+          "sha256": "bcc8e661736bd4a8d039e74f771b5c41be0e4cc4583d0d6cd0fc028380d3ad19",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/xml-beautifier-minifier/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-17",
+      "slug": "yaml-to-json-converter",
+      "title": "YAML to JSON Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/yaml-to-json-converter/index.html",
+      "sha256": "531cdf13151f3cbe2a5cfa255d508a728ad89c89ac45167009585182e4437f1a",
+      "headings": [
+        "Quickly convert YAML to JSON",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: YAML to JSON Converter macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "cb8a28e5d2d303abc597cdd5743bc674556cbda4f822d14e45869d57d9033ccf",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/yaml-to-json-converter/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-18",
+      "slug": "json-to-yaml-converter",
+      "title": "JSON to YAML Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/json-to-yaml-converter/index.html",
+      "sha256": "9edd8775f1b74ea41635c220663bce8456bb25ca5d06c1ee2c893da719d5dfb7",
+      "headings": [
+        "Quickly convert JSON to YAML",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: JSON to YAML Converter macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "cb8a28e5d2d303abc597cdd5743bc674556cbda4f822d14e45869d57d9033ccf",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/json-to-yaml-converter/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-19",
+      "slug": "number-base-converter",
+      "title": "Number Base Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/number-base-converter/index.html",
+      "sha256": "2481ceb1c537f81c2f6cc26706bcdd083242cf23de68e12d6bd550a1802f1247",
+      "headings": [
+        "Quickly convert between number bases",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Number Base Converter macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "5342db61d510595c73187844913bd4fe9ffacc189078e92f2c33483e334cde78",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app Number Base Converter Example",
+          "width": 2128,
+          "height": 1304,
+          "sha256": "2cc52d75fc02811ef6c934e90f27546d1204a038fafbe5cdc74b9bb2b21c1751",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app Custom Number Base",
+          "width": 1924,
+          "height": 1036,
+          "sha256": "2ecccf9c4737bf13297ae4d7e3126c26dfa32a1eac85368266805a6480bdbb3f",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/number-base-converter/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "DU-20",
+      "slug": "lorem-ipsum-generator",
+      "title": "Lorem Ipsum Generator",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/lorem-ipsum-generator/index.html",
+      "sha256": "ca6a54b0400c12c2671c4e8e7f978baedfd1d748614d15d6befdec5a1e886d64",
+      "headings": [
+        "Quickly generate Lorem Ipsum",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Lorem Ipsum Generator macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "e4ad460cc1eaf438ecd492d4e7849acb99ba654bfa9365ee0dd7de26e63dcd96",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app Lorem Ipsum Generator Output Options",
+          "width": 1902,
+          "height": 1048,
+          "sha256": "25264c6546a1dd0358325791b995b63c24dbf1ebbea3b30b0d33c3e0c5aaa26d",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/lorem-ipsum-generator/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-21",
+      "slug": "qr-code-generator",
+      "title": "QR Code Reader/Generator",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/qr-code-generator/index.html",
+      "sha256": "42fcb1608314fffcda7a17fdf86a9a21837182e596d9ea877e6db1d44997002b",
+      "headings": [
+        "Quickly generate QR Code",
+        "Input",
+        "Output",
+        "Read QR Code"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: QR Code Reader/Generator macOS app",
+          "width": 2444,
+          "height": 1316,
+          "sha256": "90fd010ea0ef2b084d77adea9d5de0d77aad3a2568927a2aefc38b504ac0a697",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app QR Code Generator with Watermark",
+          "width": 2630,
+          "height": 1470,
+          "sha256": "2f04156af9bb24b13e24f4b115c10a8c6a71c75eb8a0208af4da7ccfa079373e",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app QR Code Generator with icon/logo",
+          "width": 2278,
+          "height": 1186,
+          "sha256": "52023ec43aa1289a51af8890ee7f34583fec7c0b6c7f64e75e40e4c04479984e",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 4,
+          "alt": "DevUtils.app QR Code Reader",
+          "width": 1604,
+          "height": 1212,
+          "sha256": "53805de750ce943d6535af8fbb5c595b7997e4d455c21088d334e60f1463b889",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/qr-code-generator/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "id": "DU-22",
+      "slug": "string-inspector",
+      "title": "String Inspector",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/string-inspector/index.html",
+      "sha256": "7399533d2afcac83563d85f374669f110f8735cf3e21f92a1b2a1164971496e3",
+      "headings": [
+        "Quickly inspect a string",
+        "Input",
+        "Output",
+        "Config filtered words"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: String Inspector macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "3fafb2da0d4e848406bb08ab8d8499a9f543539c6e47096053919c19009e2cf5",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app String Inspector Word Distribution Filter",
+          "width": 1300,
+          "height": 766,
+          "sha256": "2731622d16c0bf1a7bf9bc815f8f0b1c8a076965b86ede05682cfec44b3e32d7",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/string-inspector/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-23",
+      "slug": "hash-generator",
+      "title": "Hash Generator",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/hash-generator/index.html",
+      "sha256": "6d3f55c4370fc5a43364ad7cada4cd809087ee743d85841470a6d93faf0aaee3",
+      "headings": [
+        "Quickly calculate a hash string",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Hash Generator macOS app",
+          "width": 2392,
+          "height": 1378,
+          "sha256": "5d69a47971274d3d2957cc20a5f94fa72e2c98d9926871a0e64794eca0057149",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/hash-generator/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-24",
+      "slug": "html-to-jsx-converter",
+      "title": "HTML/SVG to JSX Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/html-to-jsx-converter/index.html",
+      "sha256": "a6f979a4419f25e2742c9f6daa18b8c4534cdc70ad206c91ea3cb7729385ed81",
+      "headings": [
+        "Quickly convert HTML/SGV to JSX",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: HTML to JSX Converter macOS app",
+          "width": 2276,
+          "height": 1300,
+          "sha256": "b26656f950523b9df193bc1b2a000fdef88d41d95fabe0b58a6ffae6aff95841",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/html-to-jsx-converter/",
+      "reviewedScreenshotIndices": [
+        0
+      ]
+    },
+    {
+      "id": "DU-25",
+      "slug": "markdown-preview",
+      "title": "Markdown Preview",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/markdown-preview/index.html",
+      "sha256": "65add2fc89d0f0773f8e62a9a2bcee6ee7c0cf3c1656050162a8e481e4004598",
+      "headings": [
+        "Quickly Preview Markdown",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: Markdown Preview macOS app",
+          "width": 2446,
+          "height": 1302,
+          "sha256": "d544ae58ae03fda750e5c51c04f3b3e87bb94b7ada842e1b9747f1ac2da4ade3",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: Markdown Preview Settings",
+          "width": 1310,
+          "height": 822,
+          "sha256": "dd9692eac9ecc3e7a68a8d16faf76b051acdb84d3f96fe41545a4edfa3c8b9a5",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/markdown-preview/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-26",
+      "slug": "sql-formatter",
+      "title": "SQL Formatter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/sql-formatter/index.html",
+      "sha256": "95478ce718a2c20a0f783f733908e3d492f70dd4f699ce1cce6d499f60428795",
+      "headings": [
+        "Quickly Format SQL Query",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: SQL Formatter macOS app",
+          "width": 2404,
+          "height": 1270,
+          "sha256": "5af07d36e174a419231cde2a1ed0b1c34bf1fc0502c1f9daaddaa910ac3a471a",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: SQL Formatter Settings",
+          "width": 1276,
+          "height": 682,
+          "sha256": "b15035a90229acf8b6c1d95c6dcb7d63fcf8edd8d9d46d9075b02ff9033153ef",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/sql-formatter/",
+      "reviewedScreenshotIndices": [
+        0,
+        2
+      ]
+    },
+    {
+      "id": "DU-27",
+      "slug": "string-case-converter",
+      "title": "String Case Converter",
+      "source": "F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/docs/string-case-converter/index.html",
+      "sha256": "7f3a164f4654f5ef23260d9e8349fe0587b6d6d03d5849326569a89738a59f9f",
+      "headings": [
+        "Quickly Convert Between String Cases",
+        "Input",
+        "Output"
+      ],
+      "images": [
+        {
+          "index": 0,
+          "alt": "DevUtils.app: String Case Converter macOS app",
+          "width": 2292,
+          "height": 1270,
+          "sha256": "2aca6a6ef3b683ffd5fb104c60c2916feb0d73abfea6e50e2e9e84449996aa97",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 1,
+          "alt": "DevUtils.app status bar icon",
+          "width": 48,
+          "height": 48,
+          "sha256": "17ce0872037e4b9114db5be79d42abdef73f3ef93df9f24cf0da52b15017a3a5",
+          "role": "status-icon"
+        },
+        {
+          "index": 2,
+          "alt": "DevUtils.app: String Case Converter Settings",
+          "width": 1234,
+          "height": 672,
+          "sha256": "ee241f1489f92e3997d54325f58cef85deb88e0efd4cd17b2753e1827ddb8cd3",
+          "role": "tool-screenshot"
+        },
+        {
+          "index": 3,
+          "alt": "DevUtils.app: String Case Converter Settings",
+          "width": 1272,
+          "height": 694,
+          "sha256": "98dfcc327d6c2c7087c9f01abfe1d4581fa76772e01d47f65d38c5ca753ff267",
+          "role": "tool-screenshot"
+        }
+      ],
+      "referenceUrl": "https://devutils.com/docs/string-case-converter/",
+      "reviewedScreenshotIndices": [
+        0,
+        2,
+        3
+      ]
+    }
+  ]
+}

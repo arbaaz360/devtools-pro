@@ -2,6 +2,8 @@
 
 This file is a queue of self-contained tasks for lower-cost worker models. Each task is deliberately bounded so a worker can complete it without understanding the whole engine. Give a worker one task at a time and require it to report changed files, tests run, and any follow-up work.
 
+**15 September 2026 update:** this file retains the historical queue and ledger. For the plugin migration and new reference-based tools, use [PLUGIN_IMPLEMENTATION_TASKS.md](docs/PLUGIN_IMPLEMENTATION_TASKS.md). Its dependency/readiness gates supersede Tasks 24–31 below. The plugin SDK and automatic package discovery are not implemented yet; do not assign a feature worker a nonexistent SDK.
+
 ## Progress ledger (14 September 2026)
 
 - Completed and pushed: Tasks 00A, 00, 01–15, 16, 17, 18, and the quality-gate portion of 21.
@@ -22,7 +24,7 @@ Workers must follow these rules:
 
 1. Keep source documents immutable. Generated output is a temporary result until the user explicitly saves it.
 2. Do not send an entire large file to the webview. Use bounded previews, handles, ranges, or summaries.
-3. Keep processing in `crates/devtools-core`. Keep filesystem permissions, dialogs, jobs, and temporary files in the Tauri host.
+3. Maintain existing processing in `crates/devtools-core` until its migration packet moves it into a plugin. New plugin processors use the approved SDK and declared runner. Keep filesystem permissions, dialogs, jobs, and temporary files in the Tauri host.
 4. Do not add network access, telemetry, or new dependencies without stating why and adding a test.
 5. Preserve cancellation, progress reporting, resource limits, structured errors, and provenance for long-running work.
 6. Do not redesign unrelated tools. A task is complete only when its acceptance criteria and tests pass.
@@ -304,7 +306,7 @@ These tasks assume Tasks 00A–09 and the current desktop integrations are compl
 
 ## Foundation tasks for full catalogue parity
 
-These tasks implement the v2 contract described in `docs/PARITY_AND_BUILDING_BLOCKS.md`. Do them in order before adding the larger tool catalogue.
+Historical proposals below are retained for context. Their implementation sequence is superseded by [PLUGIN_IMPLEMENTATION_TASKS.md](docs/PLUGIN_IMPLEMENTATION_TASKS.md); reconcile existing work before dispatching a replacement task.
 
 ### Task 24 — Versioned contract normalizer
 
@@ -356,11 +358,11 @@ After Tasks 24–30, assign one family at a time: YAML/JSON and JSON/CSV, format
 
 ## Next recommended order
 
-1. Run the quality gate from a clean checkout before each worker handoff.
-2. Reconcile and run Task 22's benchmark report against the current CLI contract; keep raw results local and review the documented limits.
-3. Complete Task 23's extension guide and release checklist so future workers can add tools without core-engine context.
-4. Implement Foundation Tasks 24–30 in order, then assign Task 31 families in parallel.
-5. Only then consider a fully dynamic external plugin loader; that is a separate security and packaging project, not a prerequisite for bundled tools.
+1. Run the existing quality gate and P00's rendered interaction baseline before changing the shell.
+2. Implement P01's canonical contract, then P02–P05's discovery, host, state and shared views in the order specified in the new queue.
+3. Migrate existing tools through P06 and exercise the representative P07 proofs before freezing the worker SDK in P08.
+4. Dispatch remaining tool packets with a tested SDK version and base commit, one package/worktree per worker.
+5. Implement P09 separately when runtime installation is scheduled. Maintain benchmark and release evidence alongside the migration.
 
 Copy one task above to a worker and add:
 

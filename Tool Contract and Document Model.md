@@ -1,5 +1,7 @@
 # Tool Contract and Document Model (initial scaffold)
 
+**Status, 2026-09-15:** historical pseudocode, not the implemented wire protocol. [PLUGIN_SYSTEM_DESIGN.md](docs/PLUGIN_SYSTEM_DESIGN.md) is the current design specification and refines this draft for the 27 supplied DevUtils guides: linked editing, secret handles, multiple representations, scoped state, package discovery and explicit cancellation guarantees. Use [PLUGIN_IMPLEMENTATION_TASKS.md](docs/PLUGIN_IMPLEMENTATION_TASKS.md) for adoption. P01 will create the single canonical machine-readable schema; do not implement a competing schema from this draft.
+
 This document defines the UI-independent boundary between the workbench shell,
 built-in tools, and future extensions. It is intentionally serializable so the
 same contract can be used by an in-process Rust implementation and an
@@ -7,7 +9,7 @@ out-of-process/WASM adapter.
 
 ## Design rules
 
-- A tool is a versioned, deterministic function over immutable input ports.
+- A tool is a versioned function over immutable input ports. Determinism is declared; time, randomness and secrets require explicit context and cache policies.
 - Tools communicate through documents and typed values; they never import or
   mutate another tool's state.
 - Execution is streaming and cancellable. A consumer may apply backpressure by
@@ -172,16 +174,18 @@ pub enum CancelReason { User, Superseded, ResourceLimit, Shutdown }
 ## Wire and lifecycle contract
 
 Manifest, request, and event structures are encoded as JSON for debugging and
-CBOR for compact RPC transport. Every message has `protocol_version`; unknown
-fields must be ignored and required-field/type changes require a new major
-version. A handshake exchanges protocol versions, tool manifest, and granted
+CBOR for compact RPC transport in this early proposal. Every message has a
+protocol version; unknown optional metadata can be ignored, but unknown
+requested capabilities must be rejected. Required-field/type changes require
+a new major version. A handshake exchanges versions, manifest, and granted
 capabilities before input bytes are sent.
 
 Execution order is `Start -> (Output | Diagnostic | Progress | Stats)* ->
-Completed|Failed`. Events are ordered per output port. `Completed` is emitted
-only after all output chunks are flushed. A tool must acknowledge
-`Cancellation` within 100 ms, stop producing output, and release resources;
-the host may terminate a non-compliant worker. No event may block the UI thread.
+Completed|Failed|Cancelled`. Events are ordered per output port. `Completed`
+is emitted only after all output chunks are flushed. Cancellation request
+acknowledgment is separate from completed cleanup. A runner documents and
+tests its cancellation/termination bound; cooperative native code cannot
+promise forced termination. No event may block the UI thread.
 
 The desktop registry uses a compact serializable manifest for discovery and
 command-palette indexing. `inputKinds`, `limits`, `capabilities`, `operations`,
@@ -197,7 +201,7 @@ implemented in the current desktop build. The shipped v1 adapter currently
 supports one required `Document`, one result document, opaque object options,
 and one renderer kind. It intentionally lacks named multi-input ports,
 declarative option schemas, paged structured outputs, annotations, and output
-chunks. Foundation Tasks 24–30 in `WORKER_TASKS.md` implement those pieces in
+chunks. P01–P06 in `docs/PLUGIN_IMPLEMENTATION_TASKS.md` specify adoption in
 compatibility-first steps. A v1 request must continue to normalize to a v2
 request with a single `input` port, and the existing `run_compare` command must
 remain an adapter until named `left` and `right` inputs are available.
@@ -246,13 +250,15 @@ contract version)`. Caches and history must omit content marked `sensitive`.
 5. Preview is a bounded execution with the same semantics as full execution;
    tools report truncation in `Stats` or a diagnostic rather than silently
    presenting incomplete output as complete.
-6. Resource limits (CPU, memory, output bytes, regex steps, and rows) are host
-   enforced and reported as `ResourceLimit` failures.
+6. Resource budgets are host-owned and reported as `ResourceLimit` failures.
+   Runners declare which bounds are enforced and which depend on cooperative
+   checks; an in-process native call cannot promise forced termination.
 
 ## Initial built-in adapter guidance
 
 Implement `Document` and the event protocol in the Rust domain crate first.
 Keep UI adapters limited to converting editor buffers/files/clipboard into a
 `Document`, subscribing to `ExecuteEvent`, and rendering diagnostics by span.
-The first vertical slice can register JSON format, CSV preview, Base64 encode,
-and text transform tools against this contract without changing shell code.
+The first vertical slices must prove that JSON, image/Base64, compare and a
+generator can register through discovery without hand changes to shell code.
+That is a migration acceptance criterion, not a current capability.

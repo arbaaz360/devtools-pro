@@ -1,6 +1,8 @@
 # DevTools Pro capability roadmap and building blocks
 
-The long-term product target is a local toolbox with the capabilities shown in the [DevUtils demo](https://devutils.com/demo/), plus a larger catalogue. The demo currently lists 47 tools, including converters, formatters, generators, inspectors, previews, comparisons, and code generators. We will use that catalogue as a compatibility checklist, while keeping our own implementation offline-first and extensible.
+The long-term product target is a local toolbox with the capabilities shown in the [DevUtils demo](https://devutils.com/demo/), plus a larger catalogue. The earlier demo inventory below is retained as expansion scope, not a current live-site count or a claim of implemented parity.
+
+**15 September 2026 update:** the user supplied 27 local guides. Their text and 51 tool screenshots are now mapped in [DEVUTILS_REQUIREMENTS.md](DEVUTILS_REQUIREMENTS.md). Use [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md) as the current architecture design and [PLUGIN_IMPLEMENTATION_TASKS.md](PLUGIN_IMPLEMENTATION_TASKS.md) as the implementation queue. These refine the earlier ideas below; the SDK and discovery layer remain to be built.
 
 ## Capability parity checklist
 
@@ -14,17 +16,19 @@ The target catalogue is:
 - **Media and previews:** Base64 images, HTML preview, QR reader/generator, color conversion.
 - **Comparison and generation:** text diff and Lorem Ipsum generation.
 
-Each future tool must declare its inputs, outputs, options, limits, capabilities, and preferred renderer. That lets the shell offer the same predictable flow—choose a tool on the left, provide its inputs in the work area, see a bounded result on the right, then copy or save—without making every tool a special case.
+Each future tool must declare its inputs, outputs, options, limits, capabilities, and workspace. The shell provides a consistent interaction vocabulary with layouts appropriate to the tool: a single editor, transform, comparison, linked fields, generator or media/preview surface. A right-hand text result is not appropriate for every tool.
 
 ## Where we are now
 
 The current implementation has a solid safety foundation and working vertical slices for JSON/CSV/text inspection, JSON formatting and minifying, text utilities, hashing, image/Base64 conversion, cURL conversion, and text comparison. Rust owns file bytes and transformations; Tauri owns dialogs, paths, jobs, temporary results, and permissions; TypeScript owns the rail, forms, keyboard flow, and result renderers.
 
-The current v1 manifest is intentionally small: one required document, one operation, one result document, opaque JSON options, and one renderer kind. The UI view registry is isolated by tool id, but bundled views still require registration. This is enough to add another simple tool safely; it is not yet enough for the complete catalogue.
+The current v1 manifest is intentionally small: one required document, one operation, one result document, opaque JSON options, and one renderer kind. The earlier `toolViews` registry is not consumed by the current `main.ts`; the controller catalog and host dispatch still have tool-specific branches. A simple tool can be added with manual integration, but this is not yet the isolation boundary required for independent plugin workers.
 
 The existing [Tool Contract and Document Model](../Tool%20Contract%20and%20Document%20Model.md) already sketches the right v2 concepts: named input and output ports, typed values, optional streams, structured results, diagnostics with byte spans, provenance, capability grants, preview mode, and ordered execution events. The next architectural work is to implement that scaffold behind compatibility adapters rather than invent a second contract.
 
-## Shell behavior delivered in this iteration
+## Existing behavior to preserve and verify during migration
+
+The following describes implemented workflows, not a fresh native UI validation of this documentation change. P00 in the new queue must reproduce the rendered and native scenarios before further shell migration; user-reported regressions cannot be ruled out by a build or static source check.
 
 The desktop shell now treats each open tab as a small workspace record. It owns the selected tool, operation, editable draft, right-hand comparison text, revision, job state, result handle, and dirty state. A pure reducer in `apps/desktop/src/workbench/state.ts` applies transitions; `controller.ts` is the only place that performs Tauri effects. This split keeps DOM code from deciding when a file is opened or a result is retired, and lets a worker test state transitions without launching the app.
 
@@ -34,7 +38,7 @@ Clipboard round-trips have an explicit large-payload path. The visible result is
 
 The visual shell follows the reference interaction: a dense searchable rail, one selected tool row, compact operation controls above the input/output surfaces, and large dark editor panes separated by a narrow divider. The shell keeps native file dialogs and the Windows title bar instead of simulating platform chrome. Renderer-specific controls remain declarative so a future JSON tree, table, image, or HTML preview can occupy the output surface without changing the job lifecycle.
 
-This is still a bundled tool catalogue with a manifest-driven execution boundary, not an external plugin runtime. Adding a simple worker tool currently requires a core function, manifest entry, host adapter, and (where needed) a view/renderer registration. Tasks 24–30 are the planned work that will make those contracts richer and reduce registration glue; the current shell is a safe proving ground for that migration.
+This is still a bundled tool catalogue with partial manifest-driven execution, not an external plugin runtime. Adding a simple worker tool currently requires a core function, manifest entry, host adapter and UI integration. The new P00–P09 queue replaces historical Tasks 24–31 for plugin migration and establishes explicit readiness gates before independent feature workers begin.
 
 ## Contract needed for the full catalogue
 
@@ -64,11 +68,11 @@ Think of the app as a small factory:
 7. **A renderer is a display adapter.** Text uses a read-only editor, a table uses rows and columns, a diff uses structured hunks, and HTML/Markdown will use a restricted sandbox. Tools produce data; renderers decide how that data is shown.
 8. **Save is an explicit export.** The user chooses a destination only after seeing the result. Tauri writes through a sibling temporary file and atomic rename, so a failed save does not damage the source or leave a partial destination.
 
-In TypeScript, `main.ts` coordinates the page and the `toolViews/` modules define tool-specific controls. Vite bundles those files into browser assets. In Rust, modules under `crates/devtools-core` are ordinary testable libraries; the Tauri `main.rs` is an adapter around them. You do not need to know Rust syntax to reason about the boundary: input enters through a typed request, a core function returns typed output or a structured error, and the host controls files and lifecycle.
+In TypeScript, `main.ts` currently contains rendering and tool-specific decisions, while `workbench/state.ts` and `controller.ts` separate state transitions from native effects. Vite bundles frontend assets. The earlier `toolViews/` modules are not the active integration path and must be consolidated during migration. In Rust, modules under `crates/devtools-core` are testable libraries; the Tauri `main.rs` adapts them to host services. Input enters through a typed request, a core function returns output or a structured error, and the host controls files and lifecycle.
 
 ## Build order for parity
 
-Do not add 40 isolated special cases. Build the reusable layers in this order:
+The detailed, current sequence is in [PLUGIN_IMPLEMENTATION_TASKS.md](PLUGIN_IMPLEMENTATION_TASKS.md). Its dependency gates replace this earlier conceptual outline:
 
 1. Implement the v2 request/result types and a v1-to-v2 normalizer.
 2. Add named multi-input requests and compatibility adapters for the current JSON and compare commands.
@@ -79,4 +83,4 @@ Do not add 40 isolated special cases. Build the reusable layers in this order:
 7. Build vertical slices: regex, JWT, YAML/JSON, formatter family, generators, then code generators and remaining converters.
 8. Add a compatibility test for every catalogue entry: manifest, valid/invalid fixtures, limits, cancellation, renderer, copy/save behavior, and keyboard path.
 
-An external plugin loader can come later. A bundled manifest and isolated view are already enough for workers to build tools independently; the v2 contract is the important prerequisite for scale.
+An external plugin loader can follow the bundled architecture. Independent feature workers need a tested SDK, generated integration and representative workspace proofs first. A manifest and an isolated-looking folder alone do not establish that the current shell is ready.
