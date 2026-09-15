@@ -1,0 +1,6 @@
+[
+  {"name":"empty","input":"","encoded":""},
+  {"name":"hello","input":"Hello, world!","encoded":"SGVsbG8sIHdvcmxkIQ=="},
+  {"name":"unicode","input":"こんにちは 🌍","encoded":"44GT44KT44Gr44Gh44GvIPCfjI0="},
+  {"name":"nul","input":"a\u0000b","encoded":"YQBi"}
+]
