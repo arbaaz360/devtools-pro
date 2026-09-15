@@ -551,12 +551,20 @@ kbd {
   font-size: 9px !important;
 }
 .input-message {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   padding: 20px;
   color: var(--muted);
   align-self: center;
   margin: auto;
   text-align: center;
   line-height: 1.6;
+}
+.input-message p {
+  margin: 0;
+  max-width: 420px;
 }
 .image-stage {
   flex: 1;
@@ -1304,6 +1312,13 @@ textarea {
   overflow: hidden;
   background: var(--editor);
 }
+.result-status-message {
+  padding: 16px;
+  border: 1px solid #3b5749;
+  background: #19251f;
+  color: #a7e0bd;
+  line-height: 1.5;
+}
 #result-output {
   position: relative;
   z-index: 1;
@@ -1330,6 +1345,11 @@ textarea {
 }
 #result-output.json-output::selection {
   background: rgba(23, 104, 215, 0.38);
+}
+#result-output[wrap="soft"] {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .json-key {
   color: #c9c4bf;

@@ -333,20 +333,34 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
   const wrap = $("#input-image-wrap");
   const input = $("#preview") as HTMLTextAreaElement;
   const message = $("#input-message");
+  const messageText = $("#input-message-text");
+  const openCompatible = $("#input-open-compatible") as HTMLButtonElement;
   const empty = $("#empty-state");
   const imageInput = tab.source?.contentKind === "image";
   const binaryInput = tab.source?.contentKind === "binary";
+  const imageTool = tool?.input === "image";
+  const quickActions = $(".input-quick-actions") as HTMLElement;
   empty.hidden = true;
   $("#editor-host").hidden = !!tool?.compare;
   wrap.hidden = !imageInput;
   input.hidden =
     imageInput || binaryInput || !!tool?.compare || tool?.input === "image";
   message.hidden = !(binaryInput || (tool?.input === "image" && !imageInput));
+  quickActions.hidden = imageTool || binaryInput || !!tool?.compare;
+  openCompatible.hidden = true;
+  openCompatible.onclick = () => void controller.chooseFile();
   if (binaryInput)
-    message.textContent =
+    messageText.textContent =
       "Binary file · Choose a compatible tool such as Hash generator. Text editing is unavailable for this file.";
-  else if (tool?.input === "image" && !imageInput)
-    message.textContent = "Open a PNG or JPEG image to use Image to Base64.";
+  else if (imageTool && !imageInput) {
+    const detected = tab.source?.contentKind === "text"
+      ? `This tab contains ${tab.source.format.toUpperCase()} text.`
+      : "This tab does not contain an image.";
+    messageText.textContent = `${detected} Open a PNG or JPEG image to use Image to Base64.`;
+    openCompatible.hidden = false;
+  } else if (imageInput && !tab.image) {
+    messageText.textContent = tab.imageError ?? "Loading image preview…";
+  }
   $("#source-mode").textContent =
     tab.text !== null
       ? tab.dirty
@@ -365,7 +379,7 @@ function renderInput(tab: TabState, tool: ReturnType<typeof definition>) {
     } else {
       image.removeAttribute("src");
       message.hidden = false;
-      message.textContent = tab.imageError ?? "Loading image preview…";
+      messageText.textContent = tab.imageError ?? "Loading image preview…";
     }
   } else if (!tool?.compare) {
     const text = tab.text ?? tab.source?.preview ?? "";
@@ -507,6 +521,14 @@ function readableSummary(summary: unknown): string {
   }
   return summary;
 }
+function friendlyError(tab: TabState, event: NonNullable<TabState["result"]>["event"]): string {
+  const error = event.error ?? "Operation failed";
+  if (tab.toolId === "encoding.base64-image" && /base64|multiple of four|alphabet/i.test(error))
+    return "Invalid Base64 input. Paste a complete Base64 string or a data URI, then try Decode again.";
+  if (tab.toolId === "structured.csv" && /CSV record|field|row/i.test(error))
+    return "CSV inspection failed. Check that every row has the same number of columns and that quoted values are balanced.";
+  return error;
+}
 function renderResult(tab: TabState) {
   const result = tab.result;
   const empty = $("#result-empty");
@@ -518,8 +540,30 @@ function renderResult(tab: TabState) {
     $("#open-result").hidden = true;
     $("#save-result").hidden = true;
     $("#result-highlight").hidden = true;
+    $("#result-status-message").hidden = true;
     empty.hidden = false;
     content.hidden = true;
+    const tool = definition(tab.toolId);
+    const problem = tool
+      ? validation(tab, tool, controller.manifests.get(tool.id))
+      : null;
+    const title = $("#result-empty-title");
+    const text = $("#result-empty-text");
+    if (problem) {
+      title.textContent = "Input needs attention";
+      text.textContent = problem;
+    } else if (tool?.input === "image") {
+      title.textContent = "Open an image to begin";
+      text.textContent =
+        "PNG and JPEG files are supported. The encoded result will appear here automatically.";
+    } else if (tool?.operations.length) {
+      title.textContent = "Ready when you are";
+      text.textContent = `Run ${tool.operations.map((operation) => operation.label).join(", ")} to see the result here.`;
+    } else {
+      title.textContent = "Tools at your fingertips";
+      text.textContent =
+        "Choose a tool on the left. Your document stays in this tab, and the result appears here.";
+    }
     return;
   }
   if (result === renderedResult && tab.resultStale === renderedResultStale)
@@ -535,7 +579,7 @@ function renderResult(tab: TabState) {
     ? "✓ Completed successfully"
     : event.cancelled
       ? "○ Cancelled"
-      : `● ${event.error ?? "Operation failed"}`;
+      : `● ${friendlyError(tab, event)}`;
   if (tab.resultStale) stateNode.textContent += " · Updating…";
   $("#result-summary").textContent = readableSummary(event.summary);
   $("#result-metrics").innerHTML = [
@@ -552,6 +596,7 @@ function renderResult(tab: TabState) {
   structured.replaceChildren();
   const output = $("#result-output") as HTMLTextAreaElement;
   const highlight = $("#result-highlight");
+  const statusMessage = $("#result-status-message");
   const binary = !!result.image;
   const diff =
     !binary &&
@@ -590,7 +635,17 @@ function renderResult(tab: TabState) {
     highlight.hidden = true;
     highlight.replaceChildren();
   }
+  const noOutput =
+    event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
+  statusMessage.hidden = !noOutput;
+  statusMessage.textContent = noOutput
+    ? event.operationId === "inspect"
+      ? "✓ Input is valid. Review the operation details for the inspection summary."
+      : "✓ Operation completed without a generated output document."
+    : "";
+  if (noOutput) output.hidden = true;
   if (output.value !== result.text) output.value = result.text;
+  output.wrap = result.text.length > 2_000 ? "soft" : "off";
   $("#result-output-meta").textContent =
     result.previewError ??
     (result.truncated
@@ -782,10 +837,22 @@ $("#input-clear").onclick = () => {
 $("#input-sample").onclick = () => {
   const tab = activeTab(state);
   if (!tab || tab.text === null) return;
+  const samples: Record<string, string | null> = {
+    "structured.json":
+      '{"store":{"book":[{"category":"reference","title":"Sample"}]}}',
+    "encoding.base64-image":
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+    "text.json-string": '{"name":"Sample","items":[1,2,3]}',
+    "text.url": "https://example.com/search?q=hello world",
+    "text.html": "<p class=\"sample\">Hello</p>",
+    "text.unicode": "Hello ✓",
+    "text.find-replace": "Sample text\nReplace this text",
+  };
   const sample =
-    tab.toolId === "structured.json"
-      ? '{"store":{"book":[{"category":"reference","title":"Sample"}]}}'
+    Object.prototype.hasOwnProperty.call(samples, tab.toolId)
+      ? samples[tab.toolId]
       : "Sample text";
+  if (sample === null) return;
   controller.edit(tab.id, sample);
 };
 $("#palette-open").onclick = (event) =>

@@ -173,12 +173,12 @@
                 <div id="input-image-wrap" class="image-stage" hidden>
                   <img id="input-image" alt="Input image" />
                 </div>
-                <p
-                  id="input-message"
-                  class="input-message"
-                  role="status"
-                  hidden
-                ></p>
+                <div id="input-message" class="input-message" role="status" hidden>
+                  <p id="input-message-text"></p>
+                  <button id="input-open-compatible" class="outline-button" type="button" hidden>
+                    Open compatible file…
+                  </button>
+                </div>
               </div>
               <div id="tool-source" class="tool-source" hidden>
                 <div class="compare-heading">
@@ -258,6 +258,7 @@
                       <span class="section-label">OUTPUT</span
                       ><span id="result-output-meta"></span>
                     </div>
+                    <div id="result-status-message" class="result-status-message" hidden></div>
                     <div class="result-code">
                       <pre
                         id="result-highlight"

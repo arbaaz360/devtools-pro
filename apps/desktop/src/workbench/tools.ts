@@ -160,6 +160,18 @@ export function validation(
       !["image/png", "image/jpeg"].includes(tab.source?.mime ?? ""))
   )
     return `${tool.label} requires a PNG or JPEG image. Open an image in this tab or choose another tool.`;
+  if (
+    tool.id === "structured.csv" &&
+    kind === "text" &&
+    tab.source?.format === "json"
+  )
+    return "CSV Inspector requires comma-separated rows, but this document is detected as JSON. Open a CSV file or choose another tool.";
+  if (
+    tool.id === "structured.json" &&
+    kind === "text" &&
+    tab.source?.format === "csv"
+  )
+    return "JSON tools require a JSON document, but this document is detected as CSV. Open a JSON file or choose another tool.";
   if (tool.input === "text" && kind !== "text")
     return `${tool.label} accepts text, not ${kind === "image" ? "images" : "binary files"}. Choose a text tab or create a new document.`;
   if (manifest?.limits.maxInputBytes != null) {
