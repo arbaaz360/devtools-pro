@@ -1,0 +1,5 @@
+[
+  {"name":"empty","left":"","right":"","summary":{"identical":true,"leftLines":0,"rightLines":0}},
+  {"name":"no-final-newline","left":"last line","right":"last line\n","summary":{"identical":false,"addedLines":1,"removedLines":1}},
+  {"name":"zero-context","left":"a\nb\nc\n","right":"a\nx\nc\n","options":{"contextLines":0},"summary":{"changedHunks":1}}
+]

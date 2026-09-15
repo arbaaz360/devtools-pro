@@ -1,0 +1,6 @@
+[
+  {"name":"missing-left","options":{},"error":"named input left was not supplied"},
+  {"name":"missing-right","options":{},"error":"named input right was not supplied"},
+  {"name":"bad-newline","options":{"newline":"native"},"error":"newline must be preserve, lf, crlf or ignore"},
+  {"name":"bad-context","options":{"contextLines":-1},"error":"contextLines must be a non-negative integer"}
+]

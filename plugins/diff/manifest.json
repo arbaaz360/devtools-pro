@@ -1,0 +1,30 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "text.compare",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Text Diff",
+  "description": "Compare two bounded text documents with line-oriented structured hunks.",
+  "tools": [{"id":"text.compare","title":"Text Diff","category":"compare","operationIds":["text.compare"],"workspaceId":"compare"}],
+  "operations": [{
+    "id":"text.compare",
+    "title":"Compare text",
+    "executor":{"kind":"javascriptWorker","id":"text.compare.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[
+      {"id":"left","label":"Left input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]},
+      {"id":"right","label":"Right input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}
+    ],
+    "outputs":[{"id":"output","label":"Diff result","kind":"value","multiplicity":"one","representations":["diff","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "options":[
+      {"id":"newline","type":"enum","label":"Newline policy","default":"preserve","choices":[{"id":"preserve","label":"Preserve"},{"id":"lf","label":"Normalize LF"},{"id":"crlf","label":"Normalize CRLF"},{"id":"ignore","label":"Ignore style"}],"persistence":"instance","sensitive":false},
+      {"id":"context-lines","type":"integer","label":"Context lines","default":"3","minimum":"0","maximum":"64","persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100","changedPorts":["left","right"]},
+    "limits":{"maxInputBytes":"16777216","maxOutputBytes":"8388608","maxChunkBytes":"1048576","deadlineMs":"1000"}
+  }],
+  "workspaces":[{"id":"compare","kind":"compare","bindings":[{"id":"left","component":"editor","inputPort":"left"},{"id":"right","component":"editor","inputPort":"right"},{"id":"result","component":"diff","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-12"],"fixtures":["diff-identical","diff-insertion","diff-deletion","diff-replacement","diff-newline-only","diff-boundaries"],"uiScenarios":["compare-explicit","navigate-hunks","copy-complete"]}
+}

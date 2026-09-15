@@ -1,0 +1,8 @@
+[
+  {"name":"identical","left":"alpha\nbeta\n","right":"alpha\nbeta\n","summary":{"identical":true,"changedHunks":0}},
+  {"name":"insertion","left":"one\ntwo\n","right":"one\ntwo\nthree\n","summary":{"addedLines":1,"removedLines":0}},
+  {"name":"deletion","left":"one\ntwo\nthree\n","right":"one\nthree\n","summary":{"addedLines":0,"removedLines":1}},
+  {"name":"replacement","left":"old\n","right":"new\n","summary":{"addedLines":1,"removedLines":1}},
+  {"name":"newline-only","left":"one\r\ntwo\r\n","right":"one\ntwo\n","options":{"newline":"preserve"},"summary":{"newlineOnly":true}},
+  {"name":"unicode","left":"café\n🙂\n","right":"café\n🚀\n","summary":{"addedLines":1,"removedLines":1}}
+]
