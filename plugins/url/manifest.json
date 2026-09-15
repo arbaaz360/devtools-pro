@@ -1,0 +1,45 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "web.url",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "URL Utilities",
+  "description": "Encode and decode URL components, or parse query parameters from text and full URLs.",
+  "tools": [
+    {"id":"text.url","title":"URL Encode / Decode","category":"converter","operationIds":["url.transform"],"workspaceId":"url-transform","searchAliases":["percent encoding","form encoding"]},
+    {"id":"web.url-parser","title":"URL Parser","category":"converter","operationIds":["url.parse-query"],"workspaceId":"query-parser","searchAliases":["query string parser","URL query"]}
+  ],
+  "operations": [
+    {
+      "id":"url.transform",
+      "title":"Encode or decode URL text",
+      "executor":{"kind":"javascriptWorker","id":"web.url.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"percent-encoding","cancellation":"cooperative"},
+      "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+      "outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+      "options":[
+        {"id":"mode","type":"enum","label":"Mode","default":"encode","choices":[{"id":"encode","label":"Encode"},{"id":"decode","label":"Decode"}],"persistence":"instance","sensitive":false},
+        {"id":"encoding","type":"enum","label":"Encoding","default":"rfc3986","choices":[{"id":"rfc3986","label":"RFC 3986 component"},{"id":"form","label":"Form data"}],"persistence":"instance","sensitive":false}
+      ],
+      "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100","changedPorts":["input"]},
+      "limits":{"maxInputBytes":"1048576","maxOutputBytes":"4194304","maxChunkBytes":"4194304","deadlineMs":"2000"}
+    },
+    {
+      "id":"url.parse-query",
+      "title":"Parse URL query",
+      "executor":{"kind":"javascriptWorker","id":"web.url.processor","version":"0.1.0","engine":"whatwg-url","engineVersion":"1","syntax":"application/x-www-form-urlencoded","cancellation":"cooperative"},
+      "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+      "outputs":[{"id":"output","kind":"report","multiplicity":"one","representations":["code","tree","properties"],"language":"json","sensitive":false,"exports":["copyText","save"]}],
+      "options":[{"id":"indent","type":"integer","label":"JSON indentation","default":"2","minimum":"0","maximum":"8","persistence":"instance","sensitive":false}],
+      "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100","changedPorts":["input"]},
+      "limits":{"maxInputBytes":"1048576","maxOutputBytes":"4194304","maxChunkBytes":"4194304","deadlineMs":"2000","maxRows":"10000","maxNodes":"20000"}
+    }
+  ],
+  "workspaces":[
+    {"id":"url-transform","kind":"transform","bindings":[{"id":"source","component":"editor","inputPort":"input"},{"id":"options","component":"form","optionIds":["mode","encoding"]},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]},
+    {"id":"query-parser","kind":"transform","bindings":[{"id":"source","component":"editor","inputPort":"input"},{"id":"options","component":"form","optionIds":["indent"]},{"id":"result","component":"tree","outputPort":"output"}],"commands":[],"presentationSettings":[]}
+  ],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-05","DU-07"],"fixtures":["url-transform","query-parser"],"uiScenarios":["transform-complete","use-as-input","query-copy-complete"]}
+}

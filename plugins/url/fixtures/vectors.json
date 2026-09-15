@@ -1,0 +1,5 @@
+[
+  {"name":"RFC 3986 Unicode and reserved","operationId":"url.transform","options":{"mode":"encode","encoding":"rfc3986"},"input":"café / ?+","output":"caf%C3%A9%20%2F%20%3F%2B"},
+  {"name":"form spaces and literal plus","operationId":"url.transform","options":{"mode":"encode","encoding":"form"},"input":"a b+c","output":"a+b%2Bc"},
+  {"name":"query duplicate and array","operationId":"url.parse-query","options":{"indent":0},"input":"https://example.test/p?a=1&a=2&tag[]=x+y&empty=#frag","output":"{\"a\":[\"1\",\"2\"],\"tag\":[\"x y\"],\"empty\":\"\"}"}
+]
