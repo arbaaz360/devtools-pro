@@ -21,6 +21,17 @@ export interface ToolCapabilities {
   needsSecrets: boolean;
 }
 export interface ToolOperation { id: string; label: string; defaultOptions: Record<string, unknown>; }
+/** Acceptance identity returned by the native host for every new job. */
+export interface ExecutionIdentity {
+  pluginId: string;
+  pluginVersion: string;
+  toolId: string;
+  operationId: string;
+  instanceId: string;
+  jobId: string;
+  generation: number;
+}
+export interface StartedJob { jobId: string; identity: ExecutionIdentity; }
 export interface ToolManifest {
   id: string;
   label: string;
@@ -124,13 +135,13 @@ export function readBinaryPreview(documentId: string): Promise<BinaryPreview> {
   return invoke('read_binary_preview', { documentId });
 }
 
-export function startOperation(documentId: string, operation: Operation, format: Format): Promise<{ jobId: string }> {
+export function startOperation(documentId: string, operation: Operation, format: Format): Promise<StartedJob> {
   return invoke('start_operation', { documentId, operation, format });
 }
 
 /** Generic manifest-driven execution boundary. `startOperation` remains as a
  * compatibility adapter for older JSON callers. */
-export function runTool(documentId: string, toolId: string, operationId: string, options: Record<string, unknown> = {}): Promise<{ jobId: string }> {
+export function runTool(documentId: string, toolId: string, operationId: string, options: Record<string, unknown> = {}): Promise<StartedJob> {
   return invoke('run_tool', { documentId, toolId, operationId, options });
 }
 
@@ -144,28 +155,28 @@ export function runCompare(leftDocumentId: string, rightDocumentId: string, opti
   maxInputBytes?: number;
   maxLines?: number;
   maxOutputBytes?: number;
-} = {}): Promise<{ jobId: string }> {
+} = {}): Promise<StartedJob> {
   return invoke('run_compare', { leftDocumentId, rightDocumentId, options });
 }
 
-export function runTextUtility(documentId: string, toolId: 'text.url' | 'text.html' | 'text.unicode', operationId: TextUtilityOperation, maxOutputBytes?: number): Promise<{ jobId: string }> {
+export function runTextUtility(documentId: string, toolId: 'text.url' | 'text.html' | 'text.unicode', operationId: TextUtilityOperation, maxOutputBytes?: number): Promise<StartedJob> {
   const options = maxOutputBytes === undefined ? {} : { maxOutputBytes };
   return runTool(documentId, toolId, operationId, options);
 }
 
-export function runHash(documentId: string, algorithm: 'sha256' | 'sha512'): Promise<{ jobId: string }> {
+export function runHash(documentId: string, algorithm: 'sha256' | 'sha512'): Promise<StartedJob> {
   return runTool(documentId, 'encoding.hash', algorithm, {});
 }
 
-export function runImageToBase64(documentId: string, options: { dataUri?: boolean; mimeType?: string; maxInputBytes?: number } = {}): Promise<{ jobId: string }> {
+export function runImageToBase64(documentId: string, options: { dataUri?: boolean; mimeType?: string; maxInputBytes?: number } = {}): Promise<StartedJob> {
   return runTool(documentId, 'encoding.image-base64', 'encode', options);
 }
 
-export function runBase64ToImage(documentId: string, options: { mimeType?: string; maxInputBytes?: number; maxDecodedBytes?: number; maxPixels?: number } = {}): Promise<{ jobId: string }> {
+export function runBase64ToImage(documentId: string, options: { mimeType?: string; maxInputBytes?: number; maxDecodedBytes?: number; maxPixels?: number } = {}): Promise<StartedJob> {
   return runTool(documentId, 'encoding.base64-image', 'decode', options);
 }
 
-export function runCurlToCode(documentId: string, target: 'fetch' | 'python'): Promise<{ jobId: string }> {
+export function runCurlToCode(documentId: string, target: 'fetch' | 'python'): Promise<StartedJob> {
   return runTool(documentId, 'web.curl-code', target, {});
 }
 

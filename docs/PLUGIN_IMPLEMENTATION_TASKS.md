@@ -1,6 +1,6 @@
 # Plugin migration and worker packets
 
-Status: implementation queue, 2026-09-15. P00 (rendered interaction baseline), P01 (canonical plugin contract), and P02 (SDK and bundled discovery) are implemented and validated on the current base. The host integration, shared workbench UI, and runtime installation described below do **not** exist yet. P03 onward remain queued behind the documented dependencies.
+Status: implementation queue, 2026-09-16. P00 (rendered interaction baseline), P01 (canonical plugin contract), P02 (SDK and bundled discovery), and the first P03 host-dispatch slice are implemented and validated on the current base. P03 still needs full v2 port/event execution and P04/P05 state/view integration; runtime installation remains later.
 
 Read [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md) for ownership and [DEVUTILS_REQUIREMENTS.md](DEVUTILS_REQUIREMENTS.md) for the 27 reference requirement cards. This queue supersedes historical Tasks 24–31 in [WORKER_TASKS.md](../WORKER_TASKS.md). Completed historical work must be reused where it passes the acceptance cases.
 
@@ -54,6 +54,8 @@ Create trusted bundled package discovery under `plugins/`. Generate both fronten
 **Non-goals:** downloading/installing third-party code at runtime. Document rebuild requirements explicitly.
 
 ## P03 — Universal host execution and services
+
+**Current state:** the native host now owns an injected `PluginHost` registry. Existing v1 tools are registered through a compatibility executor adapter, `run_tool` resolves manifests and executors through that registry, and accepted jobs return a typed execution identity. The registry has duplicate-id, dispatch, deterministic ordering, and terminal-claim tests. This is deliberately an incremental seam: the generic scheduler still uses the legacy in-process executor signature while the v2 named-port service implementation is completed in the remaining P03 work.
 
 **Owner:** Sol/high. **Dependencies:** P01; integrate executor interfaces from P02. **Owns:** `apps/desktop/src-tauri/`, native bridge adapter, host service tests; coordinate generated type imports only.
 

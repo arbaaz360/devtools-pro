@@ -21,6 +21,9 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 
+mod plugin_host;
+use plugin_host::{ExecutionIdentity, LegacyExecutor, PluginHost};
+
 const PREVIEW_BYTES: usize = 64 * 1024;
 const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
 const MAX_IMPORTED_TEXT: usize = 36 * 1024 * 1024;
@@ -37,12 +40,24 @@ struct RegisteredDocument {
     origin_path: Option<PathBuf>,
 }
 
-#[derive(Default)]
 struct HostState {
     sequence: AtomicU64,
     documents: Mutex<HashMap<String, RegisteredDocument>>,
     jobs: Mutex<HashMap<String, CancellationToken>>,
     finished_jobs: Mutex<HashMap<String, JobFinished>>,
+    plugin_host: Mutex<PluginHost>,
+}
+
+impl Default for HostState {
+    fn default() -> Self {
+        Self {
+            sequence: AtomicU64::new(0),
+            documents: Mutex::new(HashMap::new()),
+            jobs: Mutex::new(HashMap::new()),
+            finished_jobs: Mutex::new(HashMap::new()),
+            plugin_host: Mutex::new(PluginHost::with_legacy(devtools_core::builtin_manifests(), execute_registered_tool)),
+        }
+    }
 }
 
 impl HostState {
@@ -344,7 +359,12 @@ struct JobFinished {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct StartedJob { job_id: String }
+struct StartedJob {
+    job_id: String,
+    /// The identity is returned at acceptance time so a future state reducer
+    /// can discard stale progress/results without guessing from a tool id.
+    identity: ExecutionIdentity,
+}
 
 fn parse_format(format: &str) -> Result<FileFormat, String> {
     match format {
@@ -353,11 +373,6 @@ fn parse_format(format: &str) -> Result<FileFormat, String> {
         "text" => Ok(FileFormat::Text),
         _ => Err("Unsupported input format.".into()),
     }
-}
-
-fn manifest_for_tool(tool_id: &str) -> Result<devtools_core::ToolManifest, devtools_core::ToolError> {
-    devtools_core::builtin_manifests().into_iter().find(|manifest| manifest.id == tool_id)
-        .ok_or_else(|| devtools_core::ToolError::UnknownTool { tool_id: tool_id.into() })
 }
 
 /// Generic tool entry point. The host resolves a capability-scoped document
@@ -375,7 +390,9 @@ fn run_tool(
     if !options.is_object() {
         return Err(devtools_core::ToolError::InvalidOptions { message: "options must be a JSON object".into() });
     }
-    let manifest = manifest_for_tool(&tool_id)?;
+    let (manifest, executor) = state.plugin_host.lock()
+        .map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })
+        .and_then(|host| Ok((host.manifest(&tool_id)?, host.executor(&tool_id)?)))?;
     let document = state.documents.lock().map_err(|error| devtools_core::ToolError::Execution { message: error.to_string() })?
         .get(&document_id).cloned()
         .ok_or_else(|| devtools_core::ToolError::Execution { message: "Document is no longer open.".into() })?;
@@ -399,7 +416,7 @@ fn run_tool(
     if tool_id == "text.compare" {
         return Err(ToolError::InvalidOptions { message: "text.compare requires two document handles; use run_compare".into() });
     }
-    start_generic_operation(document_id, tool_id, operation_id, options, manifest, app, state)
+    start_generic_operation(document_id, tool_id, operation_id, options, manifest, executor, app, state)
 }
 
 /// Execute one of the registered in-process tools while keeping cancellation,
@@ -410,6 +427,7 @@ fn start_generic_operation(
     operation_id: String,
     options: Value,
     manifest: ToolManifest,
+    executor: LegacyExecutor,
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<StartedJob, ToolError> {
@@ -449,7 +467,7 @@ fn start_generic_operation(
             } else {
                 let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
                 let input = read_bounded_document(&document.path, kind, manifest.limits.max_input_bytes, &token, &progress)?;
-                execute_registered_tool(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
+                executor(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
             }
         })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
         if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
@@ -480,7 +498,7 @@ fn start_generic_operation(
         if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
         let _ = app.emit_to("main", "job-finished", finished);
     });
-    Ok(StartedJob { job_id })
+    Ok(StartedJob { identity: ExecutionIdentity::new(tool_id, operation_id, job_id.clone()), job_id })
 }
 
 fn execute_registered_tool(
@@ -489,7 +507,7 @@ fn execute_registered_tool(
     input: &Document,
     options: &Value,
     token: &CancellationToken,
-    progress: &impl Fn(Progress),
+    progress: &dyn Fn(Progress),
 ) -> Result<devtools_core::ToolResult, ToolError> {
     if token.is_cancelled() { return Err(ToolError::Cancelled); }
     match tool_id {
@@ -670,7 +688,7 @@ fn run_compare(
         if let Ok(mut completed) = state.finished_jobs.lock() { completed.insert(worker_id.clone(), finished.clone()); while completed.len() > 32 { if let Some(oldest) = completed.keys().next().cloned() { completed.remove(&oldest); } else { break; } } }
         let _ = app.emit_to("main", "job-finished", finished);
     });
-    Ok(StartedJob { job_id })
+    Ok(StartedJob { identity: ExecutionIdentity::new("text.compare", "compare", job_id.clone()), job_id })
 }
 
 #[tauri::command]
@@ -715,6 +733,7 @@ fn start_operation_impl(
     }
     let state = state.inner().clone();
     let worker_id = job_id.clone();
+    let accepted_identity = ExecutionIdentity::new("structured.json", operation.clone(), job_id.clone());
     let worker_result_document_id = result_document_id.clone();
     let worker_result_path = result_path.clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -810,7 +829,7 @@ fn start_operation_impl(
         }
         let _ = app.emit_to("main", "job-finished", finished);
     });
-    Ok(StartedJob { job_id })
+    Ok(StartedJob { identity: accepted_identity, job_id })
 }
 
 #[tauri::command]
@@ -946,8 +965,8 @@ fn save_document(
 }
 
 #[tauri::command]
-fn list_tools() -> Vec<devtools_core::ToolManifest> {
-    devtools_core::builtin_manifests()
+fn list_tools(state: tauri::State<'_, Arc<HostState>>) -> Result<Vec<devtools_core::ToolManifest>, String> {
+    state.plugin_host.lock().map(|host| host.manifests()).map_err(|error| error.to_string())
 }
 
 fn main() {
