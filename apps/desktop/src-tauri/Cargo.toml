@@ -6,6 +6,9 @@ description = "Native workbench shell with bounded file previews and cancellable
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+devtools-plugin-discovery = { path = "../../../packages/plugin-discovery" }
+serde.workspace = true
+serde_json.workspace = true
 
 [dependencies]
 tauri = { version = "2", features = [] }

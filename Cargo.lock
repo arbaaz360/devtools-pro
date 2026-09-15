@@ -601,6 +601,7 @@ dependencies = [
  "base64 0.22.1",
  "devtools-core",
  "devtools-plugin-contract",
+ "devtools-plugin-discovery",
  "serde",
  "serde_json",
  "sha2",

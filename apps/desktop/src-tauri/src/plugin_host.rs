@@ -26,6 +26,23 @@ pub type LegacyExecutor = fn(
     progress: &dyn Fn(Progress),
 ) -> Result<ToolResult, ToolError>;
 
+/// Native plugin entry point used while the canonical processor runtime is
+/// being introduced. It is resolved by the same registry as legacy tools, so
+/// the scheduler does not need another tool-specific dispatch table.
+pub type NativeExecutor = fn(
+    operation_id: &str,
+    input: &Document,
+    options: &Value,
+    cancellation: &CancellationToken,
+    progress: &dyn Fn(Progress),
+) -> Result<ToolResult, ToolError>;
+
+#[derive(Clone, Copy)]
+pub enum RegisteredExecutor {
+    Legacy(LegacyExecutor),
+    Native(NativeExecutor),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ExecutionIdentity {
     pub plugin_id: String,
@@ -159,7 +176,7 @@ impl TerminalEventGuard {
 #[derive(Default)]
 pub struct PluginHost {
     manifests: HashMap<String, ToolManifest>,
-    executors: HashMap<String, LegacyExecutor>,
+    executors: HashMap<String, RegisteredExecutor>,
 }
 
 impl PluginHost {
@@ -175,8 +192,25 @@ impl PluginHost {
         if self.manifests.contains_key(&manifest.id) {
             return Err(ToolError::Execution { message: format!("duplicate registered tool id `{}`", manifest.id) });
         }
-        self.executors.insert(manifest.id.clone(), executor);
+        self.executors.insert(manifest.id.clone(), RegisteredExecutor::Legacy(executor));
         self.manifests.insert(manifest.id.clone(), manifest);
+        Ok(())
+    }
+
+    pub fn register_native(&mut self, manifest: ToolManifest, executor: NativeExecutor) -> Result<(), ToolError> {
+        if self.manifests.contains_key(&manifest.id) {
+            return Err(ToolError::Execution { message: format!("duplicate registered tool id `{}`", manifest.id) });
+        }
+        self.executors.insert(manifest.id.clone(), RegisteredExecutor::Native(executor));
+        self.manifests.insert(manifest.id.clone(), manifest);
+        Ok(())
+    }
+
+    pub fn replace_native(&mut self, tool_id: &str, executor: NativeExecutor) -> Result<(), ToolError> {
+        if !self.manifests.contains_key(tool_id) {
+            return Err(ToolError::UnknownTool { tool_id: tool_id.into() });
+        }
+        self.executors.insert(tool_id.into(), RegisteredExecutor::Native(executor));
         Ok(())
     }
 
@@ -184,7 +218,7 @@ impl PluginHost {
         self.manifests.get(tool_id).cloned().ok_or_else(|| ToolError::UnknownTool { tool_id: tool_id.into() })
     }
 
-    pub fn executor(&self, tool_id: &str) -> Result<LegacyExecutor, ToolError> {
+    pub fn executor(&self, tool_id: &str) -> Result<RegisteredExecutor, ToolError> {
         self.executors.get(tool_id).copied().ok_or_else(|| ToolError::UnknownTool { tool_id: tool_id.into() })
     }
 
@@ -197,8 +231,10 @@ impl PluginHost {
         cancellation: &CancellationToken,
         progress: &dyn Fn(Progress),
     ) -> Result<ToolResult, ToolError> {
-        let executor = self.executor(tool_id)?;
-        executor(tool_id, operation_id, input, options, cancellation, progress)
+        match self.executor(tool_id)? {
+            RegisteredExecutor::Legacy(executor) => executor(tool_id, operation_id, input, options, cancellation, progress),
+            RegisteredExecutor::Native(executor) => executor(operation_id, input, options, cancellation, progress),
+        }
     }
 
     pub fn manifests(&self) -> Vec<ToolManifest> {
@@ -228,10 +264,22 @@ mod tests {
         Ok(ToolResult { output: input.clone().with_kind(DocumentKind::Text), diagnostics: vec![] })
     }
 
+    fn native_executor(_: &str, input: &Document, _: &Value, _: &CancellationToken, _: &dyn Fn(Progress)) -> Result<ToolResult, ToolError> {
+        Ok(ToolResult { output: input.clone().with_kind(DocumentKind::Text), diagnostics: vec![] })
+    }
+
     #[test]
     fn registry_dispatches_without_scheduler_tool_branching() {
         let host = PluginHost::with_legacy([manifest("example.echo")], executor);
         let result = host.dispatch("example.echo", "run", &Document::from_text("ok"), &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "ok");
+    }
+
+    #[test]
+    fn native_executor_uses_the_same_registry_dispatch() {
+        let mut host = PluginHost::default();
+        host.register_native(manifest("example.native"), native_executor).unwrap();
+        let result = host.dispatch("example.native", "run", &Document::from_text("ok"), &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
         assert_eq!(result.output.as_text().unwrap(), "ok");
     }
 

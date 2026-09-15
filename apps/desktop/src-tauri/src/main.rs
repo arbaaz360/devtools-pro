@@ -9,6 +9,7 @@ use devtools_core::{
     compare_documents, inspect_file, transform_json_file,
 };
 use serde::Serialize;
+use serde::Deserialize;
 use serde_json::Value;
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use std::{
@@ -22,7 +23,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 mod plugin_host;
-use plugin_host::{ExecutionIdentity, LegacyExecutor, PluginHost};
+use plugin_host::{ExecutionIdentity, PluginHost, RegisteredExecutor};
 
 const PREVIEW_BYTES: usize = 64 * 1024;
 const MAX_EDITABLE_TEXT: u64 = 1024 * 1024;
@@ -46,16 +47,38 @@ struct HostState {
     jobs: Mutex<HashMap<String, CancellationToken>>,
     finished_jobs: Mutex<HashMap<String, JobFinished>>,
     plugin_host: Mutex<PluginHost>,
+    plugin_catalog: Vec<EmbeddedPlugin>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbeddedPlugin {
+    id: String,
+    version: String,
+    manifest: String,
+    processor: String,
+    frontend: Option<String>,
+    operation_ids: Vec<String>,
+}
+
+fn embedded_plugin_catalog() -> Vec<EmbeddedPlugin> {
+    serde_json::from_str(include_str!(concat!(env!("OUT_DIR"), "/plugin_catalog.json")))
+        .expect("embedded plugin catalog must be valid")
 }
 
 impl Default for HostState {
     fn default() -> Self {
+        let plugin_catalog = embedded_plugin_catalog();
+        assert!(plugin_catalog.iter().any(|plugin| plugin.id == "structured.json"), "JSON plugin must be present in generated catalog");
+        let mut plugin_host = PluginHost::with_legacy(devtools_core::builtin_manifests(), execute_registered_tool);
+        plugin_host.replace_native("structured.json", execute_json_native).expect("JSON plugin must be registered");
         Self {
             sequence: AtomicU64::new(0),
             documents: Mutex::new(HashMap::new()),
             jobs: Mutex::new(HashMap::new()),
             finished_jobs: Mutex::new(HashMap::new()),
-            plugin_host: Mutex::new(PluginHost::with_legacy(devtools_core::builtin_manifests(), execute_registered_tool)),
+            plugin_host: Mutex::new(plugin_host),
+            plugin_catalog,
         }
     }
 }
@@ -408,7 +431,7 @@ fn run_tool(
     let validation_kind = if let Some(kind) = structured_format { if kind == "json" { InputKind::Json } else { InputKind::Csv } }
         else if manifest.input_kinds.contains(&InputKind::Bytes) { InputKind::Bytes } else { InputKind::Text };
     manifest.supports(validation_kind, &operation_id)?;
-    if matches!(tool_id.as_str(), "structured.json" | "structured.csv" | "text.inspect") {
+    if matches!(tool_id.as_str(), "structured.csv" | "text.inspect") || (tool_id == "structured.json" && operation_id == "inspect") {
         let format_name = structured_format.unwrap_or("text");
         return start_operation_impl(document_id, operation_id, Some(format_name.into()), app, state)
             .map_err(|message| devtools_core::ToolError::Execution { message });
@@ -427,7 +450,7 @@ fn start_generic_operation(
     operation_id: String,
     options: Value,
     manifest: ToolManifest,
-    executor: LegacyExecutor,
+    executor: RegisteredExecutor,
     app: tauri::AppHandle,
     state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<StartedJob, ToolError> {
@@ -467,7 +490,10 @@ fn start_generic_operation(
             } else {
                 let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
                 let input = read_bounded_document(&document.path, kind, manifest.limits.max_input_bytes, &token, &progress)?;
-                executor(&worker_tool_id, &worker_operation, &input, &options, &token, &progress)
+                match executor {
+                    RegisteredExecutor::Legacy(executor) => executor(&worker_tool_id, &worker_operation, &input, &options, &token, &progress),
+                    RegisteredExecutor::Native(executor) => executor(&worker_operation, &input, &options, &token, &progress),
+                }
             }
         })).unwrap_or_else(|_| Err(ToolError::Execution { message: "The worker failed unexpectedly; the workbench is still available.".into() }));
         if let Ok(mut jobs) = state.jobs.lock() { jobs.remove(&worker_id); }
@@ -832,6 +858,28 @@ fn start_operation_impl(
     Ok(StartedJob { identity: accepted_identity, job_id })
 }
 
+/// First native plugin slice. JSON format/minify now resolves through the
+/// registry and the same generic job/result publication path as other tools.
+fn execute_json_native(
+    operation_id: &str,
+    input: &Document,
+    _options: &Value,
+    token: &CancellationToken,
+    progress: &dyn Fn(Progress),
+) -> Result<devtools_core::ToolResult, ToolError> {
+    if token.is_cancelled() { return Err(ToolError::Cancelled); }
+    let text = input.as_text().map_err(|_| ToolError::InvalidUtf8)?;
+    progress(Progress { bytes_processed: 0, total_bytes: input.len() as u64, phase: "parsing JSON".into() });
+    let value: Value = serde_json::from_str(text).map_err(|error| ToolError::Execution { message: error.to_string() })?;
+    let output = match operation_id {
+        "format" => serde_json::to_string_pretty(&value).map_err(|error| ToolError::Execution { message: error.to_string() })?,
+        "minify" => serde_json::to_string(&value).map_err(|error| ToolError::Execution { message: error.to_string() })?,
+        _ => return Err(ToolError::UnsupportedOperation { tool_id: "structured.json".into(), operation_id: operation_id.into() }),
+    };
+    progress(Progress { bytes_processed: input.len() as u64, total_bytes: input.len() as u64, phase: "complete".into() });
+    Ok(devtools_core::ToolResult { output: Document::from_text(output).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
+}
+
 #[tauri::command]
 fn cancel_operation(job_id: String, state: tauri::State<'_, Arc<HostState>>) -> Result<(), String> {
     if let Some(token) = state.jobs.lock().map_err(|e| e.to_string())?.get(&job_id) { token.cancel(); }
@@ -969,12 +1017,19 @@ fn list_tools(state: tauri::State<'_, Arc<HostState>>) -> Result<Vec<devtools_co
     state.plugin_host.lock().map(|host| host.manifests()).map_err(|error| error.to_string())
 }
 
+/// Return the generated v2 catalog embedded during the desktop build. The
+/// frontend migration can consume this catalog without rescanning the disk.
+#[tauri::command]
+fn list_plugin_catalog(state: tauri::State<'_, Arc<HostState>>) -> Vec<EmbeddedPlugin> {
+    state.plugin_catalog.clone()
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
-            open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, save_document, list_tools
+            open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, save_document, list_tools, list_plugin_catalog
         ])
         .on_window_event(|window, event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
@@ -1113,6 +1168,16 @@ mod tests {
         let error = read_bounded_document(&path, DocumentKind::Text, Some(8), &CancellationToken::default(), &|_| {}).unwrap_err();
         assert!(matches!(error, ToolError::ResourceLimit { .. }));
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn json_vertical_slice_uses_embedded_catalog_and_native_registry_executor() {
+        let catalog = embedded_plugin_catalog();
+        let json = catalog.iter().find(|plugin| plugin.id == "structured.json").expect("generated catalog contains JSON");
+        assert!(json.operation_ids.iter().any(|operation| operation == "format"));
+        let input = Document::from_text(r#"{"b":2,"a":1}"#).with_kind(DocumentKind::Text);
+        let result = execute_json_native("format", &input, &Value::Object(Default::default()), &CancellationToken::default(), &|_| {}).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "{\n  \"a\": 1,\n  \"b\": 2\n}");
     }
 
     #[test]

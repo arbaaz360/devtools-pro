@@ -1,0 +1,39 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "structured.json",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "tools": [{ "id": "structured.json", "title": "JSON", "category": "structured", "operationIds": ["format", "minify", "inspect"], "workspaceId": "json" }],
+  "operations": [
+    {
+      "id": "format",
+      "title": "Format",
+      "executor": { "kind": "javascriptWorker", "id": "structured.json.processor", "version": "0.1.0", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "kind": "artifact", "multiplicity": "one", "representations": ["text"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [], "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "67108864", "maxOutputBytes": "67108864", "maxChunkBytes": "1048576", "deadlineMs": "5000" }
+    },
+    {
+      "id": "minify",
+      "title": "Minify",
+      "executor": { "kind": "javascriptWorker", "id": "structured.json.processor", "version": "0.1.0", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "kind": "artifact", "multiplicity": "one", "representations": ["text"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [], "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "67108864", "maxOutputBytes": "67108864", "maxChunkBytes": "1048576", "deadlineMs": "5000" }
+    },
+    {
+      "id": "inspect",
+      "title": "Validate",
+      "executor": { "kind": "javascriptWorker", "id": "structured.json.processor", "version": "0.1.0", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "kind": "value", "multiplicity": "one", "representations": ["properties"], "sensitive": false, "exports": ["copyText"] }],
+      "options": [], "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "67108864", "maxOutputBytes": "1048576", "maxChunkBytes": "1048576", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{ "id": "json", "kind": "transform", "bindings": [{ "id": "input", "component": "editor", "inputPort": "input" }, { "id": "output", "component": "output", "outputPort": "output" }], "commands": [], "presentationSettings": [] }],
+  "capabilities": [], "settings": [], "tests": { "requirementIds": ["DU-02"], "fixtures": [], "uiScenarios": ["format", "minify", "validate"] }
+}
