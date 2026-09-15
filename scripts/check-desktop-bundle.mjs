@@ -66,6 +66,7 @@ if (cssAssets.length === 0) {
 
 const css = cssAssets.map((path) => readFileSync(path, 'utf8')).join('\n');
 const requiredLayout = [
+  ['[hidden]', [['display', 'none!important']]],
   ['.app-shell', [['display', 'flex'], ['flex-direction', 'column']]],
   ['.app-body', [['display', 'flex'], ['flex', '1']]],
   ['.sidebar', [['display', 'flex'], ['flex-direction', 'column']]],
