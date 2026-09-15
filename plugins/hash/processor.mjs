@@ -36,6 +36,7 @@ export async function execute(request, context) {
       algorithm: label,
       digest,
       case: presentationCase,
+      source: "input",
       inputBytes,
       encoding: "hex",
       complete: true

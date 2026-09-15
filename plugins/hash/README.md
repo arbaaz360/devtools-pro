@@ -1,6 +1,6 @@
 # Hash Generator
 
-`encoding.hash` streams the named `input` document through six compatible digest algorithms and emits all results together: MD5, SHA-1, SHA-224, SHA-256, SHA-384 and SHA-512. Each output has a copyable hexadecimal text representation and a properties value containing the algorithm, digest, presentation case, input byte count, encoding and `complete: true`.
+`encoding.hash` streams the named `input` document through six compatible digest algorithms and emits all results together: MD5, SHA-1, SHA-224, SHA-256, SHA-384 and SHA-512. Each output has a copyable hexadecimal text representation and a properties value containing the algorithm, digest, source port, presentation case, input byte count, encoding and `complete: true`.
 
 The `case` option only changes hexadecimal presentation (`lower` by default or `upper`); it never reruns or changes the input bytes. Input is consumed with the plugin SDK `ProcessorContext.readChunks` API, so host range readers can keep memory bounded. The SDK limit and cooperative cancellation checks are honored while reading.
 
