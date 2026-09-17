@@ -18,11 +18,11 @@ This record captures the first acceptance pass against the rebuilt Windows Tauri
 5. **Base64 to Image** — copying the complete Base64 result and using the decoder's Clipboard action automatically imports and decodes it. The result pane displays the image preview and reports success.
 6. **Per-tab state** — switching between the JSON, image encoder, and image decoder tabs preserves each tab's selected tool and result.
 7. **Invalid JSON** — malformed input reports a precise line/column error, leaves the output empty, and does not show a false success state.
+8. **Diff and Compare shell** — selecting the tool creates the left/right comparison workspace, runs the native comparison automatically with a blank revised side, and renders a structured hunk in the result pane.
 
 ## Remaining acceptance work
 
 - Native drag/drop, save dialogs and overwrite/collision behavior still need a dedicated pass.
-- Diff/compare needs a native two-document interaction pass.
+- Diff/compare still needs a native two-document open/compare pass, including the revised-side editor and save behavior.
 - Large-file limits, cancellation, and progress behavior need a timed pass with the benchmark fixtures.
 - Visual flicker should be checked during those interactions with a screen recording; this pass confirms final layout/state but is not a frame-by-frame performance measurement.
-
