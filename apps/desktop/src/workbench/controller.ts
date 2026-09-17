@@ -124,6 +124,8 @@ async function readDataUrl(file: File): Promise<string> {
   return `data:${file.type || "image/png"};base64,${base64}`;
 }
 
+export const IMAGE_IMPORT_LIMIT = 25 * 1024 * 1024;
+
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
 export class WorkbenchController {
   private api: WorkbenchApi;
@@ -351,11 +353,6 @@ export class WorkbenchController {
         return;
       }
       opened = await this.api.openDocument(path);
-      if (opened.contentKind !== "text" && opened.contentKind !== "image") {
-        throw new Error(
-          "Unsupported file: only text, structured data, and images are supported.",
-        );
-      }
       const existingCanonical = this.state.tabs.find(
         (tab) =>
           tab.source?.path === opened!.path || tab.savedPath === opened!.path,
@@ -365,11 +362,27 @@ export class WorkbenchController {
         this.activate(existingCanonical.id);
         return;
       }
+      const defaultToolId =
+        opened.contentKind === "binary" ? "encoding.hash" : defaultTool(opened);
+      const toolId = toolOverride ?? defaultToolId;
+      const tool = this.toolDefinition(toolId);
+      if (!tool) {
+        throw new Error(`Tool "${toolId}" is not available in the current engine.`);
+      }
+      if (tool.input === "image" && opened.contentKind !== "image") {
+        throw new Error(
+          `${tool.label} requires a PNG or JPEG image. Open an image or choose another tool.`,
+        );
+      }
+      if (tool.input === "text" && opened.contentKind !== "text") {
+        throw new Error(
+          `${tool.label} requires a text document. Open a text file or choose another tool.`,
+        );
+      }
       const text = await this.readEditable(opened);
       if (this.state.tabs.length >= MAX_TABS)
         throw new Error("The tab limit was reached while opening this file.");
       const tab = makeTab(`tab-${++this.nextId}`, opened.name, opened, text);
-      const tool = this.toolDefinition(toolOverride ?? defaultTool(opened))!;
       this.dispatch({
         type: "add",
         tab: {
@@ -394,22 +407,33 @@ export class WorkbenchController {
       if (this.state.tabs.length >= MAX_TABS) {
         throw new Error("Close a tab before opening another (16-tab limit).");
       }
-      const existing = this.state.tabs.find(
-        (t) => t.name === file.name || t.source?.name === file.name,
-      );
-      if (existing) {
-        this.activate(existing.id);
-        return;
+      // Reliable identity check: if a real filesystem path is available, deduplicate by path.
+      // Do NOT deduplicate by filename alone, so two distinct files with the same name
+      // can each be opened in their own tabs.
+      const filePath = (file as unknown as { path?: string }).path;
+      if (filePath && typeof filePath === "string") {
+        const existing = this.state.tabs.find(
+          (t) => t.source?.path === filePath || t.savedPath === filePath,
+        );
+        if (existing) {
+          this.activate(existing.id);
+          return;
+        }
       }
       const isImage =
         file.type.startsWith("image/") ||
         /\.(png|jpe?g|gif|webp)$/i.test(file.name);
       if (isImage) {
+        if (file.size > IMAGE_IMPORT_LIMIT) {
+          throw new Error(
+            `Image exceeds the ${Math.round(IMAGE_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
+          );
+        }
         const dataUrl = await readDataUrl(file);
         const doc: FileDocument = {
           id: `browser-doc-${++this.nextId}`,
           name: file.name,
-          path: file.name,
+          path: filePath || file.name,
           size: file.size,
           preview: "",
           truncated: false,
@@ -423,6 +447,9 @@ export class WorkbenchController {
         const tool = this.toolDefinition(
           toolOverride ?? "encoding.image-base64",
         )!;
+        if (tool.input === "text") {
+          throw new Error(`${tool.label} requires a text document.`);
+        }
         this.dispatch({
           type: "add",
           tab: {
@@ -449,49 +476,89 @@ export class WorkbenchController {
           file.name,
         ) ||
         !file.type;
-      if (!isText) {
-        throw new Error(
-          "Unsupported file: only text, structured data, and images are supported.",
+      if (isText) {
+        if (file.size > TEXT_IMPORT_LIMIT) {
+          throw new Error(
+            `File exceeds the ${Math.round(TEXT_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
+          );
+        }
+        const text = await file.text();
+        const isJson =
+          file.type === "application/json" || /\.json$/i.test(file.name);
+        const isCsv = file.type === "text/csv" || /\.csv$/i.test(file.name);
+        const doc: FileDocument = {
+          id: `browser-doc-${++this.nextId}`,
+          name: file.name,
+          path: filePath || file.name,
+          size: file.size,
+          preview: text.slice(0, EDIT_LIMIT),
+          truncated: file.size > EDIT_LIMIT,
+          format: isJson ? "json" : isCsv ? "csv" : "text",
+          encoding: "UTF-8",
+          contentKind: "text",
+          mime: isJson
+            ? "application/json"
+            : isCsv
+              ? "text/csv"
+              : "text/plain",
+          editable: file.size <= EDIT_LIMIT,
+        };
+        const tab = makeTab(
+          `tab-${++this.nextId}`,
+          file.name,
+          doc,
+          file.size <= EDIT_LIMIT ? text : null,
         );
+        const detectedTool = isJson
+          ? "structured.json"
+          : isCsv
+            ? "structured.csv"
+            : editor.id;
+        const tool = this.toolDefinition(toolOverride ?? detectedTool)!;
+        if (tool.input === "image") {
+          throw new Error(`${tool.label} requires a PNG or JPEG image.`);
+        }
+        this.dispatch({
+          type: "add",
+          tab: {
+            ...tab,
+            toolId: tool.id,
+            operation: tool.defaultOperation,
+            options: tool.defaultOptions,
+          },
+        });
+        if (file.size <= EDIT_LIMIT) {
+          this.schedule(tab.id, 0);
+        }
+        return;
       }
+      // Binary file (e.g. .bin)
       if (file.size > TEXT_IMPORT_LIMIT) {
         throw new Error(
           `File exceeds the ${Math.round(TEXT_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
         );
       }
-      const text = await file.text();
-      const isJson =
-        file.type === "application/json" || /\.json$/i.test(file.name);
-      const isCsv = file.type === "text/csv" || /\.csv$/i.test(file.name);
       const doc: FileDocument = {
         id: `browser-doc-${++this.nextId}`,
         name: file.name,
-        path: file.name,
+        path: filePath || file.name,
         size: file.size,
-        preview: text.slice(0, EDIT_LIMIT),
-        truncated: file.size > EDIT_LIMIT,
-        format: isJson ? "json" : isCsv ? "csv" : "text",
-        encoding: "UTF-8",
-        contentKind: "text",
-        mime: isJson
-          ? "application/json"
-          : isCsv
-            ? "text/csv"
-            : "text/plain",
-        editable: file.size <= EDIT_LIMIT,
+        preview: "",
+        truncated: false,
+        format: "text",
+        encoding: "Binary",
+        contentKind: "binary",
+        mime: file.type || "application/octet-stream",
+        editable: false,
       };
-      const tab = makeTab(
-        `tab-${++this.nextId}`,
-        file.name,
-        doc,
-        file.size <= EDIT_LIMIT ? text : null,
-      );
-      const detectedTool = isJson
-        ? "structured.json"
-        : isCsv
-          ? "structured.csv"
-          : editor.id;
-      const tool = this.toolDefinition(toolOverride ?? detectedTool)!;
+      const tab = makeTab(`tab-${++this.nextId}`, file.name, doc, null);
+      const tool = this.toolDefinition(toolOverride ?? "encoding.hash")!;
+      if (tool.input === "text") {
+        throw new Error(`${tool.label} requires a text document.`);
+      }
+      if (tool.input === "image") {
+        throw new Error(`${tool.label} requires a PNG or JPEG image.`);
+      }
       this.dispatch({
         type: "add",
         tab: {
@@ -501,9 +568,7 @@ export class WorkbenchController {
           options: tool.defaultOptions,
         },
       });
-      if (file.size <= EDIT_LIMIT) {
-        this.schedule(tab.id, 0);
-      }
+      this.schedule(tab.id, 0);
     } catch (error) {
       this.hooks.notify(errorText(error));
     }
