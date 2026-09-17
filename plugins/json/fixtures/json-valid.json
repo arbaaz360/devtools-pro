@@ -1,0 +1,215 @@
+[
+  {
+    "name": "empty object",
+    "input": "{}",
+    "formatted": "{}",
+    "minified": "{}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "counts": { "objects": 1, "arrays": 0, "members": 0, "elements": 0, "strings": 0, "numbers": 0, "booleans": 0, "nulls": 0 },
+    "oracle": true
+  },
+  {
+    "name": "empty array",
+    "input": "[]",
+    "formatted": "[]",
+    "minified": "[]",
+    "topLevel": "array",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "nested empty containers stay inline",
+    "input": "{\"a\":{},\"b\":[]}",
+    "formatted": "{\n  \"a\": {},\n  \"b\": []\n}",
+    "minified": "{\"a\":{},\"b\":[]}",
+    "topLevel": "object",
+    "maxDepth": 2,
+    "counts": { "objects": 2, "arrays": 1, "members": 2, "elements": 0, "strings": 0, "numbers": 0, "booleans": 0, "nulls": 0 },
+    "oracle": true
+  },
+  {
+    "name": "flat object",
+    "input": "{\"a\":1,\"b\":\"x\"}",
+    "formatted": "{\n  \"a\": 1,\n  \"b\": \"x\"\n}",
+    "minified": "{\"a\":1,\"b\":\"x\"}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "array of every scalar kind",
+    "input": "[1,\"two\",true,false,null]",
+    "formatted": "[\n  1,\n  \"two\",\n  true,\n  false,\n  null\n]",
+    "minified": "[1,\"two\",true,false,null]",
+    "topLevel": "array",
+    "maxDepth": 1,
+    "counts": { "objects": 0, "arrays": 1, "members": 0, "elements": 5, "strings": 1, "numbers": 1, "booleans": 2, "nulls": 1 },
+    "oracle": true
+  },
+  {
+    "name": "mixed nesting",
+    "input": "{\"a\":[1,{\"b\":[2,3]}]}",
+    "formatted": "{\n  \"a\": [\n    1,\n    {\n      \"b\": [\n        2,\n        3\n      ]\n    }\n  ]\n}",
+    "minified": "{\"a\":[1,{\"b\":[2,3]}]}",
+    "topLevel": "object",
+    "maxDepth": 4,
+    "counts": { "objects": 2, "arrays": 2, "members": 2, "elements": 4, "strings": 0, "numbers": 3, "booleans": 0, "nulls": 0 },
+    "oracle": true
+  },
+  {
+    "name": "insignificant whitespace of every kind is dropped",
+    "input": " \t\r\n{ \"a\" : [ 1 , 2 ] , \"b\" : { } } \n",
+    "formatted": "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": {}\n}",
+    "minified": "{\"a\":[1,2],\"b\":{}}",
+    "topLevel": "object",
+    "maxDepth": 2,
+    "oracle": true
+  },
+  {
+    "name": "CRLF newlines in source",
+    "input": "{\r\n  \"a\": 1\r\n}\r\n",
+    "formatted": "{\n  \"a\": 1\n}",
+    "minified": "{\"a\":1}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "top-level string",
+    "input": "\"hello\"",
+    "formatted": "\"hello\"",
+    "minified": "\"hello\"",
+    "topLevel": "string",
+    "maxDepth": 0,
+    "counts": { "objects": 0, "arrays": 0, "members": 0, "elements": 0, "strings": 1, "numbers": 0, "booleans": 0, "nulls": 0 },
+    "oracle": true
+  },
+  {
+    "name": "top-level number with surrounding whitespace",
+    "input": " 42 ",
+    "formatted": "42",
+    "minified": "42",
+    "topLevel": "number",
+    "maxDepth": 0,
+    "oracle": true
+  },
+  {
+    "name": "top-level true",
+    "input": "true",
+    "formatted": "true",
+    "minified": "true",
+    "topLevel": "boolean",
+    "maxDepth": 0,
+    "oracle": true
+  },
+  {
+    "name": "top-level null",
+    "input": "null",
+    "formatted": "null",
+    "minified": "null",
+    "topLevel": "null",
+    "maxDepth": 0,
+    "oracle": true
+  },
+  {
+    "name": "empty member name",
+    "input": "{\"\":1}",
+    "formatted": "{\n  \"\": 1\n}",
+    "minified": "{\"\":1}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "raw multibyte Unicode is copied byte for byte",
+    "input": "{\"ключ\":\"значение\",\"日本\":\"語\",\"emoji\":\"😀\"}",
+    "formatted": "{\n  \"ключ\": \"значение\",\n  \"日本\": \"語\",\n  \"emoji\": \"😀\"\n}",
+    "minified": "{\"ключ\":\"значение\",\"日本\":\"語\",\"emoji\":\"😀\"}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "Unicode escapes keep their spelling and hex case",
+    "input": "[\"\\u00e9\",\"\\u00E9\",\"\\uD83D\\uDE00\",\"\\u0000\"]",
+    "formatted": "[\n  \"\\u00e9\",\n  \"\\u00E9\",\n  \"\\uD83D\\uDE00\",\n  \"\\u0000\"\n]",
+    "minified": "[\"\\u00e9\",\"\\u00E9\",\"\\uD83D\\uDE00\",\"\\u0000\"]",
+    "topLevel": "array",
+    "maxDepth": 1,
+    "oracle": false
+  },
+  {
+    "name": "every two-character escape is preserved including solidus",
+    "input": "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"",
+    "formatted": "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"",
+    "minified": "\"\\\"\\\\\\/\\b\\f\\n\\r\\t\"",
+    "topLevel": "string",
+    "maxDepth": 0,
+    "oracle": false
+  },
+  {
+    "name": "escaped quote inside a member name",
+    "input": "{\"a\\\"b\":1}",
+    "formatted": "{\n  \"a\\\"b\": 1\n}",
+    "minified": "{\"a\\\"b\":1}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "DEL (U+007F) may appear unescaped in a string",
+    "inputHex": "5b 22 61 7f 62 22 5d",
+    "formatted": "[\n  \"a\u007fb\"\n]",
+    "minified": "[\"a\u007fb\"]",
+    "topLevel": "array",
+    "maxDepth": 1,
+    "oracle": true
+  },
+  {
+    "name": "lone surrogate escape is syntactically valid and preserved",
+    "input": "\"\\uDC00\"",
+    "formatted": "\"\\uDC00\"",
+    "minified": "\"\\uDC00\"",
+    "topLevel": "string",
+    "maxDepth": 0,
+    "oracle": false
+  },
+  {
+    "name": "deep array nesting",
+    "input": "[[[[[]]]]]",
+    "formatted": "[\n  [\n    [\n      [\n        []\n      ]\n    ]\n  ]\n]",
+    "minified": "[[[[[]]]]]",
+    "topLevel": "array",
+    "maxDepth": 5,
+    "oracle": true
+  },
+  {
+    "name": "numbers of every lexical shape in an array",
+    "input": "[0,-0,1.5,1e10,1E-2,-1.0e+3]",
+    "formatted": "[\n  0,\n  -0,\n  1.5,\n  1e10,\n  1E-2,\n  -1.0e+3\n]",
+    "minified": "[0,-0,1.5,1e10,1E-2,-1.0e+3]",
+    "topLevel": "array",
+    "maxDepth": 1,
+    "oracle": false
+  },
+  {
+    "name": "UTF-8 BOM is stripped and reported",
+    "inputHex": "ef bb bf 7b 22 61 22 3a 31 7d",
+    "formatted": "{\n  \"a\": 1\n}",
+    "minified": "{\"a\":1}",
+    "topLevel": "object",
+    "maxDepth": 1,
+    "bom": true,
+    "oracle": true
+  },
+  {
+    "name": "already formatted input is a fixed point",
+    "input": "{\n  \"a\": [\n    1,\n    2\n  ]\n}",
+    "formatted": "{\n  \"a\": [\n    1,\n    2\n  ]\n}",
+    "minified": "{\"a\":[1,2]}",
+    "topLevel": "object",
+    "maxDepth": 2,
+    "oracle": true
+  }
+]
