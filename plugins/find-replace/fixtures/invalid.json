@@ -1,0 +1,19 @@
+[
+  { "name": "mode outside the enum", "input": "abc", "options": { "query": "a", "mode": "regex" }, "code": "find.invalid-option", "message": "mode must be one of find, replace, replaceAll" },
+  { "name": "mode of the wrong type", "input": "abc", "options": { "query": "a", "mode": 1 }, "code": "find.invalid-option", "message": "mode must be one of" },
+  { "name": "query of the wrong type", "input": "abc", "options": { "query": 42 }, "code": "find.invalid-option", "message": "query must be a string" },
+  { "name": "null query is not a default", "input": "abc", "options": { "query": null }, "code": "find.invalid-option", "message": "query must be a string" },
+  { "name": "replacement of the wrong type", "input": "abc", "options": { "query": "a", "replacement": {} }, "code": "find.invalid-option", "message": "replacement must be a string" },
+  { "name": "caseSensitive must be boolean", "input": "abc", "options": { "query": "a", "caseSensitive": "yes" }, "code": "find.invalid-option", "message": "caseSensitive must be a boolean" },
+  { "name": "wholeWord must be boolean", "input": "abc", "options": { "query": "a", "wholeWord": 1 }, "code": "find.invalid-option", "message": "wholeWord must be a boolean" },
+  { "name": "kebab-case id must be boolean too", "input": "abc", "options": { "query": "a", "whole-word": "yes" }, "code": "find.invalid-option", "message": "whole-word must be a boolean" },
+  { "name": "conflicting spellings of one option are rejected", "input": "abc", "options": { "query": "a", "case-sensitive": true, "caseSensitive": false }, "code": "find.invalid-option", "message": "case-sensitive and caseSensitive disagree" },
+  { "name": "unknown option is rejected", "input": "abc", "options": { "query": "a", "regex": true }, "code": "find.invalid-option", "message": "unknown option regex" },
+  { "name": "query with a lone high surrogate", "input": "abc", "options": { "query": "\ud800" }, "code": "find.invalid-option", "message": "query must be well-formed Unicode" },
+  { "name": "replacement with a lone low surrogate", "input": "abc", "options": { "query": "a", "replacement": "\udc00" }, "code": "find.invalid-option", "message": "replacement must be well-formed Unicode" },
+  { "name": "options must be an object", "input": "abc", "options": [], "code": "find.invalid-option", "message": "options must be an object" },
+  { "name": "input is not UTF-8", "inputBytes": [255, 254, 253], "options": { "query": "a" }, "code": "find.invalid-utf8", "message": "not valid UTF-8" },
+  { "name": "overlong UTF-8 encoding is rejected", "inputBytes": [192, 128], "options": { "query": "a" }, "code": "find.invalid-utf8", "message": "not valid UTF-8" },
+  { "name": "UTF-8 encoded surrogate is rejected", "inputBytes": [237, 160, 128], "options": { "query": "a" }, "code": "find.invalid-utf8", "message": "not valid UTF-8" },
+  { "name": "truncated multibyte sequence is rejected", "inputBytes": [99, 97, 102, 195], "options": { "query": "caf" }, "code": "find.invalid-utf8", "message": "not valid UTF-8" }
+]
