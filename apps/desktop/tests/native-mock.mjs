@@ -102,6 +102,7 @@ class NativeMock {
         limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: {}, operations: [], renderer: 'text',
       }));
       case 'run_tool': return this.run(args);
+      case 'run_compare': return this.compare(args);
       case 'job_status': return this.jobs.get(args.jobId)?.event ?? null;
       case 'cancel_operation': {
         const job = this.jobs.get(args.jobId);
@@ -145,6 +146,80 @@ class NativeMock {
           output = this.document('result.txt', Buffer.from(encodeURIComponent(doc.bytes.toString('utf8'))));
         } else throw new Error(`Unmocked tool ${args.toolId}`);
         if (output) { event.resultDocumentId = output.id; event.outputBytes = output.size; }
+      } catch (error) { event.ok = false; event.error = error.message; }
+      job.event = event;
+      await this.emit('job-finished', event);
+    }, delay);
+    this.timers.add(job.timer);
+    return { jobId };
+  }
+  /** Same shape as crates/devtools-core/src/compare.rs: inclusive line split,
+   * LCS ops, 3 context lines per hunk, and the executor's summary string. */
+  compare(args) {
+    const left = this.documents.get(args.leftDocumentId);
+    const right = this.documents.get(args.rightDocumentId);
+    if (!left || !right) throw new Error('Mock: missing compare input');
+    const jobId = `job-${++this.next}`;
+    const job = {};
+    this.jobs.set(jobId, job);
+    const delay = this.delay;
+    job.timer = setTimeout(async () => {
+      this.timers.delete(job.timer);
+      const event = { jobId, ok: true, cancelled: false, inputBytes: left.bytes.length + right.bytes.length, elapsedMs: delay,
+        operationId: 'compare', sourceDocumentId: left.id, summary: null, renderer: 'diff' };
+      try {
+        const mode = args.options?.newline ?? 'preserve';
+        const normalize = (text) => {
+          if (mode === 'preserve') return text;
+          const lf = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          return mode === 'cr_lf' ? lf.replace(/\n/g, '\r\n') : lf;
+        };
+        const rawLeft = left.bytes.toString('utf8');
+        const rawRight = right.bytes.toString('utf8');
+        const leftText = normalize(rawLeft);
+        const rightText = normalize(rawRight);
+        const split = (text) => (text ? text.split(/(?<=\n)/) : []);
+        const a = split(leftText);
+        const b = split(rightText);
+        const dp = Array.from({ length: a.length + 1 }, () => new Uint32Array(b.length + 1));
+        for (let i = a.length - 1; i >= 0; i--)
+          for (let j = b.length - 1; j >= 0; j--)
+            dp[i][j] = a[i] === b[j] ? 1 + dp[i + 1][j + 1] : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        const ops = [];
+        for (let i = 0, j = 0; i < a.length || j < b.length;) {
+          if (i < a.length && j < b.length && a[i] === b[j]) { ops.push(['context', a[i]]); i++; j++; }
+          else if (j < b.length && (i === a.length || dp[i][j + 1] >= dp[i + 1][j])) { ops.push(['added', b[j]]); j++; }
+          else { ops.push(['removed', a[i]]); i++; }
+        }
+        const context = 3;
+        const merged = [];
+        ops.forEach(([kind], index) => {
+          if (kind === 'context') return;
+          const start = Math.max(0, index - context);
+          const end = Math.min(ops.length, index + context + 1);
+          const last = merged[merged.length - 1];
+          if (last && start <= last[1]) last[1] = Math.max(last[1], end); else merged.push([start, end]);
+        });
+        let added = 0, removed = 0;
+        const hunks = merged.map(([start, end]) => {
+          let beforeOld = 0, beforeNew = 0;
+          for (const [kind] of ops.slice(0, start)) { if (kind !== 'added') beforeOld++; if (kind !== 'removed') beforeNew++; }
+          let ho = beforeOld + 1, hn = beforeNew + 1;
+          const lines = ops.slice(start, end).map(([kind, text]) => {
+            if (kind === 'context') return { kind, text, oldLine: ho++, newLine: hn++ };
+            if (kind === 'added') { added++; return { kind, text, oldLine: null, newLine: hn++ }; }
+            removed++; return { kind, text, oldLine: ho++, newLine: null };
+          });
+          return { oldStart: beforeOld + 1, oldLines: ho - beforeOld - 1, newStart: beforeNew + 1, newLines: hn - beforeNew - 1, lines };
+        });
+        const canonical = (text) => text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const summary = { identical: leftText === rightText, newlineOnly: leftText !== rightText && canonical(rawLeft) === canonical(rawRight),
+          leftBytes: left.bytes.length, rightBytes: right.bytes.length, leftLines: a.length, rightLines: b.length,
+          addedLines: added, removedLines: removed, changedHunks: hunks.length };
+        const result = { summary, hunks, provenance: { operation: 'text.compare', leftEncoding: 'auto', rightEncoding: 'auto', newline: mode } };
+        const output = this.document('result.diff.json', Buffer.from(JSON.stringify(result, null, 2)), 'json', 'application/json');
+        event.summary = JSON.stringify(summary);
+        event.resultDocumentId = output.id; event.outputBytes = output.size; event.resultMime = 'application/json';
       } catch (error) { event.ok = false; event.error = error.message; }
       job.event = event;
       await this.emit('job-finished', event);
