@@ -19,3 +19,16 @@ pnpm --dir apps/desktop tauri build --debug --no-bundle
 ```
 
 The Cargo workspace executable is produced at `target/debug/devtools-desktop.exe` on Windows. For an iterative native preview, run `pnpm tauri dev` from `apps/desktop`.
+
+## Performance baseline
+
+The streaming benchmark is not part of the gate; it is run by hand when the core changes and its committed result lives in [benchmarks/baseline.md](../benchmarks/baseline.md). It needs no network access and uses the same fixture generator as the gate, so a clean checkout can run it after the gate's own prerequisites are installed:
+
+```powershell
+pwsh -NoProfile -File benchmarks/generate-corpus.ps1 -CsvMiB 50
+cargo build --release -p devtools-cli
+pwsh -NoProfile -File benchmarks/run-streaming.ps1 -Runs 5 -Warmups 1 -IncludeTransform
+pwsh -NoProfile -File benchmarks/validate-results.ps1
+```
+
+The harness fails instead of reporting when the CLI stops matching its documented output contract (summary keys, exit codes, JSON error codes), when a fixture's SHA-256 differs from `benchmarks/fixtures/manifest.json`, or when a cancelled transform leaves an output or `.partial-` file behind. Generated fixtures and reports stay ignored by git. Refresh `benchmarks/baseline.md` from the Markdown summary the run writes, and keep its caveats: warm cache, polled memory, startup-inclusive cancellation overshoot, and core-only scope. See [benchmarks/README.md](../benchmarks/README.md) for the cases, contract and report schema.
