@@ -40,7 +40,6 @@ for (const value of inputValues) {
     supplied.set(nextPort, value);
   }
 }
-for (const port of inputPorts) if (!supplied.has(port)) supplied.set(port, "");
 for (const [port, value] of supplied) reader.insert(port, value);
 const outputs = new MemoryOutputSink();
 const cancellation = new CancellationToken();
