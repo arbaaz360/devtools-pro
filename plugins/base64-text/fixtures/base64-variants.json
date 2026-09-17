@@ -1,0 +1,23 @@
+{
+  "alphabets": [
+    {"name": "bytes-fb-ff", "bytes": [251, 255], "standard": "+/8=", "url": "-_8=", "standardOmit": "+/8", "urlOmit": "-_8"},
+    {"name": "bytes-3e-3f-fc", "bytes": [62, 63, 252], "standard": "Pj/8", "url": "Pj_8", "standardOmit": "Pj/8", "urlOmit": "Pj_8"},
+    {"name": "bytes-fb-ef-be", "bytes": [251, 239, 190], "standard": "++++", "url": "----", "standardOmit": "++++", "urlOmit": "----"},
+    {"name": "bytes-ff-ff-ff", "bytes": [255, 255, 255], "standard": "////", "url": "____", "standardOmit": "////", "urlOmit": "____"}
+  ],
+  "paddingPolicies": [
+    {"name": "padded-one", "input": "SGVsbG8=", "text": "Hello", "required": "ok", "optional": "ok", "omit": "padding-forbidden"},
+    {"name": "unpadded-one", "input": "SGVsbG8", "text": "Hello", "required": "padding-missing", "optional": "ok", "omit": "ok"},
+    {"name": "padded-two", "input": "SGVsbA==", "text": "Hell", "required": "ok", "optional": "ok", "omit": "padding-forbidden"},
+    {"name": "unpadded-two", "input": "SGVsbA", "text": "Hell", "required": "padding-missing", "optional": "ok", "omit": "ok"},
+    {"name": "complete-group", "input": "SGVsbG8h", "text": "Hello!", "required": "ok", "optional": "ok", "omit": "ok"},
+    {"name": "empty", "input": "", "text": "", "required": "ok", "optional": "ok", "omit": "ok"}
+  ],
+  "whitespace": [
+    {"name": "trailing-newline", "input": "SGVsbG8=\n", "text": "Hello", "ignored": 1},
+    {"name": "leading-space", "input": " SGVsbG8=", "text": "Hello", "ignored": 1},
+    {"name": "wrapped-crlf-and-tab", "input": "SGVs\r\nbG8s\r\n\tIHdv\r\ncmxk\r\nIQ==\r\n", "text": "Hello, world!", "ignored": 11},
+    {"name": "whitespace-after-padding", "input": "SGVsbG8= \n", "text": "Hello", "ignored": 2},
+    {"name": "only-whitespace", "input": " \n\t", "text": "", "ignored": 3}
+  ]
+}
