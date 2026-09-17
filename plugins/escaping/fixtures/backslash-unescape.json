@@ -1,0 +1,107 @@
+[
+  {
+    "name": "short forms",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "a\\\\b\\nc\\rd\\te\\bf\\fg\\vh\\0i\\\"j\\'k",
+    "output": "a\\b\nc\rd\te\bf\fg\u000bh\u0000i\"j'k",
+    "value": {
+      "sequences": 10
+    }
+  },
+  {
+    "name": "hex escapes below 0x80",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\x41\\x7f\\x00\\x1B",
+    "output": "A\u007f\u0000\u001b"
+  },
+  {
+    "name": "four digit unicode in any case",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u00e9\\u00E9",
+    "output": "éé"
+  },
+  {
+    "name": "braced unicode",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{e9}\\u{1F600}\\u{10FFFF}\\u{0}\\u{000041}",
+    "output": "é😀􏿿\u0000A",
+    "value": {
+      "sequences": 5
+    }
+  },
+  {
+    "name": "surrogate pair with four digit escapes",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\ud83d\\ude00",
+    "output": "😀",
+    "value": {
+      "sequences": 2
+    }
+  },
+  {
+    "name": "literal newline kept and escaped newline interpreted",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "a\nb\\nc",
+    "output": "a\nb\nc",
+    "value": {
+      "sequences": 1
+    }
+  },
+  {
+    "name": "non-ascii passes through",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "café 😀",
+    "output": "café 😀",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "nul followed by a letter",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\0a",
+    "output": "\u0000a"
+  },
+  {
+    "name": "no escapes",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "plain text",
+    "output": "plain text"
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "",
+    "output": ""
+  }
+]

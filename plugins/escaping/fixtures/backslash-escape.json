@@ -1,0 +1,145 @@
+[
+  {
+    "name": "short forms",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\\b\nc\rd\te\bf\fg\u000bh",
+    "output": "a\\\\b\\nc\\rd\\te\\bf\\fg\\vh",
+    "value": {
+      "sequences": 7
+    }
+  },
+  {
+    "name": "other controls and delete use hex",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "\u0001\u001b\u007f",
+    "output": "\\x01\\x1b\\x7f"
+  },
+  {
+    "name": "nul is short unless a digit follows",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\u0000b\u00001",
+    "output": "a\\0b\\x001",
+    "value": {
+      "sequences": 2
+    }
+  },
+  {
+    "name": "quotes both",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "\"'",
+    "output": "\\\"\\'"
+  },
+  {
+    "name": "quotes double",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "quotes": "double"
+    },
+    "input": "\"'",
+    "output": "\\\"'"
+  },
+  {
+    "name": "quotes single",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "quotes": "single"
+    },
+    "input": "\"'",
+    "output": "\"\\'"
+  },
+  {
+    "name": "quotes none",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "quotes": "none"
+    },
+    "input": "\"'",
+    "output": "\"'",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "non-ascii kept",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "café 😀",
+    "output": "café 😀",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "non-ascii unicode with braces for astral",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "non-ascii": "unicode"
+    },
+    "input": "café 😀 \uffff",
+    "output": "caf\\u00e9 \\u{1f600} \\uffff",
+    "value": {
+      "sequences": 3
+    }
+  },
+  {
+    "name": "non-ascii utf16 surrogate pairs",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "non-ascii": "utf16"
+    },
+    "input": "café 😀",
+    "output": "caf\\u00e9 \\ud83d\\ude00",
+    "value": {
+      "sequences": 2
+    }
+  },
+  {
+    "name": "c1 controls always escaped",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\u0085b\u009f",
+    "output": "a\\u0085b\\u009f"
+  },
+  {
+    "name": "crlf",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\r\nb",
+    "output": "a\\r\\nb"
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "",
+    "output": "",
+    "value": {
+      "sequences": 0
+    }
+  }
+]

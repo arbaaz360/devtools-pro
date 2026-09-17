@@ -1,0 +1,95 @@
+[
+  {
+    "name": "all simple escapes",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\\" \\\\ \\/ \\b \\f \\n \\r \\t\"",
+    "output": "\" \\ / \b \f \n \r \t",
+    "value": {
+      "sequences": 8
+    }
+  },
+  {
+    "name": "unicode escapes in any case",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\u00e9\\u00E9\\u0041\"",
+    "output": "ééA"
+  },
+  {
+    "name": "surrogate pairs",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\ud83d\\ude00\\uD83D\\uDE00\"",
+    "output": "😀😀",
+    "value": {
+      "sequences": 4
+    }
+  },
+  {
+    "name": "literal non-ascii and delete",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"café 😀 \u007f\"",
+    "output": "café 😀 \u007f",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "surrounding json whitespace",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": " \n\t\"x\"\r\n ",
+    "output": "x"
+  },
+  {
+    "name": "body without quotes",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": "a\\\"b\\n",
+    "output": "a\"b\n"
+  },
+  {
+    "name": "body keeps surrounding whitespace",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": " x ",
+    "output": " x "
+  },
+  {
+    "name": "empty literal",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\"",
+    "output": ""
+  },
+  {
+    "name": "empty body",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": "",
+    "output": ""
+  }
+]
