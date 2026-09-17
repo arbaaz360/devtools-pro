@@ -29,5 +29,5 @@
   "workspaces":[{"id":"hash","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"md5","component":"output","outputPort":"md5"},{"id":"sha1","component":"output","outputPort":"sha1"},{"id":"sha224","component":"output","outputPort":"sha224"},{"id":"sha256","component":"output","outputPort":"sha256"},{"id":"sha384","component":"output","outputPort":"sha384"},{"id":"sha512","component":"output","outputPort":"sha512"}],"commands":[],"presentationSettings":[]}],
   "capabilities":[],
   "settings":[],
-  "tests":{"requirementIds":["DU-23"],"fixtures":["hash-vectors","hash-unicode","hash-streaming","hash-cancellation"],"uiScenarios":["hash-explicit","case-presentation","copy-each-result"]}
+  "tests":{"requirementIds":["DU-23"],"fixtures":["hash-vectors","hash-bytes","hash-streaming","hash-cancellation","hash-limits","hash-options"],"uiScenarios":["hash-explicit","case-presentation","copy-each-result"]}
 }
