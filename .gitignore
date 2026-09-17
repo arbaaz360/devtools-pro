@@ -1,4 +1,5 @@
 /target/
+apps/desktop/src-tauri/target-native-check/
 .idea/
 .vscode/
 *.user

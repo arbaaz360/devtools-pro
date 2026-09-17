@@ -179,7 +179,15 @@ function renderTools() {
   const query = ($("#tool-search") as HTMLInputElement).value
     .trim()
     .toLowerCase();
-  const toolsKey = `${query}|${state.activeId}|${state.tabs.map((tab) => `${tab.id}:${tab.toolId}`).join(",")}`;
+  // The native manifest request completes after the first shell render. Include
+  // the manifest identities in the cache key so the sidebar is rebuilt when
+  // the engine catalog arrives; otherwise a native launch can be stuck showing
+  // only the editor even though list_tools succeeded.
+  const manifestKey = [...controller.manifests.values()]
+    .map((manifest) => `${manifest.id}:${manifest.contractVersion}`)
+    .sort()
+    .join(",");
+  const toolsKey = `${query}|${state.activeId}|${manifestKey}|${state.tabs.map((tab) => `${tab.id}:${tab.toolId}`).join(",")}`;
   if (toolsKey === renderedToolsKey) return;
   renderedToolsKey = toolsKey;
   nav.innerHTML = "";
