@@ -903,6 +903,11 @@ export class WorkbenchController {
   }
   private async complete(task: Task, event: JobFinished) {
     const view: ResultView = { event, text: "", truncated: false };
+    // Immediately transition the tab out of the "running"/"queued" phase so
+    // the delayed progress indicator never fires for fast jobs.  The full
+    // result (with preview text) is dispatched once the preview is read.
+    if (this.current(task.token))
+      this.dispatch({ type: "completing", token: task.token });
     try {
       if (this.current(task.token) && event.ok && event.resultDocumentId) {
         if (
