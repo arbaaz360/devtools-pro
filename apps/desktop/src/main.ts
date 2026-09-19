@@ -1146,6 +1146,10 @@ void controller.initialize();
 render();
 $("#browser-notice").hidden = native;
 $("#engine-status").textContent = native ? "Local engine" : "Browser preview";
+const dropTarget = $("#editor-host");
+const removeDragOver = () => dropTarget.classList.remove("drag-over");
+const addDragOver = () => dropTarget.classList.add("drag-over");
+
 if (native) {
   let closingWindow = false;
   void getCurrentWindow().onCloseRequested(async (event) => {
@@ -1162,31 +1166,69 @@ if (native) {
       closingWindow = false;
     }
   });
-  void listen<{ paths?: string[] } | string[]>("tauri://drag-drop", (event) => {
-    const payload = event.payload;
-    const path = Array.isArray(payload) ? payload[0] : payload.paths?.[0];
-    if (path) void controller.openPath(path);
+  void listen("tauri://drag-enter", () => {
+    addDragOver();
   });
+  void listen("tauri://drag-over", () => {
+    addDragOver();
+  });
+  void listen("tauri://drag-leave", () => {
+    removeDragOver();
+  });
+  void listen<{ paths?: string[] } | string[]>(
+    "tauri://drag-drop",
+    async (event) => {
+      removeDragOver();
+      const payload = event.payload;
+      const path = Array.isArray(payload) ? payload[0] : payload.paths?.[0];
+      if (path) {
+        try {
+          await controller.openPath(path);
+        } finally {
+          removeDragOver();
+        }
+      }
+    },
+  );
 }
-const dropTarget = $("#editor-host");
-dropTarget.addEventListener("dragover", (event) => {
+
+window.addEventListener("dragenter", (event) => {
   event.preventDefault();
-  dropTarget.classList.add("drag-over");
+  addDragOver();
 });
-dropTarget.addEventListener("dragleave", () =>
-  dropTarget.classList.remove("drag-over"),
-);
-dropTarget.addEventListener("drop", (event) => {
+window.addEventListener("dragover", (event) => {
   event.preventDefault();
-  dropTarget.classList.remove("drag-over");
-  const file = event.dataTransfer?.files[0] as
-    | (File & { path?: string })
-    | undefined;
-  if (file?.path) void controller.openPath(file.path);
-  else if (file)
-    void file.text().then((text) => {
-      controller.newDocument();
-      const id = state.activeId;
-      if (id) controller.edit(id, text);
-    });
+  addDragOver();
+});
+window.addEventListener("dragleave", (event) => {
+  if (!event.relatedTarget || event.relatedTarget === document.documentElement) {
+    removeDragOver();
+  }
+});
+dropTarget.addEventListener("dragleave", (event) => {
+  if (!dropTarget.contains(event.relatedTarget as Node | null)) {
+    removeDragOver();
+  }
+});
+window.addEventListener("dragend", () => {
+  removeDragOver();
+});
+window.addEventListener("blur", () => {
+  removeDragOver();
+});
+window.addEventListener("drop", (event) => {
+  event.preventDefault();
+  removeDragOver();
+});
+dropTarget.addEventListener("drop", async (event) => {
+  event.preventDefault();
+  removeDragOver();
+  if (native) return;
+  const file = event.dataTransfer?.files[0];
+  if (!file) return;
+  try {
+    await controller.openBrowserFile(file);
+  } finally {
+    removeDragOver();
+  }
 });

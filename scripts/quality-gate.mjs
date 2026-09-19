@@ -24,16 +24,7 @@ run('node', ['scripts/generate-fixtures.mjs']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'check:generated']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'test']);
 run('pnpm', ['--dir', 'packages/plugin-sdk', 'test']);
-run('pnpm', [
-  '--dir',
-  'packages/plugin-sdk',
-  'headless',
-  '../../plugins',
-  '--plugin',
-  'examples.echo',
-  '--input',
-  'input=quality-gate',
-]);
+run('pnpm', ['--dir', 'packages/plugin-sdk', 'headless', '../../plugins', '--plugin', 'examples.echo', '--input', 'input=quality-gate']);
 run('cargo', ['test', '--workspace']);
 run('cargo', ['run', '-p', 'devtools-plugin-discovery', '--', 'generate', 'plugins', 'target/generated/plugins']);
 run('pnpm', ['--dir', 'apps/desktop', 'build']);

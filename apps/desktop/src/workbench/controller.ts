@@ -96,6 +96,36 @@ export const errorText = (error: unknown): string =>
         ? String(error.message)
         : JSON.stringify(error);
 
+async function readDataUrl(file: File): Promise<string> {
+  if (typeof FileReader !== "undefined") {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () =>
+        reject(reader.error ?? new Error("Failed to read image file."));
+      reader.readAsDataURL(file);
+    });
+  }
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  const nodeBuf = (
+    globalThis as unknown as {
+      Buffer?: { from(b: ArrayBuffer): { toString(enc: string): string } };
+    }
+  ).Buffer;
+  const base64 =
+    typeof btoa !== "undefined"
+      ? btoa(binary)
+      : (nodeBuf?.from(buffer).toString("base64") ?? "");
+  return `data:${file.type || "image/png"};base64,${base64}`;
+}
+
+export const IMAGE_IMPORT_LIMIT = 25 * 1024 * 1024;
+
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
 export class WorkbenchController {
   private api: WorkbenchApi;
@@ -114,6 +144,7 @@ export class WorkbenchController {
   private stopEvents?: () => void;
   private saving = new Set<string>();
   private closing = new Set<string>();
+  private openingPaths = new Set<string>();
   private disposed = false;
   constructor(api: WorkbenchApi, hooks: WorkbenchHooks) {
     this.api = api;
@@ -308,16 +339,50 @@ export class WorkbenchController {
       this.hooks.notify("Open the native desktop app to read local files.");
       return;
     }
+    if (this.openingPaths.has(path)) return;
+    this.openingPaths.add(path);
     let opened: FileDocument | undefined;
     try {
       if (this.state.tabs.length >= MAX_TABS)
         throw new Error("Close a tab before opening another (16-tab limit).");
+      const existing = this.state.tabs.find(
+        (tab) => tab.source?.path === path || tab.savedPath === path,
+      );
+      if (existing) {
+        this.activate(existing.id);
+        return;
+      }
       opened = await this.api.openDocument(path);
+      const existingCanonical = this.state.tabs.find(
+        (tab) =>
+          tab.source?.path === opened!.path || tab.savedPath === opened!.path,
+      );
+      if (existingCanonical) {
+        this.retire(opened.id);
+        this.activate(existingCanonical.id);
+        return;
+      }
+      const defaultToolId =
+        opened.contentKind === "binary" ? "encoding.hash" : defaultTool(opened);
+      const toolId = toolOverride ?? defaultToolId;
+      const tool = this.toolDefinition(toolId);
+      if (!tool) {
+        throw new Error(`Tool "${toolId}" is not available in the current engine.`);
+      }
+      if (tool.input === "image" && opened.contentKind !== "image") {
+        throw new Error(
+          `${tool.label} requires a PNG or JPEG image. Open an image or choose another tool.`,
+        );
+      }
+      if (tool.input === "text" && opened.contentKind !== "text") {
+        throw new Error(
+          `${tool.label} requires a text document. Open a text file or choose another tool.`,
+        );
+      }
       const text = await this.readEditable(opened);
       if (this.state.tabs.length >= MAX_TABS)
         throw new Error("The tab limit was reached while opening this file.");
       const tab = makeTab(`tab-${++this.nextId}`, opened.name, opened, text);
-      const tool = this.toolDefinition(toolOverride ?? defaultTool(opened))!;
       this.dispatch({
         type: "add",
         tab: {
@@ -332,6 +397,179 @@ export class WorkbenchController {
       this.schedule(tab.id, 0);
     } catch (error) {
       if (opened) this.retire(opened.id);
+      this.hooks.notify(errorText(error));
+    } finally {
+      this.openingPaths.delete(path);
+    }
+  }
+  async openBrowserFile(file: File, toolOverride?: string): Promise<void> {
+    try {
+      if (this.state.tabs.length >= MAX_TABS) {
+        throw new Error("Close a tab before opening another (16-tab limit).");
+      }
+      // Reliable identity check: if a real filesystem path is available, deduplicate by path.
+      // Do NOT deduplicate by filename alone, so two distinct files with the same name
+      // can each be opened in their own tabs.
+      const filePath = (file as unknown as { path?: string }).path;
+      if (filePath && typeof filePath === "string") {
+        const existing = this.state.tabs.find(
+          (t) => t.source?.path === filePath || t.savedPath === filePath,
+        );
+        if (existing) {
+          this.activate(existing.id);
+          return;
+        }
+      }
+      const isImage =
+        file.type.startsWith("image/") ||
+        /\.(png|jpe?g|gif|webp)$/i.test(file.name);
+      if (isImage) {
+        if (file.size > IMAGE_IMPORT_LIMIT) {
+          throw new Error(
+            `Image exceeds the ${Math.round(IMAGE_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
+          );
+        }
+        const dataUrl = await readDataUrl(file);
+        const doc: FileDocument = {
+          id: `browser-doc-${++this.nextId}`,
+          name: file.name,
+          path: filePath || file.name,
+          size: file.size,
+          preview: "",
+          truncated: false,
+          format: "text",
+          encoding: "Binary",
+          contentKind: "image",
+          mime: file.type || "image/png",
+          editable: false,
+        };
+        const tab = makeTab(`tab-${++this.nextId}`, file.name, doc, null);
+        const tool = this.toolDefinition(
+          toolOverride ?? "encoding.image-base64",
+        )!;
+        if (tool.input === "text") {
+          throw new Error(`${tool.label} requires a text document.`);
+        }
+        this.dispatch({
+          type: "add",
+          tab: {
+            ...tab,
+            toolId: tool.id,
+            operation: tool.defaultOperation,
+            options: tool.defaultOptions,
+            image: {
+              mime: file.type || "image/png",
+              data: dataUrl,
+              bytes: file.size,
+              truncated: false,
+            },
+          },
+        });
+        return;
+      }
+      const isText =
+        file.type.startsWith("text/") ||
+        file.type === "application/json" ||
+        file.type === "application/javascript" ||
+        file.type === "application/xml" ||
+        /\.(txt|json|csv|md|js|ts|html|css|xml|yaml|yml|log|py|sh|rs)$/i.test(
+          file.name,
+        ) ||
+        !file.type;
+      if (isText) {
+        if (file.size > TEXT_IMPORT_LIMIT) {
+          throw new Error(
+            `File exceeds the ${Math.round(TEXT_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
+          );
+        }
+        const text = await file.text();
+        const isJson =
+          file.type === "application/json" || /\.json$/i.test(file.name);
+        const isCsv = file.type === "text/csv" || /\.csv$/i.test(file.name);
+        const doc: FileDocument = {
+          id: `browser-doc-${++this.nextId}`,
+          name: file.name,
+          path: filePath || file.name,
+          size: file.size,
+          preview: text.slice(0, EDIT_LIMIT),
+          truncated: file.size > EDIT_LIMIT,
+          format: isJson ? "json" : isCsv ? "csv" : "text",
+          encoding: "UTF-8",
+          contentKind: "text",
+          mime: isJson
+            ? "application/json"
+            : isCsv
+              ? "text/csv"
+              : "text/plain",
+          editable: file.size <= EDIT_LIMIT,
+        };
+        const tab = makeTab(
+          `tab-${++this.nextId}`,
+          file.name,
+          doc,
+          file.size <= EDIT_LIMIT ? text : null,
+        );
+        const detectedTool = isJson
+          ? "structured.json"
+          : isCsv
+            ? "structured.csv"
+            : editor.id;
+        const tool = this.toolDefinition(toolOverride ?? detectedTool)!;
+        if (tool.input === "image") {
+          throw new Error(`${tool.label} requires a PNG or JPEG image.`);
+        }
+        this.dispatch({
+          type: "add",
+          tab: {
+            ...tab,
+            toolId: tool.id,
+            operation: tool.defaultOperation,
+            options: tool.defaultOptions,
+          },
+        });
+        if (file.size <= EDIT_LIMIT) {
+          this.schedule(tab.id, 0);
+        }
+        return;
+      }
+      // Binary file (e.g. .bin)
+      if (file.size > TEXT_IMPORT_LIMIT) {
+        throw new Error(
+          `File exceeds the ${Math.round(TEXT_IMPORT_LIMIT / (1024 * 1024))} MiB import limit.`,
+        );
+      }
+      const doc: FileDocument = {
+        id: `browser-doc-${++this.nextId}`,
+        name: file.name,
+        path: filePath || file.name,
+        size: file.size,
+        preview: "",
+        truncated: false,
+        format: "text",
+        encoding: "Binary",
+        contentKind: "binary",
+        mime: file.type || "application/octet-stream",
+        editable: false,
+      };
+      const tab = makeTab(`tab-${++this.nextId}`, file.name, doc, null);
+      const tool = this.toolDefinition(toolOverride ?? "encoding.hash")!;
+      if (tool.input === "text") {
+        throw new Error(`${tool.label} requires a text document.`);
+      }
+      if (tool.input === "image") {
+        throw new Error(`${tool.label} requires a PNG or JPEG image.`);
+      }
+      this.dispatch({
+        type: "add",
+        tab: {
+          ...tab,
+          toolId: tool.id,
+          operation: tool.defaultOperation,
+          options: tool.defaultOptions,
+        },
+      });
+      this.schedule(tab.id, 0);
+    } catch (error) {
       this.hooks.notify(errorText(error));
     }
   }
