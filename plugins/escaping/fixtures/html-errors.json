@@ -1,0 +1,334 @@
+[
+  {
+    "name": "unknown named reference",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "ab &foo; c",
+    "error": {
+      "code": "html.unknown-named-reference",
+      "byteOffset": 3,
+      "line": 1,
+      "column": 4,
+      "match": "&foo;"
+    }
+  },
+  {
+    "name": "byte offset counts utf-8 bytes",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "é&foo;",
+    "error": {
+      "code": "html.unknown-named-reference",
+      "byteOffset": 2,
+      "line": 1,
+      "column": 2
+    }
+  },
+  {
+    "name": "wrong case is unknown",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&Amp;",
+    "error": {
+      "code": "html.unknown-named-reference",
+      "byteOffset": 0,
+      "match": "case-sensitive"
+    }
+  },
+  {
+    "name": "legacy name missing semicolon on second line",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "x\n&copy 2024",
+    "error": {
+      "code": "html.reference-missing-semicolon",
+      "byteOffset": 2,
+      "line": 2,
+      "column": 1,
+      "match": "&copy"
+    }
+  },
+  {
+    "name": "legacy prefix inside a longer run",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&notit;",
+    "error": {
+      "code": "html.reference-missing-semicolon",
+      "byteOffset": 0,
+      "match": "&not"
+    }
+  },
+  {
+    "name": "numeric missing semicolon",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#233 ",
+    "error": {
+      "code": "html.reference-missing-semicolon",
+      "byteOffset": 0,
+      "match": "&#233"
+    }
+  },
+  {
+    "name": "decimal without digits",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#;",
+    "error": {
+      "code": "html.numeric-reference-empty",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "hexadecimal without digits",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "x&#x;",
+    "error": {
+      "code": "html.numeric-reference-empty",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "null reference",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#0;",
+    "error": {
+      "code": "html.numeric-reference-null",
+      "byteOffset": 0,
+      "match": "U+0000"
+    }
+  },
+  {
+    "name": "surrogate reference",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#xD800;",
+    "error": {
+      "code": "html.numeric-reference-surrogate",
+      "byteOffset": 0,
+      "match": "U+D800"
+    }
+  },
+  {
+    "name": "out of range hexadecimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#x110000;",
+    "error": {
+      "code": "html.numeric-reference-out-of-range",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "out of range huge decimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#99999999999999999999;",
+    "error": {
+      "code": "html.numeric-reference-out-of-range",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "c1 control names the windows-1252 remap",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#x80;",
+    "error": {
+      "code": "html.numeric-reference-control",
+      "byteOffset": 0,
+      "match": "U+20AC"
+    }
+  },
+  {
+    "name": "c0 control",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#1;",
+    "error": {
+      "code": "html.numeric-reference-control",
+      "byteOffset": 0,
+      "match": "U+0001"
+    }
+  },
+  {
+    "name": "carriage return reference",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#13;",
+    "error": {
+      "code": "html.numeric-reference-control",
+      "byteOffset": 0,
+      "match": "U+000D"
+    }
+  },
+  {
+    "name": "delete reference",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#x7F;",
+    "error": {
+      "code": "html.numeric-reference-control",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "noncharacter",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#xFFFE;",
+    "error": {
+      "code": "html.numeric-reference-noncharacter",
+      "byteOffset": 0,
+      "match": "U+FFFE"
+    }
+  },
+  {
+    "name": "astral noncharacter",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#x1FFFF;",
+    "error": {
+      "code": "html.numeric-reference-noncharacter",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "invalid utf-8 input",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "inputBytes": [
+      97,
+      10,
+      195,
+      40
+    ],
+    "error": {
+      "code": "input.invalid-utf8",
+      "byteOffset": 2,
+      "line": 2,
+      "column": 1,
+      "match": "0xc3"
+    }
+  },
+  {
+    "name": "truncated utf-8 input",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "inputBytes": [
+      226,
+      130
+    ],
+    "error": {
+      "code": "input.invalid-utf8",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "invalid mode option",
+    "operationId": "text.html",
+    "options": {
+      "mode": "both"
+    },
+    "input": "x",
+    "error": {
+      "code": "option.invalid",
+      "match": "mode"
+    }
+  },
+  {
+    "name": "invalid numeric option",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "numeric": "octal"
+    },
+    "input": "x",
+    "error": {
+      "code": "option.invalid",
+      "match": "numeric"
+    }
+  },
+  {
+    "name": "invalid boolean option",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "prefer-named": "yes"
+    },
+    "input": "x",
+    "error": {
+      "code": "option.invalid",
+      "match": "prefer-named"
+    }
+  },
+  {
+    "name": "camel case option id is unknown",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "preferNamed": false
+    },
+    "input": "x",
+    "error": {
+      "code": "option.unknown",
+      "match": "\"preferNamed\""
+    }
+  },
+  {
+    "name": "strict is declared for unescape only but accepted with escape",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "strict": "very"
+    },
+    "input": "x",
+    "error": {
+      "code": "option.invalid",
+      "match": "strict"
+    }
+  }
+]

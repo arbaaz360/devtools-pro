@@ -1,0 +1,102 @@
+[
+  {
+    "name": "quotes backslashes and controls",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "say \"hi\" \\ \n\t\r\b\f\u0000\u001f",
+    "output": "\"say \\\"hi\\\" \\\\ \\n\\t\\r\\b\\f\\u0000\\u001f\"",
+    "value": {
+      "sequences": 10
+    }
+  },
+  {
+    "name": "solidus and delete are not escaped",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a/b\u007f",
+    "output": "\"a/b\u007f\"",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "non-ascii kept literal by default",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "café 😀 \u2028",
+    "output": "\"café 😀 \u2028\"",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "ascii only escapes bmp and surrogate pairs",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape",
+      "ascii-only": true
+    },
+    "input": "café 😀 \u2028",
+    "output": "\"caf\\u00e9 \\ud83d\\ude00 \\u2028\"",
+    "value": {
+      "sequences": 4
+    }
+  },
+  {
+    "name": "ascii only escapes delete",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape",
+      "ascii-only": true
+    },
+    "input": "\u007f",
+    "output": "\"\\u007f\""
+  },
+  {
+    "name": "quotes omitted",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape",
+      "quotes": "omit"
+    },
+    "input": "a\"b\\c",
+    "output": "a\\\"b\\\\c"
+  },
+  {
+    "name": "crlf",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\r\nb",
+    "output": "\"a\\r\\nb\""
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "",
+    "output": "\"\"",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "empty input without quotes",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape",
+      "quotes": "omit"
+    },
+    "input": "",
+    "output": ""
+  }
+]

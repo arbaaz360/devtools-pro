@@ -1,0 +1,231 @@
+[
+  {
+    "name": "unsafe symbols use named references",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "<a href=\"x\">Tom & Jerry's</a>",
+    "output": "&lt;a href=&quot;x&quot;&gt;Tom &amp; Jerry&apos;s&lt;/a&gt;",
+    "value": {
+      "sequences": 8
+    }
+  },
+  {
+    "name": "unsafe symbols decimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "prefer-named": false
+    },
+    "input": "<a href=\"x\">Tom & Jerry's</a>",
+    "output": "&#60;a href=&#34;x&#34;&#62;Tom &#38; Jerry&#39;s&#60;/a&#62;"
+  },
+  {
+    "name": "unsafe symbols hexadecimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "prefer-named": false,
+      "numeric": "hex"
+    },
+    "input": "<a href=\"x\">Tom & Jerry's</a>",
+    "output": "&#x3C;a href=&#x22;x&#x22;&#x3E;Tom &#x26; Jerry&#x27;s&#x3C;/a&#x3E;"
+  },
+  {
+    "name": "latin-1 and symbol names",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "café © 5 ≤ 6 … € ×",
+    "output": "caf&eacute; &copy; 5 &le; 6 &hellip; &euro; &times;",
+    "value": {
+      "sequences": 6
+    }
+  },
+  {
+    "name": "non-ascii decimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "prefer-named": false
+    },
+    "input": "café ©",
+    "output": "caf&#233; &#169;"
+  },
+  {
+    "name": "non-ascii hexadecimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "prefer-named": false,
+      "numeric": "hex"
+    },
+    "input": "café ©",
+    "output": "caf&#xE9; &#xA9;"
+  },
+  {
+    "name": "named wins over hexadecimal where a name exists",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "numeric": "hex"
+    },
+    "input": "é ∞ ǅ",
+    "output": "&eacute; &infin; &#x1C5;"
+  },
+  {
+    "name": "astral characters by code point decimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "😀 𝔸",
+    "output": "&#128512; &#120120;"
+  },
+  {
+    "name": "astral characters by code point hexadecimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "numeric": "hex"
+    },
+    "input": "😀 𝔸",
+    "output": "&#x1F600; &#x1D538;"
+  },
+  {
+    "name": "encode everything decimal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "encode-everything": true
+    },
+    "input": "a&b ",
+    "output": "&#97;&amp;&#98;&#32;",
+    "value": {
+      "sequences": 4
+    }
+  },
+  {
+    "name": "encode everything hexadecimal without names",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "encode-everything": true,
+      "prefer-named": false,
+      "numeric": "hex"
+    },
+    "input": "a&b",
+    "output": "&#x61;&#x26;&#x62;"
+  },
+  {
+    "name": "encode everything overrides allow unsafe symbols",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "encode-everything": true,
+      "allow-unsafe-symbols": true
+    },
+    "input": "<&>",
+    "output": "&lt;&amp;&gt;"
+  },
+  {
+    "name": "allow unsafe symbols keeps ascii markup",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "allow-unsafe-symbols": true
+    },
+    "input": "<a> & \"é\" 'x'",
+    "output": "<a> & \"&eacute;\" 'x'",
+    "value": {
+      "sequences": 1
+    }
+  },
+  {
+    "name": "tab newline and cr stay literal other controls are numeric",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "tab\tlf\ncr\resc\u001bdel\u007f",
+    "output": "tab\tlf\ncr\resc&#27;del&#127;"
+  },
+  {
+    "name": "nul has no reference and stays literal",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\u0000b",
+    "output": "a\u0000b",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "c1 controls stay literal because browsers remap their references",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\u0085b\u009f",
+    "output": "a\u0085b\u009f",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "c1 controls stay literal even when encoding everything",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape",
+      "encode-everything": true
+    },
+    "input": "\u0080x",
+    "output": "\u0080&#120;",
+    "value": {
+      "sequences": 1
+    }
+  },
+  {
+    "name": "nbsp and soft hyphen are named",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "\u00a0\u00ad",
+    "output": "&nbsp;&shy;"
+  },
+  {
+    "name": "html4 lang and rang are not emitted because html5 moved them",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "〈〉⟨⟩",
+    "output": "&#9001;&#9002;&#10216;&#10217;"
+  },
+  {
+    "name": "crlf preserved",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "a\r\nb",
+    "output": "a\r\nb"
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "",
+    "output": "",
+    "value": {
+      "sequences": 0
+    }
+  }
+]
