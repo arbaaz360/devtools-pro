@@ -204,5 +204,20 @@
     },
     "input": "&ampamp;",
     "output": "&amp;"
+  },
+  {
+    "name": "leading zeros in numeric references are insignificant",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#000000065;&#x0000000041;",
+    "output": "AA",
+    "value": {
+      "sequences": 2,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
   }
 ]

@@ -174,7 +174,10 @@ function htmlUnescape(text, options, context) {
       if (text[cursor] === ";") cursor += 1;
       else if (strict) throw missingSemicolon(amp, text.slice(amp, cursor));
       const reference = text.slice(amp, cursor);
-      const value = digits.length > 8 ? Infinity : Number.parseInt(digits, hex ? 16 : 10);
+      // Leading zeros add nothing to the accumulated value (WHATWG numeric
+      // character reference end state), so only significant digits count.
+      const significant = digits.replace(/^0+(?=.)/u, "");
+      const value = significant.length > 8 ? Infinity : Number.parseInt(significant, hex ? 16 : 10);
       sequences += 1;
       index = cursor;
       if (value === 0 || value > 0x10ffff || (value >= 0xd800 && value <= 0xdfff)) {

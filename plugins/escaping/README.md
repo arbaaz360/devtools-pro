@@ -189,8 +189,11 @@ node plugins/escaping/test.mjs
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin text.escaping --operation text.html --input 'input=<p>Tom & Jerry</p>' --options '{"mode":"escape","numeric":"hex"}'
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin text.escaping --operation text.json-string --input 'input="line\né"' --options '{"mode":"unescape"}'
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin text.escaping --operation text.backslash --input 'input=a\tb' --options '{"mode":"unescape"}'
-python plugins/escaping/scripts/generate-entities.py
 ```
+
+The named-reference table `html-entities.mjs` is regenerated with
+`python plugins/escaping/scripts/generate-entities.py`. That is maintenance only: building,
+testing and the quality gate do not need Python.
 
 Fixtures live in `fixtures/` and are listed in the manifest: one escape, one unescape and one
 errors file per grammar. Error vectors pin the code, byte offset and, where useful, line,
