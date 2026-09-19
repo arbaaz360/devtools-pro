@@ -1,0 +1,27 @@
+name: Packet scope
+
+# Worker PRs declare their packet ("Packet: docs/packets/<file>") and may only
+# change the files that packet allows. Runs on Linux in seconds, so it reports
+# long before the Windows quality gate does.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  scope:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check changed files against the declared packet
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-packet-scope.mjs
