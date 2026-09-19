@@ -41,5 +41,5 @@
   ],
   "capabilities":[],
   "settings":[],
-  "tests":{"requirementIds":["DU-05","DU-07"],"fixtures":["url-transform","query-parser"],"uiScenarios":["transform-complete","use-as-input","query-copy-complete"]}
+  "tests":{"requirementIds":["DU-05","DU-07"],"fixtures":["transform","parse-query","invalid"],"uiScenarios":["transform-complete","use-as-input","query-copy-complete"]}
 }
