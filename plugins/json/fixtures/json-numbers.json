@@ -1,0 +1,111 @@
+[
+  {
+    "name": "twenty-digit integer is copied verbatim",
+    "input": "[12345678901234567890]",
+    "formatted": "[\n  12345678901234567890\n]",
+    "minified": "[12345678901234567890]",
+    "integers": 1, "unsafeIntegers": 1, "withFractionOrExponent": 0,
+    "unsafeOffsets": [1]
+  },
+  {
+    "name": "Number.MAX_SAFE_INTEGER is safe",
+    "input": "[9007199254740991]",
+    "minified": "[9007199254740991]",
+    "integers": 1, "unsafeIntegers": 0, "withFractionOrExponent": 0,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "MAX_SAFE_INTEGER plus one is unsafe",
+    "input": "[9007199254740992]",
+    "minified": "[9007199254740992]",
+    "integers": 1, "unsafeIntegers": 1, "withFractionOrExponent": 0,
+    "unsafeOffsets": [1]
+  },
+  {
+    "name": "negative safe boundary",
+    "input": "[-9007199254740991]",
+    "minified": "[-9007199254740991]",
+    "integers": 1, "unsafeIntegers": 0, "withFractionOrExponent": 0,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "negative unsafe integer",
+    "input": "[-9007199254740993]",
+    "minified": "[-9007199254740993]",
+    "integers": 1, "unsafeIntegers": 1, "withFractionOrExponent": 0,
+    "unsafeOffsets": [1]
+  },
+  {
+    "name": "sixteen digits below the boundary are safe",
+    "input": "[1000000000000000]",
+    "minified": "[1000000000000000]",
+    "integers": 1, "unsafeIntegers": 0, "withFractionOrExponent": 0,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "seventeen digits are always unsafe",
+    "input": "[10000000000000000]",
+    "minified": "[10000000000000000]",
+    "integers": 1, "unsafeIntegers": 1, "withFractionOrExponent": 0,
+    "unsafeOffsets": [1]
+  },
+  {
+    "name": "u64::MAX inside an object",
+    "input": "{\"id\":18446744073709551615}",
+    "formatted": "{\n  \"id\": 18446744073709551615\n}",
+    "minified": "{\"id\":18446744073709551615}",
+    "integers": 1, "unsafeIntegers": 1, "withFractionOrExponent": 0,
+    "unsafeOffsets": [6]
+  },
+  {
+    "name": "trailing zeros in a fraction are preserved",
+    "input": "[1.2300]",
+    "formatted": "[\n  1.2300\n]",
+    "minified": "[1.2300]",
+    "integers": 0, "unsafeIntegers": 0, "withFractionOrExponent": 1,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "exponent spelling is preserved",
+    "input": "[1E+2,1e-7,0e0,-1.5E10,1e00]",
+    "formatted": "[\n  1E+2,\n  1e-7,\n  0e0,\n  -1.5E10,\n  1e00\n]",
+    "minified": "[1E+2,1e-7,0e0,-1.5E10,1e00]",
+    "integers": 0, "unsafeIntegers": 0, "withFractionOrExponent": 5,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "negative zero is a distinct lexeme",
+    "input": "[-0,0,0.0]",
+    "minified": "[-0,0,0.0]",
+    "integers": 2, "unsafeIntegers": 0, "withFractionOrExponent": 1,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "exponent that overflows a double is still grammatical",
+    "input": "[1e999,-1e999]",
+    "minified": "[1e999,-1e999]",
+    "integers": 0, "unsafeIntegers": 0, "withFractionOrExponent": 2,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "long decimal expansion is preserved",
+    "input": "[3.14159265358979323846264338327950288]",
+    "minified": "[3.14159265358979323846264338327950288]",
+    "integers": 0, "unsafeIntegers": 0, "withFractionOrExponent": 1,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "leading zero before a fraction and trailing zero after it",
+    "input": "[0.10]",
+    "minified": "[0.10]",
+    "integers": 0, "unsafeIntegers": 0, "withFractionOrExponent": 1,
+    "unsafeOffsets": []
+  },
+  {
+    "name": "unsafe integers are counted at every depth",
+    "input": "{\"a\":[99999999999999999,{\"b\":99999999999999999}],\"c\":7}",
+    "minified": "{\"a\":[99999999999999999,{\"b\":99999999999999999}],\"c\":7}",
+    "integers": 3, "unsafeIntegers": 2, "withFractionOrExponent": 0,
+    "unsafeOffsets": [6, 29]
+  }
+]
