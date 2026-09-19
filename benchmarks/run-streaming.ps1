@@ -189,7 +189,8 @@ try {
   if ($LASTEXITCODE -eq 0 -and $commit) {
     $dirty = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no 2>$null).Count -gt 0
     # Only these paths feed the measured executable; a dirty harness or docs tree does not change it.
-    $coreDirty = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no -- crates Cargo.toml Cargo.lock 2>$null).Count -gt 0
+    # The :/ prefix anchors the pathspecs at the repository root; git runs from benchmarks/.
+    $coreDirty = @(& git -C $PSScriptRoot status --porcelain --untracked-files=no -- :/crates :/Cargo.toml :/Cargo.lock 2>$null).Count -gt 0
     $git = [ordered]@{ commit = $commit; dirty = $dirty; core_dirty = $coreDirty }
   }
 } catch { $git = $null }
