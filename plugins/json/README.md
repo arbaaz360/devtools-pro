@@ -5,8 +5,9 @@
 The native host currently executes `format` and `minify` through its Rust
 adapter (`transform_json_bytes` in `devtools-core`); the package processor in
 this directory is the SDK/headless reference implementation and the executable
-specification that the fixtures below pin down. Both are lexeme-preserving and
-produce the same layout.
+specification that the fixtures below pin down. Both are lexeme-preserving; `minify`
+output is byte-identical, and `format` differs in one native case listed under
+[Known compatibility gaps](#known-compatibility-gaps).
 
 ## Semantics
 
@@ -149,7 +150,19 @@ map of member names per open object.
 - **Native validate.** The native host does not route `inspect` through this
   processor; the native path reports serde_json messages with its own
   line/column convention and does not report duplicate keys, unsafe integers or
-  the BOM. Native `format`/`minify` output bytes match this processor.
+  the BOM. Native `minify` output is byte-identical to this processor. Native
+  `format` differs for an array whose elements are all numbers or literals
+  (`true`, `false`, `null`): the native `JsonFormatter` in
+  `crates/devtools-core/src/streaming.rs` only marks a container non-empty on a
+  string or nested container, so it keeps the closing bracket on the last
+  element's line (`[
+  1,
+  2]`). This processor follows the
+  `JSON.stringify(value, null, 2)` layout (`[
+  1,
+  2
+]`); the native
+  formatter is tracked as a follow-up.
 - **Options.** DU-02 indentation choices (4 spaces, tab), permissive
   comments/trailing commas and JSONPath are not implemented; the manifest
   declares no options yet. Sorting keys is deliberately not offered because it
@@ -171,7 +184,7 @@ node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins 
 Fixtures live in `fixtures/`: `json-valid` (exact format/minify bytes, inspect
 statistics, oracle flag), `json-invalid` (code, byte span, line/column and
 message for every error class, with `inputHex` for byte-level cases),
-`json-duplicate-keys` and `json-numbers`. `json-limits` and `json-cancellation`
-are generated in `test.mjs` (depth 256/257, 300 KiB strings across reader
+`json-duplicate-keys` and `json-numbers`. The limits and cancellation cases are
+generated in `test.mjs` rather than stored as fixtures (depth 256/257, 300 KiB strings across reader
 chunks, 40k-element arrays, input/output caps, diagnostic caps, cancellation
 before reading, between chunks, during scanning and during emission).

@@ -35,5 +35,5 @@
     }
   ],
   "workspaces": [{ "id": "json", "kind": "transform", "bindings": [{ "id": "input", "component": "editor", "inputPort": "input" }, { "id": "output", "component": "output", "outputPort": "output" }], "commands": [], "presentationSettings": [] }],
-  "capabilities": [], "settings": [], "tests": { "requirementIds": ["DU-02"], "fixtures": ["json-valid", "json-invalid", "json-duplicate-keys", "json-numbers", "json-limits", "json-cancellation"], "uiScenarios": ["format", "minify", "validate"] }
+  "capabilities": [], "settings": [], "tests": { "requirementIds": ["DU-02"], "fixtures": ["json-valid", "json-invalid", "json-duplicate-keys", "json-numbers"], "uiScenarios": ["format", "minify", "validate"] }
 }
