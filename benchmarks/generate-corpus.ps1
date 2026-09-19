@@ -1,4 +1,13 @@
 #requires -Version 7.0
+<# Prepares the benchmark corpus in benchmarks/fixtures (ignored by git).
+
+The JSON and text fixtures, including fixture-50mb.json and fixture-250mb.json,
+come from scripts/generate-fixtures.mjs: the same generator the quality gate and
+the cargo acceptance tests use, so the benchmark measures the bytes those tests
+exercise. That generator never rewrites an existing file; delete a fixture to
+regenerate it. This script adds the representative CSV fixture and writes
+manifest.json with the SHA-256 of every fixture it knows about.
+#>
 param(
   [ValidateRange(1, 250)][int]$CsvMiB = 50,
   [string]$Directory = (Join-Path $PSScriptRoot 'fixtures')
@@ -11,55 +20,57 @@ $entries = [System.Collections.Generic.List[object]]::new()
 
 function Add-Fixture([string]$Name, [string]$Format, [string]$Expectation, [string]$Description) {
   $path = Join-Path $Directory $Name
+  if (-not (Test-Path -LiteralPath $path)) { throw "Expected fixture is missing after generation: $path" }
   $null = $entries.Add([ordered]@{
     file = $Name; format = $Format; expectation = $Expectation; description = $Description
     bytes = (Get-Item -LiteralPath $path).Length
     sha256 = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
   })
 }
-function Write-Fixture([string]$Name, [string]$Value, [string]$Format, [string]$Expectation, [string]$Description) {
-  [System.IO.File]::WriteAllText((Join-Path $Directory $Name), $Value, $utf8)
-  Add-Fixture $Name $Format $Expectation $Description
-}
 
-# A deterministic, bounded allocation generator. Existing large JSON files are never rewritten.
+$generator = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '../scripts/generate-fixtures.mjs')).Path
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) { throw "node is required to run $generator (it is already a repository dependency)." }
+& node $generator $Directory
+if ($LASTEXITCODE -ne 0) { throw "scripts/generate-fixtures.mjs exited with $LASTEXITCODE." }
+
+# The CSV is rewritten every run. The stop condition counts encoded bytes
+# explicitly so the fixture does not depend on StreamWriter buffering details.
 $csvName = "representative-${CsvMiB}mib.csv"
 $csvPath = Join-Path $Directory $csvName
 $writer = [System.IO.StreamWriter]::new($csvPath, $false, $utf8, 65536)
 $row = 0
 try {
-  $writer.Write("id,name,active,amount,created_at,note`r`n")
+  $header = "id,name,active,amount,created_at,note`r`n"
+  $writer.Write($header)
+  $written = [long]$utf8.GetByteCount($header)
   $target = [long]$CsvMiB * 1MB
-  while ($writer.BaseStream.Position -lt $target) {
+  while ($written -lt $target) {
     $active = if ($row % 2 -eq 0) { 'true' } else { 'false' }
     $amount = '{0}.{1:00}' -f ($row % 10000), ($row % 100)
     $note = if ($row % 97 -eq 0) { '"quoted, comma; ""escaped quote"" and' + "`r`n" + 'a second line"' } else { '"Unicode café 東京; deterministic mixed-field CSV payload"' }
-    $writer.Write("$row,record-$row,$active,$amount,2026-09-13T00:00:00Z,$note`r`n")
+    $line = "$row,record-$row,$active,$amount,2026-09-13T00:00:00Z,$note`r`n"
+    $writer.Write($line)
+    $written += $utf8.GetByteCount($line)
     $row++
-    if ($row % 4096 -eq 0) { $writer.Flush() }
   }
 } finally { $writer.Dispose() }
 Add-Fixture $csvName 'csv' 'valid' "Six fields, Unicode, CRLF, booleans, decimal numbers, escaped quotes and quoted multiline fields; $row data rows."
 
-Write-Fixture 'deep-1024.json' (('[' * 1024) + '0' + (']' * 1024)) 'json' 'depth_limit' 'Valid JSON with 1024 array levels; a bounded parser should report its depth limit without crashing.'
-Write-Fixture 'long-string.json' ('{"payload":"' + ('x' * 1MB) + '","after":true}') 'json' 'valid' 'A one MiB single string checks whether previews remain bounded.'
-Write-Fixture 'malformed.json' '{"rows":[1,2,3],"missing":}' 'json' 'invalid' 'Missing JSON value after a colon.'
-Write-Fixture 'trailing-content.json' '{"ok":true} false' 'json' 'invalid' 'A complete JSON root followed by a second root.'
-Write-Fixture 'lexemes.json' '{"huge":123456789012345678901234567890,"exponent":1.2300e+100,"zero":-0,"dup":1,"dup":2,"escaped":"\u0061","unicode":"café 東京"}' 'json' 'valid' 'Large integer, exact number lexemes, duplicate keys, escapes and Unicode; transformation fidelity fixture.'
-Write-Fixture 'unclosed-quote.csv' "id,note`r`n1,`"unterminated" 'csv' 'invalid' 'Unclosed quoted CSV field at EOF.'
-Write-Fixture 'ragged.csv' "id,note`r`n1,ok`r`n2,extra,field`r`n" 'csv' 'policy_dependent' 'Ragged rows; inspection should document whether unequal field counts are accepted.'
-Write-Fixture 'mixed-newlines.txt' "first café`r`nsecond 東京`nthird`rfourth" 'text' 'valid' 'Small UTF-8 text with CRLF, LF and CR newline forms.'
-[System.IO.File]::WriteAllBytes((Join-Path $Directory 'invalid-utf8.json'), [byte[]](0x7B,0x22,0x78,0x22,0x3A,0x22,0xFF,0x22,0x7D))
+Add-Fixture 'fixture-50mb.json' 'json' 'valid' 'Generated ASCII array of identical 480-byte payload records; not representative of heterogeneous real-world JSON.'
+Add-Fixture 'fixture-250mb.json' 'json' 'valid' 'Generated ASCII array of identical 480-byte payload records; not representative of heterogeneous real-world JSON.'
+Add-Fixture 'deep-1024.json' 'json' 'depth_limit' 'Valid JSON with 1024 array levels; a bounded parser should report its depth limit without crashing.'
+Add-Fixture 'long-string.json' 'json' 'valid' 'A one MiB single string checks whether previews remain bounded.'
+Add-Fixture 'malformed.json' 'json' 'invalid' 'Missing JSON value after a colon.'
+Add-Fixture 'trailing-content.json' 'json' 'invalid' 'A complete JSON root followed by a second root.'
+Add-Fixture 'lexemes.json' 'json' 'valid' 'Large integer, exact number lexemes, duplicate keys, escapes and Unicode; transformation fidelity fixture.'
+Add-Fixture 'unclosed-quote.csv' 'csv' 'invalid' 'Unclosed quoted CSV field at EOF.'
+Add-Fixture 'ragged.csv' 'csv' 'policy_dependent' 'Ragged rows; inspection should document whether unequal field counts are accepted.'
+Add-Fixture 'mixed-newlines.txt' 'text' 'valid' 'Small UTF-8 text with CRLF, LF and CR newline forms.'
 Add-Fixture 'invalid-utf8.json' 'json' 'invalid' 'Invalid UTF-8 byte inside a JSON string.'
-[System.IO.File]::WriteAllText((Join-Path $Directory 'bom.json'), '{"bom":true}', [System.Text.UTF8Encoding]::new($true))
 Add-Fixture 'bom.json' 'json' 'policy_dependent' 'UTF-8 BOM before JSON; record whether the parser explicitly supports it.'
-foreach ($name in @('fixture-50mb.json', 'fixture-250mb.json')) {
-  if (Test-Path -LiteralPath (Join-Path $Directory $name)) {
-    Add-Fixture $name 'json' 'valid' 'Historical ASCII array fixture: sequential integer IDs and a repeated payload string; not representative of heterogeneous real-world JSON.'
-  }
-}
-$manifest = [ordered]@{ generated_at_utc = [DateTime]::UtcNow.ToString('o'); generator = 'generate-corpus.ps1'; fixtures = $entries.ToArray() }
+
+$manifest = [ordered]@{ generated_at_utc = [DateTime]::UtcNow.ToString('o'); generator = 'generate-corpus.ps1 + scripts/generate-fixtures.mjs'; fixtures = $entries.ToArray() }
 [System.IO.File]::WriteAllText((Join-Path $Directory 'manifest.json'), ($manifest | ConvertTo-Json -Depth 8), $utf8)
 foreach ($entry in $entries) {
-  Write-Output ("{0}: {1:N0} bytes ({2})" -f $entry.file, $entry.bytes, $entry.expectation)
+  Write-Output ("{0}: {1:N0} bytes ({2}) sha256 {3}" -f $entry.file, $entry.bytes, $entry.expectation, $entry.sha256)
 }

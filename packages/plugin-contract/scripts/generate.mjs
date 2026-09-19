@@ -111,7 +111,7 @@ const rust = [
 async function output(path, content) {
   if (check) {
     const current = await readFile(path, "utf8").catch(() => "");
-    if (current !== content) throw new Error(`generated file is stale: ${path}`);
+    if (current.replace(/\r\n/g, "\n") !== content.replace(/\r\n/g, "\n")) throw new Error(`generated file is stale: ${path}`);
   } else await writeFile(path, content);
 }
 

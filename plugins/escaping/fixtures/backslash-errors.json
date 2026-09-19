@@ -1,0 +1,326 @@
+[
+  {
+    "name": "trailing backslash",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "abc\\",
+    "error": {
+      "code": "backslash.incomplete-escape",
+      "byteOffset": 3
+    }
+  },
+  {
+    "name": "unknown escape",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\q",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "\\xHH"
+    }
+  },
+  {
+    "name": "bell hint",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\a",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "\\x07"
+    }
+  },
+  {
+    "name": "escape character hint",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\e",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "\\x1b"
+    }
+  },
+  {
+    "name": "octal digit",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\7",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "octal"
+    }
+  },
+  {
+    "name": "json solidus",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\/",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "JSON string tool"
+    }
+  },
+  {
+    "name": "python capital u",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\U0001F600",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0,
+      "match": "\\u{"
+    }
+  },
+  {
+    "name": "line continuation",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "a\\\nb",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 1,
+      "match": "continuation"
+    }
+  },
+  {
+    "name": "astral character after backslash",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\😀",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "nul followed by digit is ambiguous octal",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\012",
+    "error": {
+      "code": "backslash.ambiguous-octal",
+      "byteOffset": 0,
+      "match": "\\x00"
+    }
+  },
+  {
+    "name": "hex at or above 0x80 is ambiguous",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "caf\\xc3\\xa9",
+    "error": {
+      "code": "backslash.ambiguous-hex-escape",
+      "byteOffset": 3,
+      "match": "\\u00c3"
+    }
+  },
+  {
+    "name": "hex with one digit",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\x4",
+    "error": {
+      "code": "backslash.invalid-hex-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "hex with non-hex digits",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\xZZ",
+    "error": {
+      "code": "backslash.invalid-hex-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "short unicode escape",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u12",
+    "error": {
+      "code": "backslash.invalid-unicode-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "empty braces",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{}",
+    "error": {
+      "code": "backslash.invalid-unicode-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "too many brace digits",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{1234567}",
+    "error": {
+      "code": "backslash.invalid-unicode-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "non-hex in braces",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{12G}",
+    "error": {
+      "code": "backslash.invalid-unicode-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "unterminated braces",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{1F600",
+    "error": {
+      "code": "backslash.unterminated-unicode-escape",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "braces above u+10ffff",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{110000}",
+    "error": {
+      "code": "backslash.unicode-escape-out-of-range",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "braces surrogate",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\u{D800}",
+    "error": {
+      "code": "backslash.lone-surrogate",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "lone high surrogate",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\ud83d x",
+    "error": {
+      "code": "backslash.lone-surrogate",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "high surrogate followed by non-surrogate",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\ud83d\\u0041",
+    "error": {
+      "code": "backslash.lone-surrogate",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "lone low surrogate",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\\ude00",
+    "error": {
+      "code": "backslash.lone-surrogate",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "offset after multibyte and newline",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "é\n\\q",
+    "error": {
+      "code": "backslash.unknown-escape",
+      "byteOffset": 3,
+      "line": 2,
+      "column": 1
+    }
+  },
+  {
+    "name": "invalid non-ascii option",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "non-ascii": "latin1"
+    },
+    "input": "x",
+    "error": {
+      "code": "option.invalid",
+      "match": "non-ascii"
+    }
+  },
+  {
+    "name": "unknown operation",
+    "operationId": "text.unicode",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "x",
+    "error": {
+      "code": "operation.unknown",
+      "match": "text.backslash"
+    }
+  }
+]

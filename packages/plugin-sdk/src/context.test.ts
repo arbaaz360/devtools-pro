@@ -22,3 +22,9 @@ test("streaming reads reject inputs larger than the declared limit before alloca
   const ctx = new ProcessorContext(reader, new MemoryOutputSink(), new CancellationToken(), new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets(), { ...defaultLimits(), maxInputBytes: 5, maxChunkBytes: 2 });
   await assert.rejects(async () => { for await (const _chunk of ctx.readChunks("input")) { /* consume */ } }, /exceeds limit/);
 });
+
+test("named input reads reject unsupplied ports explicitly", async () => {
+  const reader = new MemoryReader();
+  const ctx = new ProcessorContext(reader, new MemoryOutputSink(), new CancellationToken(), new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
+  await assert.rejects(() => ctx.read("missing"), /named input missing was not supplied/);
+});

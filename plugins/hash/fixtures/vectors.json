@@ -1,38 +1,107 @@
-[
-  {
-    "name": "empty",
-    "input": "",
-    "digests": {
-      "md5": "d41d8cd98f00b204e9800998ecf8427e",
-      "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
-      "sha224": "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "sha384": "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b",
-      "sha512": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+{
+  "description": "Published test vectors for encoding.hash. Each vector lists only the digests its cited standard publishes; test.mjs compares those exactly and checks shape for the rest. Inputs are UTF-8 text; `repeat` builds long messages without storing them. Sources: RFC 1321 Appendix A.5 (MD5), RFC 3174 section 7.3 (SHA-1), RFC 6234 section 8.5 and FIPS 180-4 examples (SHA-1/224/256/384/512).",
+  "vectors": [
+    {
+      "name": "empty",
+      "source": "RFC 1321 A.5; FIPS 180-4 / NIST SHAVS Len=0",
+      "input": "",
+      "digests": {
+        "md5": "d41d8cd98f00b204e9800998ecf8427e",
+        "sha1": "da39a3ee5e6b4b0d3255bfef95601890afd80709",
+        "sha224": "d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "sha384": "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b",
+        "sha512": "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+      }
+    },
+    {
+      "name": "abc",
+      "source": "RFC 1321 A.5; RFC 3174 7.3 TEST1; RFC 6234 8.5 TEST1",
+      "input": "abc",
+      "digests": {
+        "md5": "900150983cd24fb0d6963f7d28e17f72",
+        "sha1": "a9993e364706816aba3e25717850c26c9cd0d89d",
+        "sha224": "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7",
+        "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+        "sha384": "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7",
+        "sha512": "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
+      }
+    },
+    {
+      "name": "rfc1321-a",
+      "source": "RFC 1321 A.5",
+      "input": "a",
+      "digests": { "md5": "0cc175b9c0f1b6a831c399e269772661" }
+    },
+    {
+      "name": "rfc1321-message-digest",
+      "source": "RFC 1321 A.5",
+      "input": "message digest",
+      "digests": { "md5": "f96b697d7cb7938d525a2f31aaf161d0" }
+    },
+    {
+      "name": "rfc1321-alphabet",
+      "source": "RFC 1321 A.5",
+      "input": "abcdefghijklmnopqrstuvwxyz",
+      "digests": { "md5": "c3fcd3d76192e4007dfb496cca67e13b" }
+    },
+    {
+      "name": "rfc1321-alphanumeric",
+      "source": "RFC 1321 A.5",
+      "input": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+      "digests": { "md5": "d174ab98d277d9f5a5611c2c9f419d9f" }
+    },
+    {
+      "name": "rfc1321-eighty-digits",
+      "source": "RFC 1321 A.5 (80 bytes crosses one 64-byte block)",
+      "input": "1234567890",
+      "repeat": 8,
+      "digests": { "md5": "57edf4a22be3c955ac49da2e2107b67a" }
+    },
+    {
+      "name": "two-block-56",
+      "source": "RFC 3174 7.3 TEST2a; RFC 6234 8.5 TEST2_1 (56 bytes forces a second padding block)",
+      "input": "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+      "digests": {
+        "sha1": "84983e441c3bd26ebaae4aa1f95129e5e54670f1",
+        "sha224": "75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525",
+        "sha256": "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+      }
+    },
+    {
+      "name": "two-block-112",
+      "source": "RFC 6234 8.5 TEST2_2; FIPS 180-4 examples (112 bytes forces a second 128-byte padding block)",
+      "input": "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+      "digests": {
+        "sha384": "09330c33f71147e83d192fc782cd1b4753111b173b3b05d22fa08086e3b0f712fcc7c71a557e2db966c3e9fa91746039",
+        "sha512": "8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909"
+      }
+    },
+    {
+      "name": "million-a",
+      "source": "RFC 3174 7.3 TEST3; RFC 6234 8.5 TEST3; FIPS 180-4 examples (1,000,000 bytes)",
+      "input": "a",
+      "repeat": 1000000,
+      "digests": {
+        "sha1": "34aa973cd4c4daa4f61eeb2bdbad27316534016f",
+        "sha224": "20794655980c91d8bbb4c1ea97618a4bf03f42581948b2ee4ee7ad67",
+        "sha256": "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+        "sha384": "9d0e1809716474cb086e834e310a4a1ced149e9c00f248527972cec5704c2a5b07b8b3dc38ecc4ebae97ddd87f3d8985",
+        "sha512": "e718483d0ce769644e2e42c7bc15b4638e1f98b13b2044285632a803afa973ebde0ff244877ea60a4cb0432ce577c31beb009c5c2c49aa2e4eadb217ad8cc09b"
+      }
+    },
+    {
+      "name": "ten-blocks-640",
+      "source": "RFC 3174 7.3 TEST4; RFC 6234 8.5 TEST4 (64-byte block repeated 10 times; exact multiple of 512 bits)",
+      "input": "01234567012345670123456701234567",
+      "repeat": 20,
+      "digests": {
+        "sha1": "dea356a2cddd90c7a7ecedc5ebb563934f460452",
+        "sha224": "567f69f168cd7844e65259ce658fe7aadfa25216e68eca0eb7ab8262",
+        "sha256": "594847328451bdfa85056225462cc1d867d877fb388df0ce35f25ab5562bfbb5",
+        "sha384": "2fc64a4f500ddb6828f6a3430b8dd72a368eb7f3a8322a70bc84275b9c0b3ab00d27a5cc3c2d224aa6b61a0d79fb4596",
+        "sha512": "89d05ba632c699c31231ded4ffc127d5a894dad412c0e024db872d1abd2ba8141a0f85072a9be1e2aa04cf33c765cb510813a39cd5a84c4acaa64d3f3fb7bae9"
+      }
     }
-  },
-  {
-    "name": "abc",
-    "input": "abc",
-    "digests": {
-      "md5": "900150983cd24fb0d6963f7d28e17f72",
-      "sha1": "a9993e364706816aba3e25717850c26c9cd0d89d",
-      "sha224": "23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7",
-      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-      "sha384": "cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7",
-      "sha512": "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f"
-    }
-  },
-  {
-    "name": "unicode",
-    "input": "Hello, 世界 🌍",
-    "digests": {
-      "md5": "17906e45bc227e6ffd7846d2d248cbb2",
-      "sha1": "6ff2884dfbf1d46991afbd953d64f50ac8c133be",
-      "sha224": "9deb213c3b9d6c4beeaa62982571a6304464c56a4df85f17b0c6f105",
-      "sha256": "6254dedd9a9c1af06bb5dbbba088665e74800984f0f4786d245766e3f341aa3f",
-      "sha384": "1c030645efb05ce8099565818765b2f3f11cdd8b82bdcaf1a95af532a7fd5620bb482ed138d7745e013c69ce5a580f16",
-      "sha512": "346e1e9090fbc9a4f52225b70c8ed0907f588afe79532a1c0bb5c7f413e765185e9b65a232c555ecdd314f3bbdec931d262a73bc8d71364f624c2bb72aef7675"
-    }
-  }
-]
+  ]
+}

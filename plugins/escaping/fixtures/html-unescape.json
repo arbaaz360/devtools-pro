@@ -1,0 +1,223 @@
+[
+  {
+    "name": "named references",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&lt;p&gt; &amp;amp; &quot;q&quot; &apos;a&apos;",
+    "output": "<p> &amp; \"q\" 'a'",
+    "value": {
+      "sequences": 7,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "html5 names are case sensitive and may be two code points",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&AMP; &Aacute; &aacute; &NotEqualTilde; &Tab;",
+    "output": "& Á á ≂̸ \t",
+    "value": {
+      "sequences": 5
+    }
+  },
+  {
+    "name": "decimal and hexadecimal references",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#233; &#xE9; &#Xe9; &#x1F600; &#128512;",
+    "output": "é é é 😀 😀"
+  },
+  {
+    "name": "leading zeros",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#0233; &#x00e9;",
+    "output": "é é"
+  },
+  {
+    "name": "ascii whitespace references are allowed in strict mode",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#9;&#10;&#12;&#32;",
+    "output": "\t\n\f "
+  },
+  {
+    "name": "bare ampersands are text",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "AT&T & co &&amp; x&foo y & ;",
+    "output": "AT&T & co && x&foo y & ;",
+    "value": {
+      "sequences": 1,
+      "preserved": 0
+    }
+  },
+  {
+    "name": "non-ascii passes through",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "déjà &amp; 😀",
+    "output": "déjà & 😀"
+  },
+  {
+    "name": "crlf preserved",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "a\r\n&amp;b",
+    "output": "a\r\n&b"
+  },
+  {
+    "name": "permissive control references round trip escaped controls",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "esc&#27;del&#127;",
+    "output": "esc\u001bdel\u007f",
+    "value": {
+      "sequences": 2
+    }
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "",
+    "output": "",
+    "value": {
+      "sequences": 0
+    }
+  },
+  {
+    "name": "permissive legacy names without semicolon",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&amp &copy2024 &notit; &ltx",
+    "output": "& ©2024 ¬it; <x",
+    "value": {
+      "sequences": 4
+    }
+  },
+  {
+    "name": "permissive numeric without semicolon",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&#233 &#xE9x",
+    "output": "é éx"
+  },
+  {
+    "name": "permissive unknown names are kept",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&foo; &bogus; &amp;",
+    "output": "&foo; &bogus; &",
+    "value": {
+      "sequences": 1,
+      "preserved": 2
+    }
+  },
+  {
+    "name": "permissive c1 windows-1252 remap",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&#x80;&#150;&#x9F;&#x81;",
+    "output": "€–Ÿ\u0081",
+    "value": {
+      "remapped": 3
+    }
+  },
+  {
+    "name": "permissive invalid numeric becomes u+fffd",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&#0;&#xD800;&#x110000;&#99999999999;",
+    "output": "\ufffd\ufffd\ufffd\ufffd",
+    "value": {
+      "replaced": 4
+    }
+  },
+  {
+    "name": "permissive controls and noncharacters are kept",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&#1;&#xFFFE;&#13;",
+    "output": "\u0001\ufffe\r"
+  },
+  {
+    "name": "permissive numeric without digits is text",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&#; &#x; &#xz",
+    "output": "&#; &#x; &#xz",
+    "value": {
+      "preserved": 3
+    }
+  },
+  {
+    "name": "permissive double encoded stays single decoded",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false
+    },
+    "input": "&ampamp;",
+    "output": "&amp;"
+  },
+  {
+    "name": "leading zeros in numeric references are insignificant",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "&#000000065;&#x0000000041;",
+    "output": "AA",
+    "value": {
+      "sequences": 2,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  }
+]

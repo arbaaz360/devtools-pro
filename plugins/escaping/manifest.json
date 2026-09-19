@@ -1,1 +1,534 @@
-{"kind":"pluginManifest","apiVersion":"devtools.plugin/v2","id":"text.escaping","version":"0.1.0","stateVersion":1,"title":"Text Escaping","description":"Escape and unescape text.","tools":[{"id":"text.html","title":"HTML Escape / Unescape","category":"converter","operationIds":["text.html"],"workspaceId":"html"},{"id":"text.json-string","title":"JSON String Escape / Unescape","category":"converter","operationIds":["text.json-string"],"workspaceId":"json"},{"id":"text.backslash","title":"Backslash Escape / Unescape","category":"converter","operationIds":["text.backslash"],"workspaceId":"backslash"}],"operations":[{"id":"text.html","title":"HTML entities","executor":{"kind":"javascriptWorker","id":"text.escaping.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"html","cancellation":"cooperative"},"inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],"outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],"options":[{"id":"mode","type":"enum","label":"Mode","default":"escape","choices":[{"id":"escape","label":"Escape"},{"id":"unescape","label":"Unescape"}],"persistence":"instance","sensitive":false}],"trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},"limits":{"maxInputBytes":"4194304","maxOutputBytes":"16777216","maxChunkBytes":"1048576","deadlineMs":"3000"}},{"id":"text.json-string","title":"JSON string","executor":{"kind":"javascriptWorker","id":"text.escaping.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"json","cancellation":"cooperative"},"inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],"outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],"options":[{"id":"mode","type":"enum","label":"Mode","default":"escape","choices":[{"id":"escape","label":"Escape"},{"id":"unescape","label":"Unescape"}],"persistence":"instance","sensitive":false}],"trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},"limits":{"maxInputBytes":"4194304","maxOutputBytes":"16777216","maxChunkBytes":"1048576","deadlineMs":"3000"}},{"id":"text.backslash","title":"Backslash sequences","executor":{"kind":"javascriptWorker","id":"text.escaping.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"backslash","cancellation":"cooperative"},"inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],"outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],"options":[{"id":"mode","type":"enum","label":"Mode","default":"escape","choices":[{"id":"escape","label":"Escape"},{"id":"unescape","label":"Unescape"}],"persistence":"instance","sensitive":false}],"trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},"limits":{"maxInputBytes":"4194304","maxOutputBytes":"16777216","maxChunkBytes":"1048576","deadlineMs":"3000"}}],"workspaces":[{"id":"html","kind":"transform","bindings":[],"commands":[],"presentationSettings":[]},{"id":"json","kind":"transform","bindings":[],"commands":[],"presentationSettings":[]},{"id":"backslash","kind":"transform","bindings":[],"commands":[],"presentationSettings":[]}],"capabilities":[],"settings":[],"tests":{"requirementIds":["DU-08","DU-09"],"fixtures":[],"uiScenarios":[]}}
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "text.escaping",
+  "version": "0.2.0",
+  "stateVersion": 1,
+  "title": "Text Escaping",
+  "description": "Escape and unescape HTML character references, JSON string literals and backslash sequences.",
+  "tools": [
+    {
+      "id": "text.html",
+      "title": "HTML Escape / Unescape",
+      "category": "converter",
+      "operationIds": [
+        "text.html"
+      ],
+      "workspaceId": "html"
+    },
+    {
+      "id": "text.json-string",
+      "title": "JSON String Escape / Unescape",
+      "category": "converter",
+      "operationIds": [
+        "text.json-string"
+      ],
+      "workspaceId": "json"
+    },
+    {
+      "id": "text.backslash",
+      "title": "Backslash Escape / Unescape",
+      "category": "converter",
+      "operationIds": [
+        "text.backslash"
+      ],
+      "workspaceId": "backslash"
+    }
+  ],
+  "operations": [
+    {
+      "id": "text.html",
+      "title": "HTML character references",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "text.escaping.processor",
+        "version": "0.2.0",
+        "engine": "ecmascript",
+        "engineVersion": "2024",
+        "syntax": "html",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": [
+            "text"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "kind": "artifact",
+          "multiplicity": "one",
+          "representations": [
+            "text",
+            "properties"
+          ],
+          "sensitive": false,
+          "exports": [
+            "copyText",
+            "save",
+            "useAsInput"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "mode",
+          "type": "enum",
+          "label": "Mode",
+          "default": "escape",
+          "choices": [
+            {
+              "id": "escape",
+              "label": "Escape"
+            },
+            {
+              "id": "unescape",
+              "label": "Unescape"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "numeric",
+          "type": "enum",
+          "label": "Numeric references",
+          "default": "decimal",
+          "choices": [
+            {
+              "id": "decimal",
+              "label": "Decimal (&#233;)"
+            },
+            {
+              "id": "hex",
+              "label": "Hexadecimal (&#xE9;)"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        },
+        {
+          "id": "prefer-named",
+          "type": "boolean",
+          "label": "Prefer named references",
+          "default": true,
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        },
+        {
+          "id": "encode-everything",
+          "type": "boolean",
+          "label": "Encode everything",
+          "default": false,
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        },
+        {
+          "id": "allow-unsafe-symbols",
+          "type": "boolean",
+          "label": "Allow unsafe symbols",
+          "default": false,
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            },
+            {
+              "effect": "enabled",
+              "when": {
+                "kind": "predicate",
+                "optionId": "encode-everything",
+                "operator": "equals",
+                "value": false
+              }
+            }
+          ]
+        },
+        {
+          "id": "strict",
+          "type": "boolean",
+          "label": "Strict HTML5 decoding",
+          "default": true,
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Unescape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "unescape"
+              }
+            }
+          ]
+        }
+      ],
+      "trigger": {
+        "modes": [
+          "explicit",
+          "inputChange"
+        ],
+        "debounceMs": "100"
+      },
+      "limits": {
+        "maxInputBytes": "4194304",
+        "maxOutputBytes": "16777216",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "3000"
+      }
+    },
+    {
+      "id": "text.json-string",
+      "title": "JSON string literal",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "text.escaping.processor",
+        "version": "0.2.0",
+        "engine": "ecmascript",
+        "engineVersion": "2024",
+        "syntax": "json",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": [
+            "text"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "kind": "artifact",
+          "multiplicity": "one",
+          "representations": [
+            "text",
+            "properties"
+          ],
+          "sensitive": false,
+          "exports": [
+            "copyText",
+            "save",
+            "useAsInput"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "mode",
+          "type": "enum",
+          "label": "Mode",
+          "default": "escape",
+          "choices": [
+            {
+              "id": "escape",
+              "label": "Escape"
+            },
+            {
+              "id": "unescape",
+              "label": "Unescape"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "quotes",
+          "type": "enum",
+          "label": "Surrounding quotes",
+          "default": "include",
+          "choices": [
+            {
+              "id": "include",
+              "label": "Include the double quotes"
+            },
+            {
+              "id": "omit",
+              "label": "String body only"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "ascii-only",
+          "type": "boolean",
+          "label": "Escape non-ASCII",
+          "default": false,
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        }
+      ],
+      "trigger": {
+        "modes": [
+          "explicit",
+          "inputChange"
+        ],
+        "debounceMs": "100"
+      },
+      "limits": {
+        "maxInputBytes": "4194304",
+        "maxOutputBytes": "16777216",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "3000"
+      }
+    },
+    {
+      "id": "text.backslash",
+      "title": "Backslash sequences",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "text.escaping.processor",
+        "version": "0.2.0",
+        "engine": "ecmascript",
+        "engineVersion": "2024",
+        "syntax": "backslash",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": [
+            "text"
+          ]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "kind": "artifact",
+          "multiplicity": "one",
+          "representations": [
+            "text",
+            "properties"
+          ],
+          "sensitive": false,
+          "exports": [
+            "copyText",
+            "save",
+            "useAsInput"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "mode",
+          "type": "enum",
+          "label": "Mode",
+          "default": "escape",
+          "choices": [
+            {
+              "id": "escape",
+              "label": "Escape"
+            },
+            {
+              "id": "unescape",
+              "label": "Unescape"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "quotes",
+          "type": "enum",
+          "label": "Escape quotes",
+          "default": "both",
+          "choices": [
+            {
+              "id": "both",
+              "label": "Double and single"
+            },
+            {
+              "id": "double",
+              "label": "Double only"
+            },
+            {
+              "id": "single",
+              "label": "Single only"
+            },
+            {
+              "id": "none",
+              "label": "Neither"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        },
+        {
+          "id": "non-ascii",
+          "type": "enum",
+          "label": "Non-ASCII characters",
+          "default": "keep",
+          "choices": [
+            {
+              "id": "keep",
+              "label": "Keep literal"
+            },
+            {
+              "id": "unicode",
+              "label": "\\uHHHH and \\u{H...}"
+            },
+            {
+              "id": "utf16",
+              "label": "\\uHHHH code units"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Escape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "escape"
+              }
+            }
+          ]
+        }
+      ],
+      "trigger": {
+        "modes": [
+          "explicit",
+          "inputChange"
+        ],
+        "debounceMs": "100"
+      },
+      "limits": {
+        "maxInputBytes": "4194304",
+        "maxOutputBytes": "16777216",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "3000"
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "html",
+      "kind": "transform",
+      "bindings": [],
+      "commands": [],
+      "presentationSettings": []
+    },
+    {
+      "id": "json",
+      "kind": "transform",
+      "bindings": [],
+      "commands": [],
+      "presentationSettings": []
+    },
+    {
+      "id": "backslash",
+      "kind": "transform",
+      "bindings": [],
+      "commands": [],
+      "presentationSettings": []
+    }
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {
+    "requirementIds": [
+      "DU-08",
+      "DU-09"
+    ],
+    "fixtures": [
+      "fixtures/html-escape.json",
+      "fixtures/html-unescape.json",
+      "fixtures/html-errors.json",
+      "fixtures/json-string-escape.json",
+      "fixtures/json-string-unescape.json",
+      "fixtures/json-string-errors.json",
+      "fixtures/backslash-escape.json",
+      "fixtures/backslash-unescape.json",
+      "fixtures/backslash-errors.json"
+    ],
+    "uiScenarios": []
+  }
+}

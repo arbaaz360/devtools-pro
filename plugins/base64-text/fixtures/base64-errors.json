@@ -1,0 +1,22 @@
+[
+  {"name": "invalid-character", "input": "SGVsbG8$=", "options": {}, "code": "invalid-character", "offset": 7, "line": 1, "column": 8, "message": "\"\\$\" is not a Base64 character"},
+  {"name": "invalid-character-second-line", "input": "SGVs\nbG8*", "options": {"error-policy": "tolerant"}, "code": "invalid-character", "offset": 8, "line": 2, "column": 4, "message": "not a Base64 character"},
+  {"name": "urlsafe-in-standard", "input": "-_8=", "options": {"variant": "standard"}, "code": "wrong-alphabet", "offset": 0, "line": 1, "column": 1, "message": "belongs to the URL-safe alphabet.*switch Alphabet to URL-safe"},
+  {"name": "standard-in-urlsafe", "input": "+/8=", "options": {"variant": "url"}, "code": "wrong-alphabet", "offset": 0, "line": 1, "column": 1, "message": "belongs to the standard alphabet.*switch Alphabet to standard"},
+  {"name": "whitespace-strict-newline", "input": "SGVsbG8=\n", "options": {}, "code": "whitespace", "offset": 8, "line": 1, "column": 9, "message": "whitespace \\\\n is not allowed by the strict error policy.*tolerant"},
+  {"name": "whitespace-strict-space", "input": "SGVs bG8=", "options": {}, "code": "whitespace", "offset": 4, "line": 1, "column": 5, "message": "whitespace \" \" is not allowed"},
+  {"name": "padding-in-middle", "input": "SGVsbG8=Zm9v", "options": {}, "code": "data-after-padding", "offset": 8, "line": 1, "column": 9, "message": "follows padding"},
+  {"name": "leading-padding", "input": "=SGVsbG8", "options": {}, "code": "padding-position", "offset": 0, "line": 1, "column": 1, "message": "starts with padding"},
+  {"name": "padding-after-complete-group", "input": "SGVsbG8h=", "options": {}, "code": "padding-position", "offset": 8, "line": 1, "column": 9, "message": "follows a complete group"},
+  {"name": "padding-after-single-character", "input": "SGVsbG8hS=", "options": {}, "code": "padding-position", "offset": 9, "line": 1, "column": 10, "message": "follows a single character"},
+  {"name": "padding-incomplete", "input": "SGVsbA=", "options": {}, "code": "padding-incomplete", "offset": 7, "line": 1, "column": 8, "message": "needs 2; append ="},
+  {"name": "padding-excess", "input": "SGVsbG8==", "options": {}, "code": "padding-excess", "offset": 8, "line": 1, "column": 9, "message": "too many padding characters: 1 \"=\" complete"},
+  {"name": "padding-forbidden", "input": "SGVsbG8=", "options": {"padding": "omit"}, "code": "padding-forbidden", "offset": 7, "line": 1, "column": 8, "message": "not allowed with the Omit padding policy"},
+  {"name": "padding-missing-required", "input": "SGVsbG8", "options": {}, "code": "padding-missing", "offset": 7, "line": 1, "column": 8, "message": "input ends without padding; \"=\" is required"},
+  {"name": "length-single-trailing", "input": "SGVsbG8hS", "options": {"padding": "optional"}, "code": "length", "offset": 9, "line": 1, "column": 10, "message": "single trailing character"},
+  {"name": "length-one-character", "input": "S", "options": {"padding": "optional", "error-policy": "tolerant"}, "code": "length", "offset": 1, "line": 1, "column": 2, "message": "truncated or corrupted"},
+  {"name": "trailing-bits-strict", "input": "//==", "options": {}, "code": "trailing-bits", "offset": 4, "line": 1, "column": 5, "message": "non-zero unused bits.*tolerant"},
+  {"name": "trailing-bits-strict-unpadded", "input": "SGVsbG9", "options": {"padding": "optional"}, "code": "trailing-bits", "offset": 7, "line": 1, "column": 8, "message": "final character \"9\""},
+  {"name": "non-ascii", "input": "SGVs€", "options": {}, "code": "not-ascii", "offset": 4, "line": 1, "column": 5, "message": "byte 0xE2 is not ASCII; Base64 text uses only ASCII"},
+  {"name": "utf8-bom", "input": "\ufeffSGVsbG8=", "options": {}, "code": "not-ascii", "offset": 0, "line": 1, "column": 1, "message": "byte-order mark"}
+]

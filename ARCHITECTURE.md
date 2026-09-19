@@ -12,7 +12,7 @@ Those documents describe the intended architecture. They do not claim the runtim
 
 ## Technology decisions
 
-**Rust** owns current processing libraries in `crates/devtools-core`. Typed errors, streaming readers and explicit allocation/cancellation policies suit large inputs. Rust does not itself guarantee bounded memory or cancellation; algorithms and hosts must enforce those policies. The CLI can test and benchmark the core without the UI.
+**Rust** owns current processing libraries in `crates/devtools-core`. Typed errors, streaming readers and explicit allocation/cancellation policies suit large inputs. Rust does not itself guarantee bounded memory or cancellation; algorithms and hosts must enforce those policies. The CLI can test and benchmark the core without the UI; [benchmarks/](benchmarks/README.md) measures it on generated 50/250 MB fixtures and records the baseline in [benchmarks/baseline.md](benchmarks/baseline.md).
 
 **Tauri 2** is the native host in `apps/desktop/src-tauri`. It owns dialogs, document handles, filesystem validation, snapshots, jobs and temporary results. The webview requests work through a typed bridge. The host supplies the platform-specific operations that later need macOS adapters.
 

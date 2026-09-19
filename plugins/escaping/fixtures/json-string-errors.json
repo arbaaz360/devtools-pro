@@ -1,0 +1,358 @@
+[
+  {
+    "name": "object is a document not a string",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "{\"a\":1}",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 0,
+      "match": "JSON tool"
+    }
+  },
+  {
+    "name": "array is a document not a string",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "[1]",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 0,
+      "match": "JSON tool"
+    }
+  },
+  {
+    "name": "number is not a string",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "42",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "bare text",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "hello",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 0,
+      "match": "quotes to omit"
+    }
+  },
+  {
+    "name": "empty input",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "only whitespace",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": " \n ",
+    "error": {
+      "code": "json.expected-string",
+      "byteOffset": 3,
+      "line": 2,
+      "column": 2
+    }
+  },
+  {
+    "name": "unterminated literal",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"abc",
+    "error": {
+      "code": "json.unterminated-string",
+      "byteOffset": 0
+    }
+  },
+  {
+    "name": "unterminated literal after whitespace",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "  \"abc",
+    "error": {
+      "code": "json.unterminated-string",
+      "byteOffset": 2
+    }
+  },
+  {
+    "name": "second literal is trailing content",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"a\" \"b\"",
+    "error": {
+      "code": "json.trailing-content",
+      "byteOffset": 4
+    }
+  },
+  {
+    "name": "comma is trailing content",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"a\",",
+    "error": {
+      "code": "json.trailing-content",
+      "byteOffset": 3
+    }
+  },
+  {
+    "name": "raw newline",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"a\nb\"",
+    "error": {
+      "code": "json.unescaped-control",
+      "byteOffset": 2,
+      "match": "U+000A"
+    }
+  },
+  {
+    "name": "raw tab",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\t\"",
+    "error": {
+      "code": "json.unescaped-control",
+      "byteOffset": 1,
+      "match": "\\t"
+    }
+  },
+  {
+    "name": "raw control in body mode",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": "a\u0001",
+    "error": {
+      "code": "json.unescaped-control",
+      "byteOffset": 1,
+      "match": "\\u0001"
+    }
+  },
+  {
+    "name": "hex escape is not json",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\x41\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 1,
+      "match": "\\u00HH"
+    }
+  },
+  {
+    "name": "single quote escape is not json",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\'\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 1,
+      "match": "single quotes"
+    }
+  },
+  {
+    "name": "zero escape is not json",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\0\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 1,
+      "match": "\\u0000"
+    }
+  },
+  {
+    "name": "capital u escape is not json",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\U0001F600\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 1,
+      "match": "surrogate pair"
+    }
+  },
+  {
+    "name": "line continuation is not json",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"a\\\nb\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 2,
+      "match": "continuation"
+    }
+  },
+  {
+    "name": "short unicode escape",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\u12\"",
+    "error": {
+      "code": "json.invalid-unicode-escape",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "non-hex unicode escape",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\u12G4\"",
+    "error": {
+      "code": "json.invalid-unicode-escape",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "incomplete escape at end of body",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": "abc\\",
+    "error": {
+      "code": "json.incomplete-escape",
+      "byteOffset": 3
+    }
+  },
+  {
+    "name": "lone high surrogate",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\ud83d\"",
+    "error": {
+      "code": "json.lone-surrogate",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "high surrogate followed by non-surrogate",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\ud83d\\u0041\"",
+    "error": {
+      "code": "json.lone-surrogate",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "high surrogate followed by literal",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\ud83dx\"",
+    "error": {
+      "code": "json.lone-surrogate",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "lone low surrogate",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"\\ude00\"",
+    "error": {
+      "code": "json.lone-surrogate",
+      "byteOffset": 1
+    }
+  },
+  {
+    "name": "raw quote in body mode",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "omit"
+    },
+    "input": "a\"b",
+    "error": {
+      "code": "json.unescaped-quote",
+      "byteOffset": 1,
+      "match": "quotes to include"
+    }
+  },
+  {
+    "name": "offset after multibyte character",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape"
+    },
+    "input": "\"é\\x\"",
+    "error": {
+      "code": "json.invalid-escape",
+      "byteOffset": 3,
+      "line": 1,
+      "column": 3
+    }
+  },
+  {
+    "name": "invalid quotes option",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "unescape",
+      "quotes": "single"
+    },
+    "input": "\"x\"",
+    "error": {
+      "code": "option.invalid",
+      "match": "quotes"
+    }
+  }
+]

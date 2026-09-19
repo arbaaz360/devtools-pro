@@ -1,0 +1,431 @@
+[
+  {
+    "name": "find ascii lists every non-overlapping occurrence",
+    "input": "the cat sat on the mat",
+    "options": { "query": "at", "mode": "find" },
+    "expect": { "matchCount": 3, "replacementCount": 0, "matches": [
+      { "start": 5, "end": 7, "startByte": 5, "endByte": 7 },
+      { "start": 9, "end": 11, "startByte": 9, "endByte": 11 },
+      { "start": 20, "end": 22, "startByte": 20, "endByte": 22 }
+    ], "text": "the cat sat on the mat" }
+  },
+  {
+    "name": "mode defaults to find and case-sensitive",
+    "input": "Hello HELLO hello",
+    "options": { "query": "hello" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 12, "end": 17, "startByte": 12, "endByte": 17 } ], "text": "Hello HELLO hello" }
+  },
+  {
+    "name": "precomposed unicode reports UTF-16 and UTF-8 offsets",
+    "input": "café café",
+    "options": { "query": "café" },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 4, "startByte": 0, "endByte": 5 },
+      { "start": 5, "end": 9, "startByte": 6, "endByte": 11 }
+    ], "text": "café café" }
+  },
+  {
+    "name": "astral code points count two UTF-16 units and four bytes",
+    "input": "😀a😀",
+    "options": { "query": "😀" },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 2, "startByte": 0, "endByte": 4 },
+      { "start": 3, "end": 5, "startByte": 5, "endByte": 9 }
+    ], "text": "😀a😀" }
+  },
+  {
+    "name": "no canonical normalization: decomposed text does not match precomposed query",
+    "input": "café",
+    "options": { "query": "café" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "café" }
+  },
+  {
+    "name": "case-insensitive ascii",
+    "input": "Hello HELLO hello",
+    "options": { "query": "hello", "caseSensitive": false },
+    "expect": { "matchCount": 3, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 5, "startByte": 0, "endByte": 5 },
+      { "start": 6, "end": 11, "startByte": 6, "endByte": 11 },
+      { "start": 12, "end": 17, "startByte": 12, "endByte": 17 }
+    ], "text": "Hello HELLO hello" }
+  },
+  {
+    "name": "case-insensitive greek folds final sigma with sigma",
+    "input": "ΣΑΣ σας",
+    "options": { "query": "σας", "caseSensitive": false },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 6 },
+      { "start": 4, "end": 7, "startByte": 7, "endByte": 13 }
+    ], "text": "ΣΑΣ σας" }
+  },
+  {
+    "name": "case-insensitive uses simple folding: capital sharp s matches ß, SS does not",
+    "input": "Straße STRASSE STRAẞE",
+    "options": { "query": "straße", "caseSensitive": false },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 6, "startByte": 0, "endByte": 7 },
+      { "start": 15, "end": 21, "startByte": 16, "endByte": 24 }
+    ], "text": "Straße STRASSE STRAẞE" }
+  },
+  {
+    "name": "case-insensitive never applies full folding",
+    "input": "STRASSE",
+    "options": { "query": "straße", "caseSensitive": false },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "STRASSE" }
+  },
+  {
+    "name": "case-insensitive keeps dotless and dotted i distinct from i",
+    "input": "ı I i İ",
+    "options": { "query": "i", "caseSensitive": false },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 2, "end": 3, "startByte": 3, "endByte": 4 },
+      { "start": 4, "end": 5, "startByte": 5, "endByte": 6 }
+    ], "text": "ı I i İ" }
+  },
+  {
+    "name": "case-insensitive folds the kelvin sign onto k and leaves other letters alone",
+    "input": "K k K Ω ω",
+    "options": { "query": "k", "caseSensitive": false },
+    "expect": { "matchCount": 3, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 1, "startByte": 0, "endByte": 1 },
+      { "start": 2, "end": 3, "startByte": 2, "endByte": 3 },
+      { "start": 4, "end": 5, "startByte": 4, "endByte": 7 }
+    ], "text": "K k K Ω ω" }
+  },
+  {
+    "name": "case-insensitive astral pair (deseret)",
+    "input": "𐐀𐐨",
+    "options": { "query": "𐐨", "caseSensitive": false },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 2, "startByte": 0, "endByte": 4 },
+      { "start": 2, "end": 4, "startByte": 4, "endByte": 8 }
+    ], "text": "𐐀𐐨" }
+  },
+  {
+    "name": "whole word requires non-word neighbours on both sides",
+    "input": "cat concatenate cat.",
+    "options": { "query": "cat", "wholeWord": true },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 16, "end": 19, "startByte": 16, "endByte": 19 }
+    ], "text": "cat concatenate cat." }
+  },
+  {
+    "name": "whole word at both document edges",
+    "input": "cat",
+    "options": { "query": "cat", "wholeWord": true },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 0, "end": 3, "startByte": 0, "endByte": 3 } ], "text": "cat" }
+  },
+  {
+    "name": "whole word treats unicode letters as word characters",
+    "input": "naïve naïveté",
+    "options": { "query": "naïve", "wholeWord": true },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 0, "end": 5, "startByte": 0, "endByte": 6 } ], "text": "naïve naïveté" }
+  },
+  {
+    "name": "whole word treats digits and underscore as word characters",
+    "input": "foo foo_bar foo1 foo",
+    "options": { "query": "foo", "wholeWord": true },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 17, "end": 20, "startByte": 17, "endByte": 20 }
+    ], "text": "foo foo_bar foo1 foo" }
+  },
+  {
+    "name": "whole word treats combining marks as word characters",
+    "input": "café cafe",
+    "options": { "query": "cafe", "wholeWord": true },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 6, "end": 10, "startByte": 7, "endByte": 11 } ], "text": "café cafe" }
+  },
+  {
+    "name": "whole word treats ideographs as letters",
+    "input": "日本 日本語",
+    "options": { "query": "日本", "wholeWord": true },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 0, "end": 2, "startByte": 0, "endByte": 6 } ], "text": "日本 日本語" }
+  },
+  {
+    "name": "whole word resumes one unit after a rejected candidate",
+    "input": "x--- ",
+    "options": { "query": "--", "wholeWord": true },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 2, "end": 4, "startByte": 2, "endByte": 4 } ], "text": "x--- " }
+  },
+  {
+    "name": "whole word combines with case-insensitive",
+    "input": "Cat cat concat",
+    "options": { "query": "CAT", "caseSensitive": false, "wholeWord": true },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 4, "end": 7, "startByte": 4, "endByte": 7 }
+    ], "text": "Cat cat concat" }
+  },
+  {
+    "name": "manifest option ids (kebab-case) are accepted alongside the camelCase aliases",
+    "input": "Cat cat concat",
+    "options": { "query": "CAT", "case-sensitive": false, "whole-word": true },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 4, "end": 7, "startByte": 4, "endByte": 7 }
+    ], "text": "Cat cat concat" }
+  },
+  {
+    "name": "overlapping-looking occurrences are matched left to right without overlap",
+    "input": "aaaa",
+    "options": { "query": "aa" },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 2, "startByte": 0, "endByte": 2 },
+      { "start": 2, "end": 4, "startByte": 2, "endByte": 4 }
+    ], "text": "aaaa" }
+  },
+  {
+    "name": "a self-overlapping query matches once",
+    "input": "ababa",
+    "options": { "query": "aba" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 0, "end": 3, "startByte": 0, "endByte": 3 } ], "text": "ababa" }
+  },
+  {
+    "name": "replace all over overlapping-looking occurrences",
+    "input": "aaaaa",
+    "options": { "query": "aa", "replacement": "b", "mode": "replaceAll" },
+    "expect": { "matchCount": 2, "replacementCount": 2, "matches": [
+      { "start": 0, "end": 2, "startByte": 0, "endByte": 2 },
+      { "start": 2, "end": 4, "startByte": 2, "endByte": 4 }
+    ], "text": "bba" }
+  },
+  {
+    "name": "adjacent occurrences",
+    "input": "abcabc",
+    "options": { "query": "abc" },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 3, "end": 6, "startByte": 3, "endByte": 6 }
+    ], "text": "abcabc" }
+  },
+  {
+    "name": "replace first changes only the leftmost occurrence but lists every match",
+    "input": "one two one",
+    "options": { "query": "one", "replacement": "1", "mode": "replace" },
+    "expect": { "matchCount": 2, "replacementCount": 1, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 8, "end": 11, "startByte": 8, "endByte": 11 }
+    ], "text": "1 two one" }
+  },
+  {
+    "name": "replace first with no match leaves the text alone",
+    "input": "abc",
+    "options": { "query": "z", "replacement": "y", "mode": "replace" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc" }
+  },
+  {
+    "name": "replacement text is literal: dollar patterns and backslashes are inserted verbatim",
+    "input": "a.b a.b",
+    "options": { "query": "a.b", "replacement": "$1\\n$&", "mode": "replaceAll" },
+    "expect": { "matchCount": 2, "replacementCount": 2, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 4, "end": 7, "startByte": 4, "endByte": 7 }
+    ], "text": "$1\\n$& $1\\n$&" }
+  },
+  {
+    "name": "query metacharacters are literal",
+    "input": "x.* [a-z]+ (x)",
+    "options": { "query": ".*", "replacement": "", "mode": "replaceAll" },
+    "expect": { "matchCount": 1, "replacementCount": 1, "matches": [ { "start": 1, "end": 3, "startByte": 1, "endByte": 3 } ], "text": "x [a-z]+ (x)" }
+  },
+  {
+    "name": "replace all case-insensitively keeps untouched text intact",
+    "input": "Foo foo FOO",
+    "options": { "query": "foo", "replacement": "bar", "caseSensitive": false, "mode": "replaceAll" },
+    "expect": { "matchCount": 3, "replacementCount": 3, "matches": [
+      { "start": 0, "end": 3, "startByte": 0, "endByte": 3 },
+      { "start": 4, "end": 7, "startByte": 4, "endByte": 7 },
+      { "start": 8, "end": 11, "startByte": 8, "endByte": 11 }
+    ], "text": "bar bar bar" }
+  },
+  {
+    "name": "empty replacement deletes matches",
+    "input": "a-b-c",
+    "options": { "query": "-", "replacement": "", "mode": "replaceAll" },
+    "expect": { "matchCount": 2, "replacementCount": 2, "matches": [
+      { "start": 1, "end": 2, "startByte": 1, "endByte": 2 },
+      { "start": 3, "end": 4, "startByte": 3, "endByte": 4 }
+    ], "text": "abc" }
+  },
+  {
+    "name": "replacement may be longer than the query",
+    "input": "x",
+    "options": { "query": "x", "replacement": "xyz", "mode": "replaceAll" },
+    "expect": { "matchCount": 1, "replacementCount": 1, "matches": [ { "start": 0, "end": 1, "startByte": 0, "endByte": 1 } ], "text": "xyz" }
+  },
+  {
+    "name": "replacement containing the query is never rescanned",
+    "input": "aaa",
+    "options": { "query": "a", "replacement": "aa", "mode": "replaceAll" },
+    "expect": { "matchCount": 3, "replacementCount": 3, "matches": [
+      { "start": 0, "end": 1, "startByte": 0, "endByte": 1 },
+      { "start": 1, "end": 2, "startByte": 1, "endByte": 2 },
+      { "start": 2, "end": 3, "startByte": 2, "endByte": 3 }
+    ], "text": "aaaaaa" }
+  },
+  {
+    "name": "replace all with no match reports zero replacements",
+    "input": "abc",
+    "options": { "query": "z", "replacement": "y", "mode": "replaceAll" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc" }
+  },
+  {
+    "name": "multiline: newlines are ordinary characters",
+    "input": "line one\nline two\nline three",
+    "options": { "query": "line" },
+    "expect": { "matchCount": 3, "replacementCount": 0, "matches": [
+      { "start": 0, "end": 4, "startByte": 0, "endByte": 4 },
+      { "start": 9, "end": 13, "startByte": 9, "endByte": 13 },
+      { "start": 18, "end": 22, "startByte": 18, "endByte": 22 }
+    ], "text": "line one\nline two\nline three" }
+  },
+  {
+    "name": "multiline: a query containing a newline spans lines",
+    "input": "line one\nline two\nline three",
+    "options": { "query": "one\nline" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 5, "end": 13, "startByte": 5, "endByte": 13 } ], "text": "line one\nline two\nline three" }
+  },
+  {
+    "name": "multiline: LF query matches inside CRLF, CRLF query matches only CRLF",
+    "input": "a\r\nb\nc",
+    "options": { "query": "\n" },
+    "expect": { "matchCount": 2, "replacementCount": 0, "matches": [
+      { "start": 2, "end": 3, "startByte": 2, "endByte": 3 },
+      { "start": 4, "end": 5, "startByte": 4, "endByte": 5 }
+    ], "text": "a\r\nb\nc" }
+  },
+  {
+    "name": "multiline: CRLF query",
+    "input": "a\r\nb\nc",
+    "options": { "query": "\r\n" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 1, "end": 3, "startByte": 1, "endByte": 3 } ], "text": "a\r\nb\nc" }
+  },
+  {
+    "name": "multiline: replace all rewrites line endings without normalizing anything else",
+    "input": "a\nb\nc",
+    "options": { "query": "\n", "replacement": "\r\n", "mode": "replaceAll" },
+    "expect": { "matchCount": 2, "replacementCount": 2, "matches": [
+      { "start": 1, "end": 2, "startByte": 1, "endByte": 2 },
+      { "start": 3, "end": 4, "startByte": 3, "endByte": 4 }
+    ], "text": "a\r\nb\r\nc" }
+  },
+  {
+    "name": "tab is an ordinary character",
+    "input": "a\tb",
+    "options": { "query": "\t" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 1, "end": 2, "startByte": 1, "endByte": 2 } ], "text": "a\tb" }
+  },
+  {
+    "name": "empty query in find mode matches nothing and says so",
+    "input": "abc",
+    "options": { "query": "" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc", "diagnostics": ["find.empty-query"] }
+  },
+  {
+    "name": "empty query in replace all mode changes nothing",
+    "input": "abc",
+    "options": { "query": "", "replacement": "x", "mode": "replaceAll" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc", "diagnostics": ["find.empty-query"] }
+  },
+  {
+    "name": "missing query defaults to empty",
+    "input": "abc",
+    "options": { "mode": "find" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc", "diagnostics": ["find.empty-query"] }
+  },
+  {
+    "name": "no match has no diagnostics",
+    "input": "abc",
+    "options": { "query": "z" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "abc", "diagnostics": [] }
+  },
+  {
+    "name": "empty input",
+    "input": "",
+    "options": { "query": "a" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "", "inputBytes": 0, "outputBytes": 0 }
+  },
+  {
+    "name": "empty input and empty query",
+    "input": "",
+    "options": { "query": "", "replacement": "x", "mode": "replaceAll" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "", "diagnostics": ["find.empty-query"] }
+  },
+  {
+    "name": "query longer than the input",
+    "input": "ab",
+    "options": { "query": "abc" },
+    "expect": { "matchCount": 0, "replacementCount": 0, "matches": [], "text": "ab" }
+  },
+  {
+    "name": "a leading byte order mark is preserved as text",
+    "input": "﻿hello",
+    "options": { "query": "hello" },
+    "expect": { "matchCount": 1, "replacementCount": 0, "matches": [ { "start": 1, "end": 6, "startByte": 3, "endByte": 8 } ], "text": "﻿hello", "inputBytes": 8, "outputBytes": 8 }
+  },
+  {
+    "name": "replace all after a byte order mark keeps the mark",
+    "input": "﻿a a",
+    "options": { "query": "a", "replacement": "bb", "mode": "replaceAll" },
+    "expect": { "matchCount": 2, "replacementCount": 2, "matches": [
+      { "start": 1, "end": 2, "startByte": 3, "endByte": 4 },
+      { "start": 3, "end": 4, "startByte": 5, "endByte": 6 }
+    ], "text": "﻿bb bb", "inputBytes": 6, "outputBytes": 8 }
+  },
+  {
+    "name": "NUL in the text is an ordinary character",
+    "input": "a\u0000b\u0000",
+    "options": {
+      "query": "\u0000",
+      "replacement": "-",
+      "mode": "replaceAll"
+    },
+    "expect": {
+      "matchCount": 2,
+      "replacementCount": 2,
+      "matches": [
+        {
+          "start": 1,
+          "end": 2,
+          "startByte": 1,
+          "endByte": 2
+        },
+        {
+          "start": 3,
+          "end": 4,
+          "startByte": 3,
+          "endByte": 4
+        }
+      ],
+      "text": "a-b-",
+      "inputBytes": 4,
+      "outputBytes": 4
+    }
+  },
+  {
+    "name": "NUL in the query and the replacement",
+    "input": "x\u0000y",
+    "options": {
+      "query": "\u0000",
+      "replacement": "\u0000\u0000",
+      "mode": "replaceAll"
+    },
+    "expect": {
+      "matchCount": 1,
+      "replacementCount": 1,
+      "matches": [
+        {
+          "start": 1,
+          "end": 2,
+          "startByte": 1,
+          "endByte": 2
+        }
+      ],
+      "text": "x\u0000\u0000y",
+      "inputBytes": 3,
+      "outputBytes": 4
+    }
+  }
+]

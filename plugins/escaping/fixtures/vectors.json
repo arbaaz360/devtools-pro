@@ -1,1 +1,0 @@
-[{"name":"html","operationId":"text.html","options":{"mode":"escape"},"input":"<a & \"x\">","output":"&lt;a &amp; &quot;x&quot;&gt;"},{"name":"json","operationId":"text.json-string","options":{"mode":"escape"},"input":"line\n","output":"\"line\\n\""}]

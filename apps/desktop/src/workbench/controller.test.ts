@@ -1,7 +1,7 @@
 import test, { type TestContext } from "node:test";
 import assert from "node:assert/strict";
 import { setImmediate } from "node:timers/promises";
-import { WorkbenchController, type WorkbenchApi } from "./controller.ts";
+import { WorkbenchController, IMAGE_IMPORT_LIMIT, type WorkbenchApi } from "./controller.ts";
 import { EDIT_LIMIT, TEXT_IMPORT_LIMIT } from "./state.ts";
 import type { FileDocument, Format, JobFinished, ToolManifest } from "../bridge.ts";
 
@@ -119,6 +119,7 @@ async function harness(t: TestContext) {
     listTools: async () => [
       manifest("encoding.image-base64", "encode"),
       manifest("encoding.base64-image", "decode"),
+      manifest("encoding.hash", "sha256"),
       manifest("text.url", "encode"),
       manifest("plugin.echo", "run"),
     ],
@@ -357,4 +358,272 @@ test("large read-only preview accepts full replacement but rejects a partial pre
   assert.equal(h.controller.tab(id)?.text, "small replacement");
   assert.equal(h.controller.tab(id)?.dirty, true);
   assert.ok(h.closed.includes(original.id));
+});
+
+test("native file drop of text, JSON, and image preserves active dirty tab and detects correct tools", async (t) => {
+  const h = await harness(t);
+  const dirtyTabId = h.newTab("my dirty draft notes");
+  assert.equal(h.controller.tab(dirtyTabId)?.dirty, true);
+
+  // 1. Drop text file
+  const textDoc = h.register("plain file content", { name: "notes.txt", path: "/mock/notes.txt", format: "text" });
+  await h.controller.openPath(textDoc.path);
+  assert.equal(h.controller.state.tabs.length, 2);
+  const textTabId = h.controller.state.activeId!;
+  assert.notEqual(textTabId, dirtyTabId);
+  const textTab = h.controller.tab(textTabId)!;
+  assert.equal(textTab.name, "notes.txt");
+  assert.equal(textTab.text, "plain file content");
+  assert.equal(textTab.savedText, "plain file content");
+  assert.equal(textTab.dirty, false);
+  assert.equal(textTab.toolId, "editor.text");
+  // Preceding dirty tab must remain unchanged
+  assert.equal(h.controller.tab(dirtyTabId)?.text, "my dirty draft notes");
+  assert.equal(h.controller.tab(dirtyTabId)?.dirty, true);
+
+  // 2. Drop JSON file
+  const jsonDoc = h.register('{"hello":"world"}', { name: "data.json", path: "/mock/data.json", format: "json" });
+  await h.controller.openPath(jsonDoc.path);
+  assert.equal(h.controller.state.tabs.length, 3);
+  const jsonTabId = h.controller.state.activeId!;
+  assert.notEqual(jsonTabId, textTabId);
+  const jsonTab = h.controller.tab(jsonTabId)!;
+  assert.equal(jsonTab.name, "data.json");
+  assert.equal(jsonTab.toolId, "structured.json");
+  assert.equal(jsonTab.dirty, false);
+
+  // 3. Drop image file
+  const imageDoc = h.register("image bytes", {
+    name: "photo.png",
+    path: "/mock/photo.png",
+    contentKind: "image",
+    mime: "image/png",
+    editable: false,
+  });
+  await h.controller.openPath(imageDoc.path);
+  assert.equal(h.controller.state.tabs.length, 4);
+  const imageTabId = h.controller.state.activeId!;
+  const imageTab = h.controller.tab(imageTabId)!;
+  assert.equal(imageTab.name, "photo.png");
+  assert.equal(imageTab.toolId, "encoding.image-base64");
+  assert.equal(imageTab.dirty, false);
+  await waitFor(() => imageTab.image !== null, "image preview to load");
+
+  // Verify dirty tab is still intact
+  assert.equal(h.controller.tab(dirtyTabId)?.text, "my dirty draft notes");
+  assert.equal(h.controller.tab(dirtyTabId)?.dirty, true);
+});
+
+test("dropping an already open file activates the existing tab instead of creating a duplicate", async (t) => {
+  const h = await harness(t);
+  const doc = h.register("re-dropped document", { name: "config.json", path: "/mock/config.json", format: "json" });
+  await h.controller.openPath(doc.path);
+  assert.equal(h.controller.state.tabs.length, 1);
+  const firstId = h.controller.state.activeId!;
+
+  // Create another tab and switch to it
+  const otherId = h.newTab("temporary tab");
+  assert.equal(h.controller.state.tabs.length, 2);
+  assert.equal(h.controller.state.activeId, otherId);
+
+  // Dropping config.json again
+  await h.controller.openPath(doc.path);
+  // Tab count must still be 2 (no duplicate tab created)
+  assert.equal(h.controller.state.tabs.length, 2);
+  // Existing tab must be activated
+  assert.equal(h.controller.state.activeId, firstId);
+});
+
+test("concurrent duplicate drops of the same path produce a single tab", async (t) => {
+  const h = await harness(t);
+  const doc = h.register("concurrent drop", { name: "shared.txt", path: "/mock/shared.txt" });
+  await Promise.all([
+    h.controller.openPath(doc.path),
+    h.controller.openPath(doc.path),
+  ]);
+  assert.equal(h.controller.state.tabs.length, 1);
+});
+
+test("dropping an unreadable or missing path notifies with error and preserves existing tabs", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("safe text");
+  await h.controller.openPath("/mock/nonexistent-file.txt");
+  assert.equal(h.controller.state.tabs.length, 1);
+  assert.equal(h.controller.state.activeId, id);
+  assert.equal(h.controller.tab(id)?.text, "safe text");
+  assert.ok(h.notices.some((notice) => /missing mock path/i.test(notice)));
+});
+
+test("dropping a binary file opens tab with Hash generator without rejecting binary input", async (t) => {
+  const h = await harness(t);
+  const dirtyId = h.newTab("draft in progress");
+  const binDoc = h.register("binary payload bytes", {
+    name: "data.bin",
+    path: "/mock/data.bin",
+    contentKind: "binary",
+    mime: "application/octet-stream",
+    editable: false,
+  });
+
+  await h.controller.openPath(binDoc.path);
+
+  // Must open a new tab for data.bin with Hash Generator, not reject it
+  assert.equal(h.controller.state.tabs.length, 2);
+  const activeTab = h.controller.tab(h.controller.state.activeId!)!;
+  assert.equal(activeTab.name, "data.bin");
+  assert.equal(activeTab.toolId, "encoding.hash");
+  assert.equal(activeTab.text, null); // uneditable binary input
+  assert.equal(activeTab.dirty, false);
+
+  // Preceding dirty draft tab must remain untouched
+  assert.equal(h.controller.tab(dirtyId)?.text, "draft in progress");
+  assert.equal(h.controller.tab(dirtyId)?.dirty, true);
+
+  // Opening binary document with a text-only tool override rejects with structured error
+  const binDoc2 = h.register("binary payload 2", {
+    name: "payload.bin",
+    path: "/mock/payload.bin",
+    contentKind: "binary",
+    mime: "application/octet-stream",
+    editable: false,
+  });
+  await h.controller.openPath(binDoc2.path, "structured.json");
+  assert.equal(h.controller.state.tabs.length, 2);
+  assert.ok(h.notices.some((n) => /requires a text document/i.test(n)));
+});
+
+test("browser file drop deterministically opens text, JSON, and image files without dirtying state", async (t) => {
+  const h = await harness(t);
+  const dirtyId = h.newTab("draft in progress");
+
+  // 1. Text file
+  const textFile = new File(["browser text"], "notes.txt", { type: "text/plain" });
+  await h.controller.openBrowserFile(textFile);
+  assert.equal(h.controller.state.tabs.length, 2);
+  const textId = h.controller.state.activeId!;
+  const textTab = h.controller.tab(textId)!;
+  assert.equal(textTab.name, "notes.txt");
+  assert.equal(textTab.text, "browser text");
+  assert.equal(textTab.savedText, "browser text");
+  assert.equal(textTab.dirty, false);
+  assert.equal(textTab.toolId, "editor.text");
+
+  // 2. JSON file
+  const jsonFile = new File(['{"format":"browser"}'], "app.json", { type: "application/json" });
+  await h.controller.openBrowserFile(jsonFile);
+  assert.equal(h.controller.state.tabs.length, 3);
+  const jsonId = h.controller.state.activeId!;
+  const jsonTab = h.controller.tab(jsonId)!;
+  assert.equal(jsonTab.name, "app.json");
+  assert.equal(jsonTab.toolId, "structured.json");
+  assert.equal(jsonTab.dirty, false);
+
+  // 3. Image file
+  const imageFile = new File([new Uint8Array([137, 80, 78, 71])], "sample.png", { type: "image/png" });
+  await h.controller.openBrowserFile(imageFile);
+  assert.equal(h.controller.state.tabs.length, 4);
+  const imageId = h.controller.state.activeId!;
+  const imageTab = h.controller.tab(imageId)!;
+  assert.equal(imageTab.name, "sample.png");
+  assert.equal(imageTab.toolId, "encoding.image-base64");
+  assert.equal(imageTab.dirty, false);
+  assert.ok(imageTab.image?.data.startsWith("data:image/png;base64,"));
+
+  // 4. Dropping existing file with path identity activates it
+  const jsonFileWithPath = Object.assign(
+    new File(['{"format":"browser"}'], "app.json", { type: "application/json" }),
+    { path: "app.json" },
+  );
+  h.controller.activate(dirtyId);
+  assert.equal(h.controller.state.activeId, dirtyId);
+  await h.controller.openBrowserFile(jsonFileWithPath);
+  assert.equal(h.controller.state.tabs.length, 4);
+  assert.equal(h.controller.state.activeId, jsonId);
+
+  // 5. Preceding dirty draft is untouched
+  assert.equal(h.controller.tab(dirtyId)?.text, "draft in progress");
+  assert.equal(h.controller.tab(dirtyId)?.dirty, true);
+});
+
+test("refuses oversized image files before reading body in browser drop", async (t) => {
+  const h = await harness(t);
+  let bodyRead = false;
+  const oversizedImage = {
+    name: "huge.png",
+    size: IMAGE_IMPORT_LIMIT + 1,
+    type: "image/png",
+    arrayBuffer: async () => {
+      bodyRead = true;
+      return new ArrayBuffer(0);
+    },
+    text: async () => {
+      bodyRead = true;
+      return "";
+    },
+  } as unknown as File;
+
+  await h.controller.openBrowserFile(oversizedImage);
+
+  assert.equal(bodyRead, false, "Image body must not be read when file exceeds limit");
+  assert.equal(h.controller.state.tabs.length, 0);
+  assert.ok(
+    h.notices.some((n) => /Image exceeds the 25 MiB import limit/i.test(n)),
+    "Must report structured user-facing limit notification",
+  );
+});
+
+test("does not deduplicate browser drops by filename alone without path identity", async (t) => {
+  const h = await harness(t);
+  const file1 = {
+    name: "notes.txt",
+    size: 11,
+    type: "text/plain",
+    text: async () => "content one",
+  } as unknown as File;
+  const file2 = {
+    name: "notes.txt",
+    size: 11,
+    type: "text/plain",
+    text: async () => "content two",
+  } as unknown as File;
+
+  await h.controller.openBrowserFile(file1);
+  assert.equal(h.controller.state.tabs.length, 1);
+  assert.equal(h.controller.state.tabs[0].name, "notes.txt");
+  assert.equal(h.controller.state.tabs[0].text, "content one");
+
+  // Dropping second file with same name without path creates a distinct tab
+  await h.controller.openBrowserFile(file2);
+  assert.equal(h.controller.state.tabs.length, 2);
+  assert.equal(h.controller.state.tabs[1].name, "notes.txt");
+  assert.equal(h.controller.state.tabs[1].text, "content two");
+
+  // File with reliable path identity activates existing tab
+  const fileWithPath1 = {
+    name: "config.json",
+    path: "/home/user/config.json",
+    size: 13,
+    type: "application/json",
+    text: async () => '{"key":"val"}',
+  } as unknown as File;
+  const fileWithPath2 = {
+    name: "config.json",
+    path: "/home/user/config.json",
+    size: 13,
+    type: "application/json",
+    text: async () => '{"key":"val"}',
+  } as unknown as File;
+
+  await h.controller.openBrowserFile(fileWithPath1);
+  assert.equal(h.controller.state.tabs.length, 3);
+  const configTabId = h.controller.state.activeId!;
+
+  // Switch to first tab
+  h.controller.activate(h.controller.state.tabs[0].id);
+  assert.notEqual(h.controller.state.activeId, configTabId);
+
+  // Drop with same path activates existing tab
+  await h.controller.openBrowserFile(fileWithPath2);
+  assert.equal(h.controller.state.tabs.length, 3);
+  assert.equal(h.controller.state.activeId, configTabId);
 });

@@ -1,0 +1,179 @@
+[
+  {
+    "name": "duplicate member is kept in source order and reported once",
+    "input": "{\"a\":1,\"a\":2}",
+    "formatted": "{\n  \"a\": 1,\n  \"a\": 2\n}",
+    "minified": "{\"a\":1,\"a\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 7,
+        "end": 10,
+        "line": 1,
+        "column": 8,
+        "firstOffset": 1,
+        "firstEnd": 4,
+        "name": "a"
+      }
+    ]
+  },
+  {
+    "name": "three occurrences produce two warnings that both point at the first",
+    "input": "{\"a\":1,\"a\":2,\"a\":3}",
+    "formatted": "{\n  \"a\": 1,\n  \"a\": 2,\n  \"a\": 3\n}",
+    "minified": "{\"a\":1,\"a\":2,\"a\":3}",
+    "duplicateKeys": 2,
+    "diagnostics": [
+      {
+        "offset": 7,
+        "end": 10,
+        "line": 1,
+        "column": 8,
+        "firstOffset": 1,
+        "firstEnd": 4,
+        "name": "a"
+      },
+      {
+        "offset": 13,
+        "end": 16,
+        "line": 1,
+        "column": 14,
+        "firstOffset": 1,
+        "firstEnd": 4,
+        "name": "a"
+      }
+    ]
+  },
+  {
+    "name": "member names compare after escape decoding",
+    "input": "{\"\\u0061\":1,\"a\":2}",
+    "formatted": "{\n  \"\\u0061\": 1,\n  \"a\": 2\n}",
+    "minified": "{\"\\u0061\":1,\"a\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 12,
+        "end": 15,
+        "line": 1,
+        "column": 13,
+        "firstOffset": 1,
+        "firstEnd": 9,
+        "name": "a"
+      }
+    ]
+  },
+  {
+    "name": "raw and escaped non-ASCII names are the same member",
+    "input": "{\"é\":1,\"\\u00e9\":2}",
+    "formatted": "{\n  \"é\": 1,\n  \"\\u00e9\": 2\n}",
+    "minified": "{\"é\":1,\"\\u00e9\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 8,
+        "end": 16,
+        "line": 1,
+        "column": 8,
+        "firstOffset": 1,
+        "firstEnd": 5,
+        "name": "é"
+      }
+    ]
+  },
+  {
+    "name": "surrogate pair escapes decode to the same name as the raw character",
+    "input": "{\"😀\":1,\"\\uD83D\\uDE00\":2}",
+    "formatted": "{\n  \"😀\": 1,\n  \"\\uD83D\\uDE00\": 2\n}",
+    "minified": "{\"😀\":1,\"\\uD83D\\uDE00\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 10,
+        "end": 24,
+        "line": 1,
+        "column": 8,
+        "firstOffset": 1,
+        "firstEnd": 7,
+        "name": "😀"
+      }
+    ]
+  },
+  {
+    "name": "empty names can be duplicates too",
+    "input": "{\"\":1,\"\":2}",
+    "formatted": "{\n  \"\": 1,\n  \"\": 2\n}",
+    "minified": "{\"\":1,\"\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 6,
+        "end": 8,
+        "line": 1,
+        "column": 7,
+        "firstOffset": 1,
+        "firstEnd": 3,
+        "name": ""
+      }
+    ]
+  },
+  {
+    "name": "member names are case sensitive",
+    "input": "{\"a\":1,\"A\":2}",
+    "formatted": "{\n  \"a\": 1,\n  \"A\": 2\n}",
+    "minified": "{\"a\":1,\"A\":2}",
+    "duplicateKeys": 0,
+    "diagnostics": []
+  },
+  {
+    "name": "the same name in different objects is not a duplicate",
+    "input": "{\"a\":{\"a\":1},\"b\":[{\"a\":1},{\"a\":2}]}",
+    "formatted": "{\n  \"a\": {\n    \"a\": 1\n  },\n  \"b\": [\n    {\n      \"a\": 1\n    },\n    {\n      \"a\": 2\n    }\n  ]\n}",
+    "minified": "{\"a\":{\"a\":1},\"b\":[{\"a\":1},{\"a\":2}]}",
+    "duplicateKeys": 0,
+    "diagnostics": []
+  },
+  {
+    "name": "duplicate in a nested object is positioned on a later line",
+    "input": "{\n  \"outer\": {\n    \"k\": 1,\n    \"k\": 2\n  }\n}",
+    "formatted": "{\n  \"outer\": {\n    \"k\": 1,\n    \"k\": 2\n  }\n}",
+    "minified": "{\"outer\":{\"k\":1,\"k\":2}}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 31,
+        "end": 34,
+        "line": 4,
+        "column": 5,
+        "firstOffset": 19,
+        "firstEnd": 22,
+        "name": "k"
+      }
+    ]
+  },
+  {
+    "name": "a raw U+FEFF inside a member name is significant",
+    "input": "{\"﻿a\":1,\"a\":2}",
+    "formatted": "{\n  \"﻿a\": 1,\n  \"a\": 2\n}",
+    "minified": "{\"﻿a\":1,\"a\":2}",
+    "duplicateKeys": 0,
+    "diagnostics": []
+  },
+  {
+    "name": "escaped and raw U+FEFF inside a member name are the same name",
+    "input": "{\"\\uFEFFa\":1,\"﻿a\":2}",
+    "formatted": "{\n  \"\\uFEFFa\": 1,\n  \"﻿a\": 2\n}",
+    "minified": "{\"\\uFEFFa\":1,\"﻿a\":2}",
+    "duplicateKeys": 1,
+    "diagnostics": [
+      {
+        "offset": 13,
+        "end": 19,
+        "line": 1,
+        "column": 14,
+        "firstOffset": 1,
+        "firstEnd": 10,
+        "name": "﻿a"
+      }
+    ]
+  }
+]
