@@ -1,0 +1,12 @@
+[
+  {"name": "rfc9562-dns-www.example.com", "namespace": "dns", "input": "www.example.com", "v3": "5df41881-3aed-3515-88a7-2f4a814cf09e", "v5": "2ed6657d-e927-568b-95e1-2665a8aea6a2", "reference": "RFC 9562 Appendix A.3 and A.4"},
+  {"name": "rfc4122-dns-www.widgets.com", "namespace": "dns", "input": "www.widgets.com", "v3": "3d813cbb-47fb-32ba-91df-831e1593ac29", "v5": "21f7f8de-8051-5b89-8680-0195ef798b6a", "reference": "RFC 4122 Appendix B with errata 1352"},
+  {"name": "python-dns-python.org", "namespace": "dns", "input": "python.org", "v3": "6fa459ea-ee8a-3ca4-894e-db77e160355e", "v5": "886313e1-3b8a-5372-9b90-0c9aee199e5d", "reference": "Python uuid module documentation"},
+  {"name": "dns-example.com", "namespace": "dns", "input": "example.com", "v3": "9073926b-929f-31c2-abc9-fad77ae3e8eb", "v5": "cfbff0d1-9375-5685-968c-48ce8b15ae17", "reference": "Python uuid module"},
+  {"name": "url-https", "namespace": "url", "input": "https://example.com/path?q=1", "v3": "546e596b-05ff-3a1c-925b-641a72883f16", "v5": "4d939a02-ffec-5054-8c09-9a5221c624b7", "reference": "Python uuid module"},
+  {"name": "url-http-www", "namespace": "URL", "input": "http://www.example.com/", "v3": "556cf76b-3b36-3ae6-85f9-50424b369b50", "v5": "fcde3c85-2270-590f-9e7c-ee003d65e0e2", "reference": "Python uuid module; preset name is case-insensitive"},
+  {"name": "oid-enterprise-arc", "namespace": "oid", "input": "1.3.6.1.4.1", "v3": "ef89b4fd-cc82-39f4-8098-b58dd72a496c", "v5": "106dd502-8b3e-50db-80ed-1134f5c18eae", "reference": "Python uuid module"},
+  {"name": "x500-distinguished-name", "namespace": "x500", "input": "CN=Example,O=Example Org,C=US", "v3": "a554d959-4f21-364e-a8b5-02c08e2b3f63", "v5": "62521dcd-f971-55c5-aaae-8ed86b117e04", "reference": "Python uuid module"},
+  {"name": "dns-unicode-name", "namespace": "dns", "input": "héllo wörld 🌍", "v3": "b9857575-9e42-3b76-8794-986bdbaa7a1a", "v5": "b534d485-f373-5e2c-9e1f-0ac19db8a58f", "reference": "Python uuid module; name is hashed as UTF-8"},
+  {"name": "custom-namespace-uuid", "namespace": "12345678-1234-4123-8123-123456789abc", "input": "custom", "v3": "90b73f3b-e617-3c7f-a9bb-01193da54e9d", "v5": "524d4cc9-31f5-50bb-9f3b-820a56c6c2d1", "reference": "Python uuid module; any canonical UUID is a namespace"}
+]
