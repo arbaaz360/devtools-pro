@@ -5,9 +5,9 @@
 The native host currently executes `format` and `minify` through its Rust
 adapter (`transform_json_bytes` in `devtools-core`); the package processor in
 this directory is the SDK/headless reference implementation and the executable
-specification that the fixtures below pin down. Both are lexeme-preserving; `minify`
-output is byte-identical, and `format` differs in one native case listed under
-[Known compatibility gaps](#known-compatibility-gaps).
+specification that the fixtures below pin down. Both are lexeme-preserving and
+produce the same bytes; [Known compatibility gaps](#known-compatibility-gaps)
+records the one native divergence that #14 corrected.
 
 ## Semantics
 
@@ -150,19 +150,12 @@ map of member names per open object.
 - **Native validate.** The native host does not route `inspect` through this
   processor; the native path reports serde_json messages with its own
   line/column convention and does not report duplicate keys, unsafe integers or
-  the BOM. Native `minify` output is byte-identical to this processor. Native
-  `format` differs for an array whose elements are all numbers or literals
-  (`true`, `false`, `null`): the native `JsonFormatter` in
-  `crates/devtools-core/src/streaming.rs` only marks a container non-empty on a
-  string or nested container, so it keeps the closing bracket on the last
-  element's line (`[
-  1,
-  2]`). This processor follows the
-  `JSON.stringify(value, null, 2)` layout (`[
-  1,
-  2
-]`); the native
-  formatter is tracked as a follow-up.
+  the BOM. Native `format`/`minify` output bytes match this processor. Before
+  #14 the native `JsonFormatter` in `crates/devtools-core/src/streaming.rs`
+  only marked a container non-empty on a string or nested container, so an
+  array of numbers or literals kept its closing bracket on the last element's
+  line (`[\n  1,\n  2]` instead of `[\n  1,\n  2\n]`); the `json-valid`
+  fixtures pin the `JSON.stringify(value, null, 2)` layout both now produce.
 - **Options.** DU-02 indentation choices (4 spaces, tab), permissive
   comments/trailing commas and JSONPath are not implemented; the manifest
   declares no options yet. Sorting keys is deliberately not offered because it
