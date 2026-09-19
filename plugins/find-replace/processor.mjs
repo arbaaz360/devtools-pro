@@ -118,15 +118,25 @@ async function readText(context) {
 const foldCache = new Map();
 
 /**
+ * CaseFolding.txt status-S entries whose uppercase is not one code point, so
+ * the upper-then-lower derivation in foldCodePoint cannot reach them: the
+ * precomposed ΐ and ΰ and the ligature pair ﬅ/ﬆ.
+ */
+const FOLD_EXCEPTIONS = new Map([[0x1fd3, 0x0390], [0x1fe3, 0x03b0], [0xfb05, 0xfb06]]);
+
+/**
  * Simple case folding of one code point, equivalent to ECMAScript's u-mode
  * Canonicalize (CaseFolding.txt statuses C and S). Upper-then-lower maps the
  * one-to-many and symbol variants (ς→σ, µ→μ, ſ→s, ẞ→ß, K→k) onto their
  * class; anything whose mapping is not one code point folds to itself.
  * Dotless ı has only a Turkic mapping and therefore stays distinct from i.
+ * FOLD_EXCEPTIONS covers the three pairs this derivation cannot see.
  */
 export function foldCodePoint(codePoint) {
   if (codePoint < 0x80) return codePoint >= 0x41 && codePoint <= 0x5a ? codePoint + 0x20 : codePoint;
   if (codePoint === 0x131) return codePoint;
+  const exception = FOLD_EXCEPTIONS.get(codePoint);
+  if (exception !== undefined) return exception;
   const cached = foldCache.get(codePoint);
   if (cached !== undefined) return cached;
   const single = (value) => value.length > 0 && value.length <= 2 && String.fromCodePoint(value.codePointAt(0)) === value;
@@ -203,25 +213,39 @@ function isWholeWord(text, start, end) {
 /**
  * Enumerate literal, non-overlapping occurrences from left to right. After an
  * accepted match the scan resumes at its end; after a candidate rejected by the
- * whole-word test it resumes one code unit later so no bounded occurrence is
- * skipped. `visit` receives source offsets. Cancellation is polled every
- * `checkEvery` candidates.
+ * whole-word test it resumes at the next offset where a word can begin, so no
+ * bounded occurrence is skipped. `visit` receives source offsets. Cancellation
+ * is polled every `checkEvery` candidates.
+ *
+ * The whole needle goes to `indexOf`, which uses the engine's substring search
+ * and stays linear for a long query over repetitive text; locating the first
+ * code unit and confirming with `startsWith` cost O(query) per candidate.
  */
 function scan(source, haystack, needle, map, wholeWord, context, visit) {
-  const first = needle.charAt(0);
   let candidates = 0;
   let from = 0;
   while (from <= haystack.length - needle.length) {
-    const at = haystack.indexOf(first, from);
+    const at = haystack.indexOf(needle, from);
     if (at < 0) break;
     if ((candidates++ & (limits.checkEvery - 1)) === 0) check(context);
-    if (!haystack.startsWith(needle, at)) { from = at + 1; continue; }
     const start = map ? map[at] : at;
     const end = map ? map[at + needle.length] : at + needle.length;
-    if (wholeWord && !isWholeWord(source, start, end)) { from = at + 1; continue; }
+    if (wholeWord && !isWholeWord(source, start, end)) { from = nextWordStart(source, haystack, map, at + 1); continue; }
     visit(start, end);
     from = at + needle.length;
   }
+}
+
+/**
+ * First haystack offset at or after `from` where a whole word can begin: the
+ * source code point before it is not a word character. A whole-word scan
+ * resumes here after a rejected candidate, so each offset is examined at most
+ * once and a query rejected everywhere still costs linear time.
+ */
+function nextWordStart(source, haystack, map, from) {
+  let offset = from;
+  while (offset < haystack.length && isWordCharacterAt(source, (map ? map[offset] : offset) - 1)) offset += 1;
+  return offset;
 }
 
 function utf8Length(codePoint) {

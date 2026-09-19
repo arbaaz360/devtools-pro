@@ -143,6 +143,7 @@ test("case folding matches ECMAScript u-mode canonicalization for every cased co
   const single = (value) => value.length > 0 && String.fromCodePoint(value.codePointAt(0)) === value;
   const oracle = (codePoint) => new RegExp("^\\u{" + codePoint.toString(16) + "}$", "iu");
   let cased = 0;
+  const folds = [];
   for (let codePoint = 0; codePoint <= 0x10ffff; codePoint++) {
     if (codePoint >= 0xd800 && codePoint <= 0xdfff) continue;
     const character = String.fromCodePoint(codePoint);
@@ -151,6 +152,7 @@ test("case folding matches ECMAScript u-mode canonicalization for every cased co
     const folded = foldCodePoint(codePoint);
     if (lower === character && upper === character) { assert.equal(folded, codePoint); continue; }
     cased += 1;
+    folds.push(folded);
     const sameClass = oracle(codePoint);
     assert.ok(sameClass.test(String.fromCodePoint(folded)), `U+${codePoint.toString(16)} folds inside its own class`);
     assert.equal(foldCodePoint(folded), folded, `U+${codePoint.toString(16)} fold is idempotent`);
@@ -162,6 +164,33 @@ test("case folding matches ECMAScript u-mode canonicalization for every cased co
     }
   }
   assert.ok(cased > 2500, `oracle covered ${cased} cased code points`);
+  // The per-code-point checks above cannot see two fold groups that the engine
+  // treats as one class (a status-S pair whose uppercase is not one code point:
+  // ΐ U+0390/U+1FD3, ΰ U+03B0/U+1FE3, ﬅ/ﬆ U+FB05/U+FB06), so every group's
+  // representative must match itself alone among all representatives.
+  const groups = [...new Set(folds)];
+  const corpus = groups.map((value) => String.fromCodePoint(value)).join("");
+  const escape = (value) => "\\u{" + value.toString(16) + "}";
+  for (const group of groups) {
+    const hits = corpus.match(new RegExp(escape(group), "giu")) ?? [];
+    assert.equal(hits.length, 1, `fold group U+${group.toString(16)} is canon-equal to another group`);
+  }
+  assert.ok(groups.length > 1400, `${groups.length} fold groups`);
+});
+
+test("literal scanning stays linear for long queries over repetitive text", async () => {
+  const input = "a".repeat(256 * 1024);
+  const started = performance.now();
+  const plain = await run({ query: "a".repeat(8 * 1024) + "b" }, input);
+  assert.equal(plain.value.matchCount, 0);
+  const words = await run({ query: "a".repeat(8 * 1024), "whole-word": true }, input);
+  assert.equal(words.value.matchCount, 0);
+  const folded = await run({ query: "A".repeat(8 * 1024) + "b", "case-sensitive": false }, input);
+  assert.equal(folded.value.matchCount, 0);
+  const boundary = await run({ query: "a".repeat(8 * 1024), "whole-word": true }, input.slice(0, 8 * 1024) + " " + input);
+  assert.equal(boundary.value.matchCount, 1);
+  const elapsed = performance.now() - started;
+  assert.ok(elapsed < 3000, `four pathological scans took ${Math.round(elapsed)} ms`);
 });
 
 test("match listing is bounded while counts and replacements stay exact", async () => {

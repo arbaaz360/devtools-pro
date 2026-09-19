@@ -43,7 +43,8 @@ uses. Supplying both spellings with different values is rejected.
   with Unicode *simple* case folding (CaseFolding.txt statuses C and S), which
   is exactly the equivalence ECMAScript applies to `u`-mode `i` regular
   expressions. The package test proves this against the engine for every cased
-  code point. Consequences: `Σ`, `σ` and final `ς` are equal; `K` (Kelvin sign)
+  code point, including the status-S pairs whose uppercase is not one code
+  point (`ΐ`, `ΰ`, `ﬅ`/`ﬆ`). Consequences: `Σ`, `σ` and final `ς` are equal; `K` (Kelvin sign)
   equals `k`; `ẞ` equals `ß`; `ß` does not equal `ss` (no full folding);
   dotless `ı` and dotted `İ` stay distinct from `i`/`I`. Offsets always refer
   to the source text, even when a folded form has a different length.

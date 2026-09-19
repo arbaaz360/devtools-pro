@@ -373,5 +373,59 @@
       { "start": 1, "end": 2, "startByte": 3, "endByte": 4 },
       { "start": 3, "end": 4, "startByte": 5, "endByte": 6 }
     ], "text": "﻿bb bb", "inputBytes": 6, "outputBytes": 8 }
+  },
+  {
+    "name": "NUL in the text is an ordinary character",
+    "input": "a\u0000b\u0000",
+    "options": {
+      "query": "\u0000",
+      "replacement": "-",
+      "mode": "replaceAll"
+    },
+    "expect": {
+      "matchCount": 2,
+      "replacementCount": 2,
+      "matches": [
+        {
+          "start": 1,
+          "end": 2,
+          "startByte": 1,
+          "endByte": 2
+        },
+        {
+          "start": 3,
+          "end": 4,
+          "startByte": 3,
+          "endByte": 4
+        }
+      ],
+      "text": "a-b-",
+      "inputBytes": 4,
+      "outputBytes": 4
+    }
+  },
+  {
+    "name": "NUL in the query and the replacement",
+    "input": "x\u0000y",
+    "options": {
+      "query": "\u0000",
+      "replacement": "\u0000\u0000",
+      "mode": "replaceAll"
+    },
+    "expect": {
+      "matchCount": 1,
+      "replacementCount": 1,
+      "matches": [
+        {
+          "start": 1,
+          "end": 2,
+          "startByte": 1,
+          "endByte": 2
+        }
+      ],
+      "text": "x\u0000\u0000y",
+      "inputBytes": 3,
+      "outputBytes": 4
+    }
   }
 ]
