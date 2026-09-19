@@ -125,8 +125,14 @@ fn rust_string(value: &str) -> String { format!("{:?}", value) }
 
 #[cfg(test)]
 mod tests {
-    use super::*; use std::time::{SystemTime, UNIX_EPOCH};
-    fn temp() -> PathBuf { std::env::temp_dir().join(format!("devtools-plugin-discovery-{}", SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos())) }
+    use super::*; use std::sync::atomic::{AtomicUsize, Ordering}; use std::time::{SystemTime, UNIX_EPOCH};
+    fn temp() -> PathBuf {
+        // Tests run on parallel threads, so a timestamp alone can collide and one test
+        // then sees another test's packages. Combine the process id and a counter.
+        static NEXT: AtomicUsize = AtomicUsize::new(0);
+        let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        std::env::temp_dir().join(format!("devtools-plugin-discovery-{}-{}-{nanos}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)))
+    }
     fn write_pkg(root: &Path, dir: &str, id: &str) { let pkg = root.join(dir); fs::create_dir_all(&pkg).unwrap(); fs::write(pkg.join("plugin.json"), r#"{"apiVersion":"devtools.plugin/v2","manifest":"manifest.json","processor":"processor.mjs"}"#).unwrap(); fs::write(pkg.join("processor.mjs"), "export async function execute() {}\n").unwrap(); let manifest = serde_json::json!({"kind":"pluginManifest","apiVersion":"devtools.plugin/v2","id":id,"version":"0.1.0","stateVersion":1,"tools":[{"id":format!("{id}.tool"),"title":"Example","category":"example","operationIds":["run"],"workspaceId":"workspace"}],"operations":[{"id":"run","title":"Run","executor":{"kind":"javascriptWorker","id":"processor","version":"0.1","cancellation":"cooperative"},"inputs":[],"outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text"],"sensitive":false,"exports":["copyText"]}],"options":[],"trigger":{"modes":["explicit"],"debounceMs":"0"},"limits":{"maxInputBytes":"100","maxOutputBytes":"100","maxChunkBytes":"100","deadlineMs":"0"}}],"workspaces":[{"id":"workspace","kind":"generator","bindings":[],"commands":[],"presentationSettings":[]}],"capabilities":[],"settings":[],"tests":{"requirementIds":[],"fixtures":[],"uiScenarios":[]}}); fs::write(pkg.join("manifest.json"), serde_json::to_vec(&manifest).unwrap()).unwrap(); }
     #[test] fn deterministic_discovery_and_duplicate_detection() { let root = temp(); write_pkg(&root,"z","z.example"); write_pkg(&root,"a","a.example"); let found = discover(&root).unwrap(); assert_eq!(found.iter().map(|p| p.manifest.id.as_str()).collect::<Vec<_>>(), vec!["a.example","z.example"]); write_pkg(&root,"dup","a.example"); assert!(matches!(discover(&root), Err(DiscoveryError::DuplicateId { .. }))); let _ = fs::remove_dir_all(root); }
     #[test] fn rejects_traversal_and_missing_processor() { let root = temp(); let pkg = root.join("bad"); fs::create_dir_all(&pkg).unwrap(); fs::write(pkg.join("plugin.json"), r#"{"apiVersion":"devtools.plugin/v2","manifest":"../manifest.json","processor":"processor.mjs"}"#).unwrap(); assert!(matches!(discover(&root), Err(DiscoveryError::InvalidEntrypoint { field: "manifest", .. }))); let _ = fs::remove_dir_all(root); }

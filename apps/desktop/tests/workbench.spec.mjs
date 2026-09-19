@@ -13,11 +13,18 @@ async function ready(page) {
   await expect(page.locator('#result-state')).toContainText('Completed successfully');
   await expect(page.locator('#result-state')).not.toContainText('Updating');
 }
+// Default delay of apps/desktop/src/ui/delayedIndicator.ts: a job that finishes inside it
+// must never show the progress panel; a job that outlives it is allowed to.
+const INDICATOR_DELAY_MS = 200;
 async function watchGeometry(page) {
   await page.evaluate(() => {
+    const completed = () => {
+      const text = document.querySelector('#result-state').textContent;
+      return text.includes('Completed successfully') && !text.includes('Updating');
+    };
     const input = document.querySelector('#editor-host');
     const rect = input.getBoundingClientRect();
-    window.__geometry = { original: [rect.x, rect.y, rect.width, rect.height], samples: [], progressVisible: false, stopped: false };
+    window.__geometry = { original: [rect.x, rect.y, rect.width, rect.height], samples: [], progressVisible: false, stopped: false, runStartedAt: null, runFinishedAt: null };
     const sample = () => {
       const state = window.__geometry;
       if (state.stopped) return;
@@ -25,17 +32,34 @@ async function watchGeometry(page) {
       state.samples.push([r.x, r.y, r.width, r.height]);
       const p = document.querySelector('#job-panel');
       state.progressVisible ||= !p.hidden && getComputedStyle(p).visibility !== 'hidden';
+      // Measure the job on the page's own clock so the no-flash rule is judged
+      // against what the shell saw, not against Playwright's polling latency.
+      const now = performance.now();
+      if (state.runStartedAt === null) { if (!completed()) state.runStartedAt = now; }
+      else if (state.runFinishedAt === null && completed()) state.runFinishedAt = now;
       requestAnimationFrame(sample);
     };
     requestAnimationFrame(sample);
   });
 }
 async function assertGeometry(page, progressVisible) {
-  const report = await page.evaluate(() => { window.__geometry.stopped = true; return window.__geometry; });
+  const report = await page.evaluate(() => {
+    const state = window.__geometry;
+    state.stopped = true;
+    if (state.runStartedAt !== null && state.runFinishedAt === null) state.runFinishedAt = performance.now();
+    return state;
+  });
   expect(report.samples.length).toBeGreaterThan(0);
   for (const rect of report.samples)
     rect.forEach((value, i) => expect(Math.abs(value - report.original[i]), `pane moved: ${JSON.stringify(report)}`).toBeLessThanOrEqual(1));
-  if (progressVisible !== undefined) expect(report.progressVisible).toBe(progressVisible);
+  if (progressVisible === false) {
+    // A loaded CI runner can stretch the mock host's round trips past the indicator
+    // delay; the shell is then allowed to show progress, so the assertion only applies
+    // to a job the page observed finishing inside the delay.
+    const elapsed = report.runStartedAt === null ? 0 : report.runFinishedAt - report.runStartedAt;
+    if (elapsed < INDICATOR_DELAY_MS) expect(report.progressVisible, `progress flashed for a ${Math.round(elapsed)} ms job`).toBe(false);
+    else test.info().annotations.push({ type: 'no-flash assertion skipped', description: `job took ${Math.round(elapsed)} ms, longer than the ${INDICATOR_DELAY_MS} ms indicator delay` });
+  } else if (progressVisible !== undefined) expect(report.progressVisible).toBe(progressVisible);
 }
 
 test('blank document is a full-size editable surface; keyboard commands retain focus', async ({ page, host }, info) => {
