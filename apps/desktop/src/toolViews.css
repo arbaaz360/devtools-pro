@@ -3,19 +3,19 @@
 /* Diff & Compare: two editors that fill the source pane; the result stacks below. */
 .tool-source { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 6px; overflow: hidden; }
 .compare-sources { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; min-height: 0; flex: 1; }
-.compare-source { display: flex; min-width: 0; min-height: 0; flex-direction: column; border: 1px solid var(--border); border-radius: 3px; background: #101214; }
-.compare-source-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex: 0 0 auto; min-height: 34px; padding: 3px 4px 3px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.compare-source { display: flex; min-width: 0; min-height: 0; flex-direction: column; border: 1px solid var(--border); border-radius: var(--radius); background: var(--well); }
+.compare-source-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; flex: 0 0 auto; min-height: 30px; padding: 2px 4px 2px 8px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
 .compare-source-title { display: flex; min-width: 0; flex-direction: column; gap: 1px; }
 .compare-source-name { display: inline-flex; align-items: center; gap: 5px; min-width: 0; color: var(--text); font-size: 11px; font-weight: 600; cursor: text; }
 .compare-source-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .compare-source-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 1px; }
 .compare-source-actions .flat-button { min-height: 22px; padding: 0 6px; font-size: 10px; }
 .compare-source textarea { min-height: 0; flex: 1; padding: 9px; border: 0; border-radius: 0; }
-.compare-source textarea:read-only { color: #b8c7d8; }
+.compare-source textarea:read-only { color: #a9b0b8; }
 .compare-source-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto; min-height: 19px; padding: 2px 8px; border-top: 1px solid var(--border); color: var(--faint); font-size: 9px; }
 .compare-source-foot > span { min-width: 0; white-space: nowrap; }
 .compare-source-issue { overflow: hidden; text-overflow: ellipsis; color: var(--red); }
-.compare-granularity { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: 3px; overflow: hidden; }
+.compare-granularity { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
 .compare-granularity .flat-button { min-height: 23px; padding: 0 7px; border-radius: 0; font-size: 10px; }
 .compare-granularity .flat-button.active { background: var(--surface-3); color: var(--text); }
 .compare-granularity .flat-button:disabled { opacity: .4; }
@@ -48,25 +48,25 @@ body.resizing-rows, body.resizing-rows * { cursor: row-resize !important; }
 .diff-nav { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
 .diff-nav .flat-button { min-height: 22px; padding: 0 6px; font-size: 10px; }
 .diff-nav-count { min-width: 64px; color: var(--muted); font-size: 10px; text-align: center; white-space: nowrap; }
-.diff-body { position: relative; min-height: 0; flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: 3px; background: #101214; }
+.diff-body { position: relative; min-height: 0; flex: 1; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--well); }
 .diff-hunk { border-bottom: 1px solid var(--border); }
 .diff-hunk-title { position: sticky; top: 0; z-index: 1; padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--muted); background: var(--surface-2); font-size: 10px; }
-.diff-line { display: grid; grid-template-columns: 42px 42px 14px minmax(0, 1fr); min-height: 19px; font: 11px/1.5 "Cascadia Code", "SFMono-Regular", Consolas, monospace; }
-.diff-line-number { padding: 1px 6px; color: var(--faint); background: #131619; text-align: right; user-select: none; }
+.diff-line { display: grid; grid-template-columns: 42px 42px 14px minmax(0, 1fr); min-height: 19px; font: 11px/1.5 var(--mono); }
+.diff-line-number { padding: 1px 6px; color: var(--faint); background: #111214; text-align: right; user-select: none; }
 .diff-line-sign { padding: 1px 0; color: var(--faint); text-align: center; user-select: none; }
 .diff-line-text { padding: 1px 8px 1px 4px; white-space: pre; overflow-wrap: normal; tab-size: 2; }
-.diff-line.added .diff-line-text, .diff-line.added .diff-line-sign { background: #143426; color: #85dfae; }
-.diff-line.removed .diff-line-text, .diff-line.removed .diff-line-sign { background: #3b2029; color: #f29cac; }
-.diff-line.added .diff-line-number { background: #11261d; }
-.diff-line.removed .diff-line-number { background: #2a181e; }
+.diff-line.added .diff-line-text, .diff-line.added .diff-line-sign { background: #13291d; color: #7fd3a3; }
+.diff-line.removed .diff-line-text, .diff-line.removed .diff-line-sign { background: #331d24; color: #e79aa9; }
+.diff-line.added .diff-line-number { background: #10201a; }
+.diff-line.removed .diff-line-number { background: #26161b; }
 .diff-line.current .diff-line-number:first-child { box-shadow: inset 3px 0 var(--accent); }
 .diff-line.current .diff-line-text { filter: brightness(1.18); }
-.diff-line-eol { margin-left: 8px; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: 3px; color: var(--faint); font-size: 9px; user-select: none; }
+.diff-line-eol { margin-left: 8px; padding: 0 4px; border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--faint); font-size: 9px; user-select: none; }
 .diff-notice { margin: 0; padding: 8px; border-top: 1px solid var(--border); color: var(--yellow); background: var(--surface-2); font-size: 10px; }
-.diff-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 0; flex: 1; padding: 24px; border: 1px solid var(--border); border-radius: 3px; background: #101214; color: var(--muted); text-align: center; }
+.diff-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 0; flex: 1; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--well); color: var(--muted); text-align: center; }
 .diff-empty p { max-width: 420px; margin: 0; font-size: 11px; }
-.diff-empty-mark { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid #245943; border-radius: 6px; background: #13291f; color: #72d6a5; font-size: 18px; }
-.diff-empty.newline-only .diff-empty-mark { border-color: #6c5937; background: #302818; color: #e8c47d; }
+.diff-empty-mark { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--well); color: var(--green); font-size: 18px; }
+.diff-empty.newline-only .diff-empty-mark { border-color: var(--border-strong); background: var(--well); color: var(--yellow); }
 .diff-raw { flex: 0 0 auto; margin-top: 6px; }
-.diff-raw summary { padding: 2px 0; color: var(--muted); font-size: 10px; cursor: pointer; }
-.diff-raw pre { max-height: 160px; margin: 4px 0 0; padding: 6px; overflow: auto; border: 1px solid var(--border); border-radius: 3px; background: #101214; color: #b8c7d8; font: 10px/1.5 "Cascadia Code", "SFMono-Regular", Consolas, monospace; white-space: pre; }
+.diff-raw summary { padding: 2px 0; color: var(--muted); font-size: 10px; cursor: default; }
+.diff-raw pre { max-height: 160px; margin: 4px 0 0; padding: 6px; overflow: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--well); color: #a9b0b8; font: 10px/1.5 var(--mono); white-space: pre; }
