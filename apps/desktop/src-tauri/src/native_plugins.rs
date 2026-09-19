@@ -86,6 +86,22 @@ mod tests {
     }
 
     #[test]
+    fn closes_scalar_only_containers_on_their_own_line() {
+        // Numbers and literals must mark a container non-empty just as strings and
+        // nested containers do; otherwise `[1, 2]` closed on the last element's
+        // line, diverging from JSON.stringify(value, null, 2) and from the
+        // reference processor in plugins/json.
+        let options = Value::Object(Default::default());
+        let token = CancellationToken::default();
+        let progress = |_: devtools_core::Progress| {};
+        let mut context = NativeExecutionContext::new("format", &options, &token, &progress, 1024, None);
+        context.add_input("source", br#"{"a":[1,2],"b":[true,null,-0.5e3],"c":[],"d":{}}"#.to_vec()).unwrap();
+        execute_json(&mut context).unwrap();
+        let output = context.take_outputs().pop().unwrap();
+        assert_eq!(String::from_utf8(output.bytes).unwrap(), "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": [\n    true,\n    null,\n    -0.5e3\n  ],\n  \"c\": [],\n  \"d\": {}\n}");
+    }
+
+    #[test]
     fn rejects_unknown_operation() {
         let options = Value::Object(Default::default());
         let token = CancellationToken::default();

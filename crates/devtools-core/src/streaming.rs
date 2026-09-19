@@ -248,7 +248,7 @@ impl<W: Write> JsonFormatter<W> {
                 b'{' | b'[' => { if self.after_open { self.emit(b"\n")?; self.emit(&vec![b' '; self.stack.len()*2])?; } if let Some(x)=self.stack.last_mut(){*x=true;} self.emit(&[b])?; self.stack.push(false); self.after_open=true; },
                 b'}' | b']' => { let had = self.stack.pop().unwrap_or(true); if had { self.emit(b"\n")?; self.emit(&vec![b' '; self.stack.len()*2])?; } self.emit(&[b])?; self.after_open=false; },
                 b',' => { self.emit(b",\n")?; self.emit(&vec![b' '; self.stack.len()*2])?; self.after_open=false; },
-                b':' => self.emit(b": ")?, _ => { if self.after_open { self.emit(b"\n")?; self.emit(&vec![b' '; self.stack.len()*2])?; self.after_open=false; } self.emit(&[b])?; }
+                b':' => self.emit(b": ")?, _ => { if self.after_open { self.emit(b"\n")?; self.emit(&vec![b' '; self.stack.len()*2])?; self.after_open=false; } if let Some(x)=self.stack.last_mut(){*x=true;} self.emit(&[b])?; }
             }}
         } Ok(())
     }
@@ -288,6 +288,7 @@ pub fn preview_file(path: &Path, offset: u64, max_bytes: usize) -> Result<FilePr
         let mut f=File::create(&p).unwrap(); f.write_all(s.as_bytes()).unwrap(); p
     }
     #[test] fn cancel_token() { let t=CancellationToken::default(); t.cancel(); assert!(t.is_cancelled()); }
+    #[test] fn pretty_closes_scalar_only_containers_on_their_own_line() { let (out, _) = transform_json_bytes(br#"{"a":[1,2],"b":[true,null,-0.5e3],"c":[],"d":{}}"#, JsonLayout::Pretty, &CancellationToken::default(), |_|{}).unwrap(); assert_eq!(std::str::from_utf8(&out).unwrap(), "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": [\n    true,\n    null,\n    -0.5e3\n  ],\n  \"c\": [],\n  \"d\": {}\n}"); }
     #[test] fn json_stream_preserves_lexemes() { let i=file("j",r#"{"a":1.2300,"a":2}"#); let o=i.with_extension("out"); let t=CancellationToken::default(); transform_json_file(&i,&o,JsonLayout::Minify,&t, |_|{}).unwrap(); assert_eq!(std::fs::read_to_string(&o).unwrap(),r#"{"a":1.2300,"a":2}"#); let _=std::fs::remove_file(i); let _=std::fs::remove_file(o); }
     #[test] fn invalid_and_csv_ragged() { let i=file("bad", "{bad"); assert!(inspect_file(&i,FileFormat::Json,&CancellationToken::default(), |_|{}).is_err()); let c=file("csv","a,b\n1\n"); assert!(inspect_file(&c,FileFormat::Csv,&CancellationToken::default(), |_|{}).is_err()); }
     #[test] fn text_inspection_reports_explicit_unicode_and_newline_stats() {
