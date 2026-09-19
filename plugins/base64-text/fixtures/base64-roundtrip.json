@@ -1,0 +1,16 @@
+[
+  {"name": "empty", "input": "", "encoded": "", "decoded": "text"},
+  {"name": "ascii", "input": "The quick brown fox jumps over the lazy dog.", "encoded": "VGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIHRoZSBsYXp5IGRvZy4=", "decoded": "text"},
+  {"name": "hello", "input": "Hello, world!", "encoded": "SGVsbG8sIHdvcmxkIQ==", "decoded": "text"},
+  {"name": "unicode", "input": "こんにちは 🌍 Ünïcödé", "encoded": "44GT44KT44Gr44Gh44GvIPCfjI0gw5xuw69jw7Zkw6k=", "decoded": "text"},
+  {"name": "multiline-lf", "input": "line one\nline two\n", "encoded": "bGluZSBvbmUKbGluZSB0d28K", "decoded": "text"},
+  {"name": "multiline-crlf", "input": "line one\r\nline two\r\n", "encoded": "bGluZSBvbmUNCmxpbmUgdHdvDQo=", "decoded": "text"},
+  {"name": "nul", "input": "a\u0000b", "encoded": "YQBi", "decoded": "text"},
+  {"name": "one-byte-two-pads", "input": "f", "encoded": "Zg==", "decoded": "text"},
+  {"name": "two-bytes-one-pad", "input": "fo", "encoded": "Zm8=", "decoded": "text"},
+  {"name": "three-bytes-no-pad", "input": "foo", "encoded": "Zm9v", "decoded": "text"},
+  {"name": "utf8-bom-preserved", "bytes": [239, 187, 191, 104, 105], "encoded": "77u/aGk=", "decoded": "text"},
+  {"name": "all-256-bytes", "bytes": "0..255", "encoded": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w==", "decoded": "binary"},
+  {"name": "invalid-utf8-single-byte", "bytes": [255], "encoded": "/w==", "decoded": "binary"},
+  {"name": "invalid-utf8-inside-ascii", "bytes": [104, 105, 255, 33], "encoded": "aGn/IQ==", "decoded": "binary"}
+]

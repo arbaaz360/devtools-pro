@@ -2,25 +2,25 @@
   "kind": "pluginManifest",
   "apiVersion": "devtools.plugin/v2",
   "id": "encoding.base64-text",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "stateVersion": 1,
   "title": "Base64 Text",
-  "description": "Encode UTF-8 text as Base64 or decode Base64 back to UTF-8 text.",
+  "description": "Encode the exact input bytes as Base64, or decode Base64 to UTF-8 text with binary payloads labelled as bytes. Standard and URL-safe alphabets, explicit padding and error policies.",
   "tools": [{"id":"encoding.base64-text","title":"Base64 Text","category":"converter","operationIds":["encoding.base64-text"],"workspaceId":"base64"}],
   "operations": [{
     "id":"encoding.base64-text",
     "title":"Encode or decode Base64 text",
-    "executor":{"kind":"javascriptWorker","id":"encoding.base64-text.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
-    "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
-    "outputs":[{"id":"output","kind":"value","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "executor":{"kind":"javascriptWorker","id":"encoding.base64-text.processor","version":"0.2.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain","application/octet-stream"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
     "options":[
       {"id":"mode","type":"enum","label":"Mode","default":"encode","choices":[{"id":"encode","label":"Encode"},{"id":"decode","label":"Decode"}],"persistence":"instance","sensitive":false},
       {"id":"variant","type":"enum","label":"Alphabet","default":"standard","choices":[{"id":"standard","label":"Standard (+/)"},{"id":"url","label":"URL-safe (-_)"}],"persistence":"instance","sensitive":false},
-      {"id":"padding","type":"enum","label":"Padding","default":"required","choices":[{"id":"required","label":"Required (=)"},{"id":"omit","label":"Omit (=)"},{"id":"optional","label":"Optional"}],"persistence":"instance","sensitive":false},
+      {"id":"padding","type":"enum","label":"Padding","default":"required","choices":[{"id":"required","label":"Required (=)"},{"id":"omit","label":"Omit"},{"id":"optional","label":"Optional"}],"persistence":"instance","sensitive":false},
       {"id":"error-policy","type":"enum","label":"Errors","default":"strict","choices":[{"id":"strict","label":"Strict"},{"id":"tolerant","label":"Tolerant"},{"id":"replace","label":"Replace invalid UTF-8"}],"persistence":"instance","sensitive":false}
     ],
     "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
-    "limits":{"maxInputBytes":"16777216","maxOutputBytes":"16777216","maxChunkBytes":"1048576","deadlineMs":"1000"}
+    "limits":{"maxInputBytes":"2097152","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"1000"}
   }],
   "workspaces":[{"id":"base64","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
   "capabilities":[],
