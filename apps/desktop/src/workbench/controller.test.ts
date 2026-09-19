@@ -122,6 +122,7 @@ async function harness(t: TestContext) {
       manifest("encoding.hash", "sha256"),
       manifest("text.url", "encode"),
       manifest("plugin.echo", "run"),
+      manifest("text.compare", "compare"),
     ],
     chooseDocumentOutput: async () => null,
     saveDocument: async () => undefined,
@@ -205,6 +206,30 @@ test("copy complete paged Base64 then replace a 64 KiB fragment and decode the f
   assert.equal(h.creates.at(-1)?.text, BASE64);
   assert.equal(h.documents.get(decode.id)?.text, BASE64);
   assert.ok(!h.closed.includes(decode.id), "Imported source must remain live for the decoder");
+});
+
+test("a compare with an empty side never creates a host snapshot or a job", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("left text");
+  h.controller.selectTool(id, "text.compare");
+  const created = h.creates.length;
+  h.controller.right(id, "");
+  // Let the auto-run debounce elapse, then force a run: the gate must stop
+  // both before anything reaches the host.
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  h.controller.run(id);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(h.creates.length, created, "an empty side is never snapshotted");
+  assert.equal(h.controller.tab(id)?.phase, "idle");
+  assert.equal(h.controller.tab(id)?.jobId, null);
+  assert.equal(h.controller.tab(id)?.result, null, "a gated compare keeps no stale result");
+  assert.equal(h.controller.tab(id)?.rightDirty, false);
+
+  h.controller.right(id, "right text");
+  assert.equal(h.controller.tab(id)?.rightDirty, true);
+  h.controller.run(id);
+  await waitFor(() => h.creates.length === created + 2, "both sides snapshotted once the gate opens");
+  await waitFor(() => h.controller.tab(id)?.phase === "error", "the harness rejects the comparison");
 });
 
 test("host manifests add tools to the catalog without shell registration", async (t) => {

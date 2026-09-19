@@ -1,4 +1,5 @@
 import "./styles.css";
+import "./toolViews.css";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import {
@@ -19,8 +20,13 @@ import {
   jobStatus,
   subscribeJobs,
   listTools,
+  type FileDocument,
 } from "./bridge";
-import { WorkbenchController, type WorkbenchApi } from "./workbench/controller";
+import {
+  WorkbenchController,
+  errorText,
+  type WorkbenchApi,
+} from "./workbench/controller";
 import {
   activeTab,
   type TabState,
@@ -32,6 +38,20 @@ import {
 } from "./workbench/tools";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
+import {
+  SIDE_TITLES,
+  byteLength,
+  compareInputProblem,
+  describeCompare,
+  granularityControl,
+  lineCount,
+  mountCompareWorkspace,
+  parseCompareResult,
+  renderCompareResult,
+  type CompareSide,
+  type CompareSideView,
+  type CompareWorkspace,
+} from "./toolViews/diffView";
 
 const $ = <T extends HTMLElement = HTMLElement>(selector: string) =>
   document.querySelector<T>(selector)!;
@@ -68,6 +88,7 @@ let renderedToolsKey = "";
 let renderedActionsKey = "";
 const layoutStorage = {
   split: "devtoolspro.workspace.split",
+  compareSplit: "devtoolspro.workspace.compare-split",
   sidebar: "devtoolspro.sidebar.collapsed",
 };
 const readNumber = (key: string, fallback: number) => {
@@ -81,7 +102,36 @@ const readNumber = (key: string, fallback: number) => {
   }
 };
 let splitRatio = Math.min(0.72, Math.max(0.28, readNumber(layoutStorage.split, 0.56)));
+// Compare tabs stack sources above the result, so they keep their own ratio.
+let compareSplitRatio = Math.min(0.72, Math.max(0.28, readNumber(layoutStorage.compareSplit, 0.5)));
 const collapsedResults = new Set<string>();
+/** Per-tab compare view state that the workbench reducer does not own: which
+ * file backs each side, and the selected change. Pruned when a tab closes. */
+interface CompareSourceMeta {
+  label: string | null;
+  baseline: string | null;
+  issue: string | null;
+}
+interface CompareMeta {
+  left: CompareSourceMeta;
+  right: CompareSourceMeta;
+  /** Once a tab has compared, its result pane stays so editing does not reflow the editors. */
+  hadResult: boolean;
+  change: number;
+  changeResult: object | null;
+  statusFor: object | null;
+  status: string;
+}
+const compareMetas = new Map<string, CompareMeta>();
+const emptySide = (): CompareSourceMeta => ({ label: null, baseline: null, issue: null });
+function compareMeta(id: string): CompareMeta {
+  let meta = compareMetas.get(id);
+  if (!meta) {
+    meta = { left: emptySide(), right: emptySide(), hadResult: false, change: -1, changeResult: null, statusFor: null, status: "" };
+    compareMetas.set(id, meta);
+  }
+  return meta;
+}
 try {
   if (localStorage.getItem(layoutStorage.sidebar) === "true")
     document.querySelector(".sidebar")?.classList.add("collapsed");
@@ -97,6 +147,7 @@ function displayTabName(tab: TabState): string {
 function persistLayout() {
   try {
     localStorage.setItem(layoutStorage.split, String(splitRatio));
+    localStorage.setItem(layoutStorage.compareSplit, String(compareSplitRatio));
   } catch {
     /* optional */
   }
@@ -119,7 +170,14 @@ const jobIndicator = delayedIndicator((visible) => {
 
 function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
   const dialog = $("#unsaved-dialog") as HTMLDialogElement;
-  $("#unsaved-message").textContent = `${displayTabName(tab)} has unsaved changes.`;
+  const rightOnly = !tab.dirty && tab.rightDirty;
+  $("#unsaved-message").textContent = rightOnly
+    ? `${displayTabName(tab)} has unsaved text on the right / revised side. Closing discards it.`
+    : tab.rightDirty
+      ? `${displayTabName(tab)} has unsaved changes. Save writes the document; the right / revised text is discarded with the tab.`
+      : `${displayTabName(tab)} has unsaved changes.`;
+  // Save writes the left document only, so offer it only when that is what is unsaved.
+  $("#unsaved-save").hidden = rightOnly;
   dialog.showModal();
   return new Promise((resolve) => {
     const finish = (answer: "save" | "discard" | "cancel") => {
@@ -153,7 +211,7 @@ function renderTabs() {
     button.tabIndex = tab.id === state.activeId ? 0 : -1;
     const tabName = displayTabName(tab);
     button.title = tab.source?.path ?? tabName;
-    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
+    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty || tab.rightDirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
     button.onclick = () => controller.activate(tab.id);
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -345,13 +403,16 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
     label.textContent = "Newlines";
     const select = document.createElement("select");
     select.setAttribute("aria-label", "Compare newline handling");
+    const newlineLabels: Record<string, string> = {
+      preserve: "Preserve",
+      lf: "Normalize to LF",
+      cr_lf: "Normalize to CRLF",
+      ignore: "Ignore line endings",
+    };
     for (const value of ["preserve", "lf", "cr_lf", "ignore"]) {
       const option = document.createElement("option");
       option.value = value;
-      option.textContent =
-        value === "cr_lf"
-          ? "Normalize CRLF"
-          : value[0].toUpperCase() + value.slice(1);
+      option.textContent = newlineLabels[value];
       option.selected = value === tab.options.newline;
       select.append(option);
     }
@@ -361,8 +422,186 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
         newline: select.value,
       });
     label.append(select);
-    host.append(label);
+    host.append(label, granularityControl());
   }
+}
+/* ------------------------------------------------------- Diff & Compare */
+let compareWorkspace: CompareWorkspace | null = null;
+function compareSurface(): CompareWorkspace {
+  if (compareWorkspace) return compareWorkspace;
+  // Handlers capture the tab id at event time: a file dialog may resolve after
+  // the user has switched tabs, and the result must land in the original tab.
+  compareWorkspace = mountCompareWorkspace($("#tool-source"), {
+    input(side, area) {
+      const id = state.activeId;
+      if (!id) return;
+      compareMeta(id)[side].issue = null;
+      if (side === "left") controller.edit(id, area.value);
+      else controller.right(id, area.value);
+    },
+    paste(side, event, area) {
+      const id = state.activeId;
+      const text = event.clipboardData?.getData("text/plain");
+      if (!id || side !== "left" || text === undefined) return;
+      // Route left pastes through the import transaction so oversized clipboard
+      // text becomes a host snapshot instead of being rejected by the editor.
+      event.preventDefault();
+      const start = area.selectionStart;
+      const end = area.selectionEnd;
+      const previous = controller.tab(id)?.text;
+      compareMeta(id).left.issue = null;
+      void controller.paste(id, text, start, end).then(() => {
+        const current = controller.tab(id);
+        if (state.activeId !== id || current?.text === null || current?.text === previous) return;
+        const caret = Math.min(start + text.length, current?.text?.length ?? 0);
+        area.setSelectionRange(caret, caret);
+      });
+    },
+    open(side) {
+      if (state.activeId) void openCompareSource(state.activeId, side);
+    },
+    clipboard(side) {
+      if (state.activeId) void pasteCompareSource(state.activeId, side);
+    },
+    clear(side) {
+      const id = state.activeId;
+      if (!id) return;
+      compareMeta(id)[side] = emptySide();
+      if (side === "left") controller.edit(id, "");
+      else controller.right(id, "", null);
+      render();
+    },
+  });
+  return compareWorkspace;
+}
+const sideName = (side: CompareSide) => SIDE_TITLES[side].toLowerCase();
+function compareSideView(tab: TabState, side: CompareSide, meta: CompareMeta): CompareSideView {
+  const source = meta[side];
+  const text = side === "left" ? (tab.text ?? tab.source?.preview ?? "") : tab.rightText;
+  const readOnly = side === "left" ? tab.text === null || tab.phase === "importing" : false;
+  const documentName = side === "left" && (tab.source || tab.savedPath) ? tab.name : null;
+  const label = source.label ?? (text ? (documentName ?? "Unsaved text") : "No source");
+  const dirty = side === "right"
+    ? tab.rightBaseline !== null && text !== tab.rightBaseline
+    : source.label !== null
+      ? source.baseline !== null && text !== source.baseline
+      : documentName !== null && tab.dirty;
+  const size = side === "left" && tab.text === null ? tab.source?.size : byteLength(text);
+  const lines = lineCount(text);
+  return {
+    label,
+    dirty,
+    text,
+    readOnly,
+    meta: readOnly && tab.source
+      ? `${bytes(tab.source.size)} · read-only preview`
+      : `${lines} line${lines === 1 ? "" : "s"} · ${bytes(size)}`,
+    issue: source.issue,
+  };
+}
+/** Empty-side gate shared by the actions, the status line and the host
+ * boundary. Only emptiness matters here, so character counts stand in for
+ * byte sizes and a 1 MiB side is not re-encoded on every render. */
+function compareProblem(tab: TabState): string | null {
+  const leftSize = tab.text !== null ? tab.text.length : tab.source?.size;
+  return compareInputProblem(leftSize, tab.rightText.length);
+}
+function compareStatus(tab: TabState): { text: string; tone: "" | "compare-gate" | "compare-ok" } {
+  const problem = compareProblem(tab);
+  if (problem) return { text: problem, tone: "compare-gate" };
+  if (tab.phase === "queued" || tab.phase === "running")
+    return { text: "Comparing the complete text of both sides…", tone: "" };
+  const result = tab.result;
+  if (result?.event.ok && result.text) {
+    const meta = compareMeta(tab.id);
+    if (meta.statusFor !== result) {
+      const model = parseCompareResult(result.text);
+      const description = model ? describeCompare(model) : null;
+      meta.statusFor = result;
+      meta.status = description ? `${description.headline} · ${description.detail}` : "";
+    }
+    if (meta.status)
+      return {
+        text: `${meta.status}${tab.resultStale ? " · Updating…" : ""}`,
+        tone: meta.status.startsWith("No differences") ? "compare-ok" : "",
+      };
+  }
+  return { text: "Two sources · Editable up to 1 MiB each · Compare runs after you edit either side", tone: "" };
+}
+async function openCompareSource(id: string, side: CompareSide) {
+  const meta = compareMeta(id);
+  if (!native) {
+    meta[side].issue = "Open the desktop app to read local files.";
+    render();
+    return;
+  }
+  let opened: FileDocument | undefined;
+  try {
+    const path = await chooseFile();
+    if (!path) return;
+    opened = await openDocument(path);
+    const text = await controller.readEditable(opened);
+    if (text === null)
+      throw new Error(`Choose a UTF-8 text file up to 1 MiB for the ${sideName(side)} editor.`);
+    const tab = controller.tab(id);
+    if (!tab) return;
+    if (side === "left" && tab.text === null)
+      throw new Error("The left side is a read-only preview. Open a smaller file in a new tab to edit it.");
+    meta[side] = { label: opened.name, baseline: text, issue: null };
+    if (side === "left") controller.edit(id, text);
+    else controller.right(id, text, text);
+    notify(`Opened ${opened.name} as ${sideName(side)}`);
+  } catch (error) {
+    meta[side].issue = errorText(error);
+  } finally {
+    // The side keeps its own copy; the host handle is only needed for the read.
+    if (opened) void closeDocument(opened.id).catch(() => undefined);
+    render();
+  }
+}
+async function pasteCompareSource(id: string, side: CompareSide) {
+  const meta = compareMeta(id);
+  try {
+    const text = await navigator.clipboard.readText();
+    const tab = controller.tab(id);
+    if (!tab) return;
+    if (!text) throw new Error("The clipboard has no text to paste.");
+    if (side === "left" && tab.text === null)
+      throw new Error("The left side is a read-only preview. Open a smaller file in a new tab to edit it.");
+    // The clipboard becomes the whole source for that side.
+    meta[side] = emptySide();
+    if (side === "left") await controller.paste(id, text, 0, (tab.text ?? "").length);
+    else controller.right(id, text, null);
+  } catch (error) {
+    meta[side].issue = errorText(error);
+  } finally {
+    render();
+  }
+}
+function swapCompareSources(id: string) {
+  const tab = controller.tab(id);
+  if (!tab) return;
+  if (tab.text === null) {
+    notify("Swap needs an editable left side. This tab shows a read-only file preview.");
+    return;
+  }
+  const meta = compareMeta(id);
+  const leftView = compareSideView(tab, "left", meta);
+  const rightView = compareSideView(tab, "right", meta);
+  const documentName = tab.source || tab.savedPath ? tab.name : null;
+  const previousLeft: CompareSourceMeta = {
+    label: meta.left.label ?? (leftView.text ? documentName : null),
+    baseline: meta.left.label !== null ? meta.left.baseline : documentName ? tab.savedText : null,
+    issue: null,
+  };
+  meta.left = { label: meta.right.label ?? (rightView.text ? "Unsaved text" : null), baseline: meta.right.baseline, issue: null };
+  meta.right = previousLeft;
+  const left = tab.text;
+  const right = tab.rightText;
+  controller.right(id, left, previousLeft.baseline);
+  controller.edit(id, right);
+  render();
+  notify("Swapped the left and right sources");
 }
 function renderSources(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $("#tool-source");
@@ -371,16 +610,11 @@ function renderSources(tab: TabState, tool: ToolDefinition | undefined) {
     return;
   }
   host.hidden = false;
-  const left = $("#compare-left") as HTMLTextAreaElement;
-  const leftText = tab.text ?? tab.source?.preview ?? "";
-  if (left.value !== leftText) left.value = leftText;
-  left.readOnly = tab.text === null;
-  left.oninput = () => controller.edit(tab.id, left.value);
-  const right = $("#compare-right") as HTMLTextAreaElement;
-  if (right.value !== tab.rightText) right.value = tab.rightText;
-  right.oninput = () => controller.right(tab.id, right.value);
-  $("#compare-open-left").onclick = () => void controller.chooseFile("text.compare");
-  $("#compare-open-right").onclick = () => void controller.openRight(tab.id);
+  const meta = compareMeta(tab.id);
+  compareSurface().update({
+    left: compareSideView(tab, "left", meta),
+    right: compareSideView(tab, "right", meta),
+  });
 }
 function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
   const image = $("#input-image") as HTMLImageElement;
@@ -464,12 +698,24 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
       });
     };
   }
-  $("#preview-heading").textContent = tab.text !== null ? "Document" : "Input";
-  $("#preview-meta").textContent = tab.source
-    ? `${bytes(tab.source.size)} · ${tab.source.mime ?? tab.source.format.toUpperCase()}`
-    : "Unsaved document";
-  $("#preview-limit").textContent =
-    tab.phase === "importing"
+  $("#preview-heading").textContent = tool?.compare
+    ? "Sources"
+    : tab.text !== null
+      ? "Document"
+      : "Input";
+  $("#preview-meta").textContent = tool?.compare
+    ? "Left and right stay separate · Files remain unchanged"
+    : tab.source
+      ? `${bytes(tab.source.size)} · ${tab.source.mime ?? tab.source.format.toUpperCase()}`
+      : "Unsaved document";
+  const limit = $("#preview-limit");
+  const status = tool?.compare ? compareStatus(tab) : null;
+  limit.classList.toggle("compare-gate", status?.tone === "compare-gate");
+  limit.classList.toggle("compare-ok", status?.tone === "compare-ok");
+  limit.title = status?.text ?? "";
+  limit.textContent = status
+    ? status.text
+    : tab.phase === "importing"
       ? "Importing complete pasted input…"
       : tab.pasted && tab.text === null
         ? `Preview of ${bytes(tab.source?.size)} pasted input · Tools process all bytes · Ctrl+A then paste to replace`
@@ -488,12 +734,35 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
 }
 function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".toolbar-actions");
-  const actionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${tab.phase}:${tool ? (validation(tab, tool) ?? "") : ""}`;
+  const gate = tool?.compare ? `${compareProblem(tab) ?? ""}:${tab.text === null}` : "";
+  const actionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${tab.phase}:${tool ? (validation(tab, tool) ?? "") : ""}:${gate}`;
   if (actionsKey === renderedActionsKey) return;
   renderedActionsKey = actionsKey;
   host.innerHTML = "";
   if (!tool?.operations.length) return;
   if (tool.id === "text.find-replace") return;
+  if (tool.compare) {
+    const busy = tab.phase === "queued" || tab.phase === "importing" || tab.phase === "running";
+    const swap = document.createElement("button");
+    swap.type = "button";
+    swap.className = "outline-button";
+    swap.textContent = "Swap";
+    swap.title = tab.text === null
+      ? "Swap needs an editable left side."
+      : "Exchange the left and right sources and their labels";
+    swap.disabled = tab.text === null || tab.phase === "importing";
+    swap.onclick = () => swapCompareSources(tab.id);
+    const problem = validation(tab, tool) ?? compareProblem(tab);
+    const compare = document.createElement("button");
+    compare.type = "button";
+    compare.className = "primary-button";
+    compare.textContent = "Compare";
+    compare.title = problem ?? "Compare both sides (runs automatically after edits)";
+    compare.disabled = busy || !!problem;
+    compare.onclick = () => controller.options(tab.id, "compare", { ...tab.options });
+    host.append(swap, compare);
+    return;
+  }
   for (const operation of tool.operations) {
     const button = document.createElement("button");
     button.type = "button";
@@ -508,57 +777,6 @@ function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
     button.onclick = () =>
       controller.options(tab.id, operation.id, { ...tab.options });
     host.append(button);
-  }
-}
-function renderDiffResult(text: string, host: HTMLElement): boolean {
-  try {
-    const value: unknown = JSON.parse(text);
-    if (
-      !value ||
-      typeof value !== "object" ||
-      !Array.isArray((value as { hunks?: unknown }).hunks)
-    )
-      return false;
-    host.replaceChildren();
-    for (const hunk of (value as { hunks: unknown[] }).hunks) {
-      if (!hunk || typeof hunk !== "object") continue;
-      const record = hunk as {
-        oldStart?: number;
-        oldLines?: number;
-        newStart?: number;
-        newLines?: number;
-        lines?: unknown[];
-      };
-      const section = document.createElement("section");
-      section.className = "diff-hunk";
-      const heading = document.createElement("div");
-      heading.className = "diff-hunk-title";
-      heading.textContent = `Lines ${record.oldStart ?? "?"},${record.oldLines ?? 0} → ${record.newStart ?? "?"},${record.newLines ?? 0}`;
-      section.append(heading);
-      for (const line of record.lines ?? []) {
-        if (!line || typeof line !== "object") continue;
-        const item = line as {
-          kind?: string;
-          text?: string;
-          oldLine?: number | null;
-          newLine?: number | null;
-        };
-        const row = document.createElement("div");
-        row.className = `diff-line ${item.kind ?? "context"}`;
-        const number = document.createElement("span");
-        number.className = "diff-line-number";
-        number.textContent = `${item.oldLine ?? ""}  ${item.newLine ?? ""}`;
-        const body = document.createElement("span");
-        body.className = "diff-line-text";
-        body.textContent = `${item.kind === "added" ? "+" : item.kind === "removed" ? "−" : " "}${item.text ?? ""}`;
-        row.append(number, body);
-        section.append(row);
-      }
-      host.append(section);
-    }
-    return host.childElementCount > 0;
-  } catch {
-    return false;
   }
 }
 function readableSummary(summary: unknown): string {
@@ -609,6 +827,21 @@ function renderResult(tab: TabState) {
     if (problem) {
       title.textContent = "Input needs attention";
       text.textContent = problem;
+    } else if (tool?.compare) {
+      const gate = compareProblem(tab);
+      if (gate) {
+        title.textContent = "Both sources are needed";
+        text.textContent = gate;
+      } else if (tab.error) {
+        title.textContent = "Compare could not run";
+        text.textContent = tab.error;
+      } else if (tab.phase === "queued" || tab.phase === "running") {
+        title.textContent = "Comparing…";
+        text.textContent = "Line changes appear here as soon as the comparison completes.";
+      } else {
+        title.textContent = "Ready to compare";
+        text.textContent = "Compare runs after you edit either side, or press Compare.";
+      }
     } else if (tool?.input === "image") {
       title.textContent = "Open an image to begin";
       text.textContent =
@@ -654,14 +887,34 @@ function renderResult(tab: TabState) {
   media.innerHTML = "";
   const structured = $("#result-structured");
   structured.replaceChildren();
+  structured.classList.remove("diff-result");
   const output = $("#result-output") as HTMLTextAreaElement;
   const highlight = $("#result-highlight");
   const statusMessage = $("#result-status-message");
   const binary = !!result.image;
-  const diff =
-    !binary &&
-    event.renderer === "diff" &&
-    renderDiffResult(result.text, structured);
+  let diff = false;
+  if (!binary && event.renderer === "diff" && event.ok) {
+    // A truncated preview never parses; it falls back to the bounded raw text
+    // below rather than pretending to be a complete diff.
+    const model = parseCompareResult(result.text);
+    if (model) {
+      const meta = compareMeta(tab.id);
+      if (meta.changeResult !== result) {
+        meta.changeResult = result;
+        meta.change = -1;
+      }
+      renderCompareResult(structured, {
+        result: model,
+        raw: result.text,
+        current: meta.change,
+        stats: `${event.elapsedMs} ms · in ${bytes(event.inputBytes)} · out ${bytes(event.outputBytes)}`,
+        onNavigate: (index) => {
+          meta.change = index;
+        },
+      });
+      diff = true;
+    }
+  }
   structured.hidden = !diff;
   media.hidden = !binary;
   $(".result-preview-block").classList.toggle("binary-output", binary);
@@ -733,7 +986,8 @@ function updateCaretStatus(tab: TabState | undefined) {
   $("#status-encoding").textContent = tab?.source?.encoding ?? "UTF-8";
   const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
   $("#status-format").textContent = tab?.source?.format?.toUpperCase() ?? (tool?.input === "image" ? "IMAGE" : "TEXT");
-  const validity = tab?.error || tab?.result?.previewError
+  const gated = !!tab && !!tool?.compare && !!compareProblem(tab);
+  const validity = (tab?.error && !gated) || tab?.result?.previewError
     ? "Error"
     : tab?.phase === "running" || tab?.phase === "queued"
       ? "Processing"
@@ -749,14 +1003,21 @@ function renderWorkspaceLayout(tab: TabState | undefined, tool: ToolDefinition |
   const resultPane = $(".results-pane") as HTMLElement;
   const splitter = $("#workspace-splitter") as HTMLElement;
   const hasResult = !!tab?.result;
-  const showResult = !!tab && (hasResult || !!tool?.compare) && !collapsedResults.has(tab.id);
-  workspace.style.setProperty("--split-position", `${Math.round(splitRatio * 100)}%`);
+  const compare = !!tool?.compare;
+  const meta = tab && compare ? compareMeta(tab.id) : null;
+  if (meta && hasResult) meta.hadResult = true;
+  // The result pane appears with the first result and then stays, so clearing
+  // a side while comparing does not bounce the editors between two heights.
+  const showResult = !!tab && (hasResult || !!meta?.hadResult) && !collapsedResults.has(tab.id);
+  workspace.classList.toggle("compare-layout", compare);
+  workspace.style.setProperty("--split-position", `${Math.round((compare ? compareSplitRatio : splitRatio) * 100)}%`);
   workspace.classList.toggle("result-absent", !showResult);
-  workspace.classList.toggle("result-collapsed", !!tab && !showResult && hasResult);
+  workspace.classList.toggle("result-collapsed", !!tab && !showResult && (hasResult || !!meta?.hadResult));
   resultPane.hidden = !showResult;
   splitter.hidden = !showResult;
+  splitter.setAttribute("aria-orientation", splitIsVertical() ? "horizontal" : "vertical");
   const toggle = $("#result-toggle") as HTMLButtonElement;
-  toggle.hidden = !hasResult;
+  toggle.hidden = !(hasResult || !!meta?.hadResult);
   toggle.textContent = showResult ? "Hide result" : "Show result";
   toggle.setAttribute("aria-expanded", String(showResult));
   const collapse = $("#result-collapse") as HTMLButtonElement;
@@ -786,7 +1047,10 @@ function render() {
     : "Press Ctrl+N for a blank document or choose a file.";
   // Operation failures already have a result diagnostic. Other errors use the
   // fixed source footer so toggling them never pushes the document down.
-  const sourceError = !!tab?.error && (!tab.result || tab.resultStale);
+  // The compare gate is guidance, not a failure: the status line explains the
+  // empty side in place, so the red diagnostic stays for real errors.
+  const gated = !!tab && !!tool?.compare && !!compareProblem(tab);
+  const sourceError = !!tab?.error && (!tab.result || tab.resultStale) && !gated;
   $("#error").hidden = !sourceError;
   $("#error").textContent = tab?.error ?? "";
   $("#error").title = tab?.error ?? "";
@@ -883,6 +1147,8 @@ const hooks = {
   changed(next: WorkspaceState) {
     const switched = state?.activeId !== next.activeId;
     state = next;
+    for (const id of compareMetas.keys())
+      if (!next.tabs.some((tab) => tab.id === id)) compareMetas.delete(id);
     render();
     if (switched && activeTab(state)?.text !== null) {
       const input = $(
@@ -896,20 +1162,35 @@ const hooks = {
   notify,
   confirmClose: promptClose,
 };
+// Compare must see two non-empty sources. The controller snapshots each side
+// into a host document before it can ask for a job, so the gate sits on the
+// host boundary and fails the run with the same message the workspace shows.
+const documentSizes = new Map<string, number>();
+const remember = (document: FileDocument) => {
+  documentSizes.set(document.id, document.size);
+  return document;
+};
 const api: WorkbenchApi = {
   native,
   chooseFile,
   chooseDocumentOutput,
   chooseResultOutput,
-  openDocument,
-  createTextDocument,
-  closeDocument,
+  openDocument: (path) => openDocument(path).then(remember),
+  createTextDocument: (text, name, format) =>
+    createTextDocument(text, name, format).then(remember),
+  closeDocument: (id) => {
+    documentSizes.delete(id);
+    return closeDocument(id);
+  },
   readPreview,
   readBinaryPreview,
   saveDocument,
   saveResult,
   runTool,
-  runCompare,
+  runCompare: (left, right, options) => {
+    const problem = compareInputProblem(documentSizes.get(left), documentSizes.get(right));
+    return problem ? Promise.reject(new Error(problem)) : runCompare(left, right, options);
+  },
   cancelOperation,
   jobStatus,
   subscribeJobs,
@@ -1034,33 +1315,44 @@ $("#result-collapse").onclick = () => {
 };
 const splitter = $("#workspace-splitter");
 let draggingSplitter = false;
-const setSplitFromClientX = (clientX: number) => {
-  const rect = $("#document-panel").getBoundingClientRect();
-  if (!rect.width) return;
-  splitRatio = Math.min(0.72, Math.max(0.28, (clientX - rect.left) / rect.width));
+function splitIsVertical(): boolean {
+  return getComputedStyle($("#document-panel")).flexDirection === "column";
+}
+function applySplit(ratio: number) {
+  const clamped = Math.min(0.72, Math.max(0.28, ratio));
+  if ($("#document-panel").classList.contains("compare-layout")) compareSplitRatio = clamped;
+  else splitRatio = clamped;
   persistLayout();
-  $("#document-panel").style.setProperty("--split-position", `${Math.round(splitRatio * 100)}%`);
+  $("#document-panel").style.setProperty("--split-position", `${Math.round(clamped * 100)}%`);
+}
+const currentSplit = () =>
+  $("#document-panel").classList.contains("compare-layout") ? compareSplitRatio : splitRatio;
+const setSplitFromPointer = (clientX: number, clientY: number) => {
+  const rect = $("#document-panel").getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  applySplit(splitIsVertical() ? (clientY - rect.top) / rect.height : (clientX - rect.left) / rect.width);
 };
 splitter.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   draggingSplitter = true;
   splitter.setPointerCapture(event.pointerId);
   document.body.classList.add("resizing");
+  document.body.classList.toggle("resizing-rows", splitIsVertical());
 });
 splitter.addEventListener("pointermove", (event) => {
-  if (draggingSplitter) setSplitFromClientX(event.clientX);
+  if (draggingSplitter) setSplitFromPointer(event.clientX, event.clientY);
 });
 splitter.addEventListener("pointerup", () => {
   draggingSplitter = false;
-  document.body.classList.remove("resizing");
+  document.body.classList.remove("resizing", "resizing-rows");
 });
 splitter.addEventListener("keydown", (event) => {
-  if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
-  if (event.key === "Home") splitRatio = 0.28;
-  else if (event.key === "End") splitRatio = 0.72;
-  else splitRatio = Math.min(0.72, Math.max(0.28, splitRatio + (event.key === "ArrowRight" ? 0.04 : -0.04)));
-  persistLayout();
+  const grow = event.key === "ArrowRight" || event.key === "ArrowDown";
+  if (event.key === "Home") applySplit(0.28);
+  else if (event.key === "End") applySplit(0.72);
+  else applySplit(currentSplit() + (grow ? 0.04 : -0.04));
   render();
 });
 paletteSearch.oninput = commands;
@@ -1137,7 +1429,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("beforeunload", (event) => {
-  if (state.tabs.some((tab) => tab.dirty)) {
+  if (state.tabs.some((tab) => tab.dirty || tab.rightDirty)) {
     event.preventDefault();
     event.returnValue = "";
   }

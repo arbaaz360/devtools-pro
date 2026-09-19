@@ -12,6 +12,7 @@ import {
   EDIT_LIMIT,
   TEXT_IMPORT_LIMIT,
   MAX_TABS,
+  compareInputMissing,
   emptyWorkspace,
   makeTab,
   matches,
@@ -710,13 +711,13 @@ export class WorkbenchController {
     this.dispatch({ type: "options", id, operation, options });
     this.schedule(id, 0);
   }
-  right(id: string, text: string) {
+  right(id: string, text: string, baseline?: string | null) {
     if (new TextEncoder().encode(text).length > EDIT_LIMIT) {
       this.hooks.notify("Comparison text is limited to 1 MiB.");
       return;
     }
     this.invalidate(id);
-    this.dispatch({ type: "right", id, text });
+    this.dispatch({ type: "right", id, text, baseline });
     this.schedule(id);
   }
   findOptions(
@@ -742,7 +743,7 @@ export class WorkbenchController {
         throw new Error(
           "Choose a UTF-8 text file up to 1 MiB for the right comparison editor.",
         );
-      if (this.tab(id)) this.right(id, text);
+      if (this.tab(id)) this.right(id, text, text);
     } catch (error) {
       this.dispatch({ type: "error", id, message: errorText(error) });
     } finally {
@@ -771,6 +772,14 @@ export class WorkbenchController {
     const problem = validation(tab, tool, this.manifests.get(tool.id));
     if (problem) {
       this.dispatch({ type: "error", id, message: problem });
+      return;
+    }
+    // The empty-side gate also holds at the host boundary: an empty side
+    // never becomes a snapshot or a job. The shell reports the gap as status
+    // and the stale result is dropped, as a failed run would have dropped it.
+    if (tool.compare && compareInputMissing(tab)) {
+      this.invalidate(id);
+      this.dispatch({ type: "gated", id });
       return;
     }
     if (!this.api.native) {
@@ -1049,7 +1058,7 @@ export class WorkbenchController {
     if (!tab || this.closing.has(id)) return false;
     this.closing.add(id);
     try {
-      if (tab.dirty) {
+      if (tab.dirty || tab.rightDirty) {
         const answer = await this.hooks.confirmClose(tab);
         if (answer === "cancel") return false;
         if (
