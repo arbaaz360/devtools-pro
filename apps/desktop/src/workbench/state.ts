@@ -182,7 +182,6 @@ export type Action =
   | { type: "error"; id: string; message: string }
   | { type: "started"; token: RunToken; jobId: string; identity?: ExecutionIdentity }
   | { type: "progress"; token: RunToken; progress: JobProgress }
-  | { type: "completing"; token: RunToken }
   | { type: "result"; token: RunToken; result: ResultView }
   | { type: "failed"; token: RunToken; message: string }
   | {
@@ -306,10 +305,6 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "progress":
           return tab.phase === "running"
             ? { ...tab, progress: action.progress }
-            : tab;
-        case "completing":
-          return tab.phase === "queued" || tab.phase === "running"
-            ? { ...tab, phase: "idle", jobId: null, jobIdentity: null, progress: null }
             : tab;
         case "result":
           return {
