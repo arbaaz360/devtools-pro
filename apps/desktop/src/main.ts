@@ -1443,10 +1443,19 @@ const removeDragOver = () => dropTarget.classList.remove("drag-over");
 const addDragOver = () => dropTarget.classList.add("drag-over");
 
 if (native) {
+  // A window with nothing unsaved closes natively; the host cancels jobs and
+  // removes temporary documents when the window is destroyed. Only unsaved
+  // work holds the close, and then only until every prompt is answered.
+  // The frontend cannot close the window without the `destroy` permission,
+  // so intercepting every request and failing there would trap the app.
   let closingWindow = false;
   void getCurrentWindow().onCloseRequested(async (event) => {
+    if (closingWindow) {
+      event.preventDefault();
+      return;
+    }
+    if (!state.tabs.some((tab) => tab.dirty || tab.rightDirty)) return;
     event.preventDefault();
-    if (closingWindow) return;
     closingWindow = true;
     try {
       for (const tab of [...state.tabs])
@@ -1454,6 +1463,8 @@ if (native) {
       controller.dispose();
       jobIndicator.dispose();
       await getCurrentWindow().destroy();
+    } catch (error) {
+      notify(`The window could not be closed: ${errorText(error)}`);
     } finally {
       closingWindow = false;
     }
