@@ -8,6 +8,13 @@ node scripts/quality-gate.mjs
 
 It generates missing acceptance fixtures (preserving existing files), runs the full Rust workspace tests including native host and large-file acceptance tests, builds the desktop TypeScript/Vite bundle, runs the shell registry/lifecycle tests, checks that the built `index.html` has only relative and existing CSS/JavaScript asset references, verifies the shell's required flex layout declarations in the emitted stylesheet, builds the CLI, runs an inspect/minify/reopen CLI smoke with source immutability, and runs `git diff --check`. Every failed command exits nonzero. The Windows CI runner matches the currently supported native build.
 
+The gate also runs every plugin package's own tests (`plugins/*/test.mjs`, JavaScript processors on the plugin SDK) one package at a time, so a merged package cannot regress unnoticed. To run them standalone, optionally against another plugins root:
+
+```powershell
+node scripts/test-plugins.mjs
+node scripts/test-plugins.mjs <plugins root>
+```
+
 The layout check protects the native Tauri window from rendering as an unstyled document. It requires `.app-shell`, `.app-body`, `.sidebar`, and `.workspace` to retain their built flex declarations; checking the built output catches asset pipeline and packaging regressions as well as stylesheet edits.
 
 The current Rust baseline has not been reformatted as a dedicated change. The gate reports whether `rustfmt` is installed but does not treat formatting as passing or failing until that baseline work is completed, so it does not hide existing formatting debt or add unrelated formatting churn to worker changes.
