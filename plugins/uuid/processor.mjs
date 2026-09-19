@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { ProcessorCancelled } from "../../packages/plugin-sdk/src/index.ts";
+import { ProcessorCancelled } from "../../packages/plugin-sdk/src/context.ts";
 
 // RFC 4122 §C name-space IDs; any canonical UUID is accepted as a custom namespace.
 const NAMESPACES = {

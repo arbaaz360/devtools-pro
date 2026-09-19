@@ -87,7 +87,8 @@ raises `read of uuid exceeds …`, `output exceeds limit` or `output chunk
 exceeds limit` and nothing is written when a limit fails because the text
 artifact is written before the value. Cancellation is checked before the run,
 before every generated value and inside every SDK write; a cancelled run throws
-`ProcessorCancelled` and leaves no output.
+`ProcessorCancelled` and leaves no value; a text artifact already written
+before the cancelled write belongs to a failed run and is discarded by the host.
 
 ## Fixtures
 
