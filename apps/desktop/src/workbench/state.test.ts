@@ -148,3 +148,21 @@ test("switching tools clears unrelated results and preserves per-tab find option
   assert.equal(state.tabs[0].findWholeWord, true);
   assert.equal(state.tabs[1].findQuery, "");
 });
+
+test("the right side tracks its own baseline and unsaved state", () => {
+  let state = workspaceWith("one");
+  const tab = () => state.tabs[0];
+  state = reduce(state, { type: "right", id: "one", text: "typed" });
+  assert.equal(tab().rightDirty, true, "typed text would be lost on close");
+  assert.equal(tab().dirty, false, "the left document is untouched");
+  state = reduce(state, { type: "right", id: "one", text: "from disk", baseline: "from disk" });
+  assert.equal(tab().rightDirty, false, "a file-backed side starts clean");
+  state = reduce(state, { type: "right", id: "one", text: "from disk edited" });
+  assert.equal(tab().rightDirty, true);
+  assert.equal(tab().rightBaseline, "from disk", "typing keeps the baseline");
+  state = reduce(state, { type: "right", id: "one", text: "from disk" });
+  assert.equal(tab().rightDirty, false, "restoring the file text is clean again");
+  state = reduce(state, { type: "right", id: "one", text: "", baseline: null });
+  assert.equal(tab().rightDirty, false, "a cleared side has nothing to lose");
+  assert.equal(tab().rightBaseline, null);
+});

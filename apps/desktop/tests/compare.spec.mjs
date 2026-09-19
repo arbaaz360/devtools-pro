@@ -267,3 +267,21 @@ test('the editors use the pane height and the result stacks below without shrink
   await expect(page.locator('#workspace-splitter')).toHaveAttribute('aria-orientation', 'horizontal');
   await page.screenshot({ path: info.outputPath('compare-layout.png') });
 });
+
+test('closing a tab with unsaved right-side text asks first and offers no Save', async ({ page, host }) => {
+  await openCompare(page);
+  await right(page).fill('pasted or typed revision');
+  await expect(page.locator('#tabs .dirty-indicator'), 'the tab shows it holds unsaved text').toBeVisible();
+  await expect(status(page)).toContainText('Left / original is empty');
+  expect(compareCalls(host), 'an empty side never reaches the host').toBe(0);
+  await page.locator('.tab-close').first().click();
+  await expect(page.locator('#unsaved-dialog')).toBeVisible();
+  await expect(page.locator('#unsaved-message')).toContainText('right / revised side');
+  await expect(page.locator('#unsaved-save'), 'Save writes the left document only').toBeHidden();
+  await page.locator('#unsaved-cancel').click();
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(right(page)).toHaveValue('pasted or typed revision');
+  await page.locator('.tab-close').first().click();
+  await page.locator('#unsaved-discard').click();
+  await expect(page.getByRole('tab')).toHaveCount(0);
+});

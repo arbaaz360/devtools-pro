@@ -170,7 +170,14 @@ const jobIndicator = delayedIndicator((visible) => {
 
 function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
   const dialog = $("#unsaved-dialog") as HTMLDialogElement;
-  $("#unsaved-message").textContent = `${displayTabName(tab)} has unsaved changes.`;
+  const rightOnly = !tab.dirty && tab.rightDirty;
+  $("#unsaved-message").textContent = rightOnly
+    ? `${displayTabName(tab)} has unsaved text on the right / revised side. Closing discards it.`
+    : tab.rightDirty
+      ? `${displayTabName(tab)} has unsaved changes. Save writes the document; the right / revised text is discarded with the tab.`
+      : `${displayTabName(tab)} has unsaved changes.`;
+  // Save writes the left document only, so offer it only when that is what is unsaved.
+  $("#unsaved-save").hidden = rightOnly;
   dialog.showModal();
   return new Promise((resolve) => {
     const finish = (answer: "save" | "discard" | "cancel") => {
@@ -204,7 +211,7 @@ function renderTabs() {
     button.tabIndex = tab.id === state.activeId ? 0 : -1;
     const tabName = displayTabName(tab);
     button.title = tab.source?.path ?? tabName;
-    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
+    button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty || tab.rightDirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
     button.onclick = () => controller.activate(tab.id);
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -461,7 +468,7 @@ function compareSurface(): CompareWorkspace {
       if (!id) return;
       compareMeta(id)[side] = emptySide();
       if (side === "left") controller.edit(id, "");
-      else controller.right(id, "");
+      else controller.right(id, "", null);
       render();
     },
   });
@@ -474,9 +481,11 @@ function compareSideView(tab: TabState, side: CompareSide, meta: CompareMeta): C
   const readOnly = side === "left" ? tab.text === null || tab.phase === "importing" : false;
   const documentName = side === "left" && (tab.source || tab.savedPath) ? tab.name : null;
   const label = source.label ?? (text ? (documentName ?? "Unsaved text") : "No source");
-  const dirty = source.label !== null
-    ? source.baseline !== null && text !== source.baseline
-    : documentName !== null && tab.dirty;
+  const dirty = side === "right"
+    ? tab.rightBaseline !== null && text !== tab.rightBaseline
+    : source.label !== null
+      ? source.baseline !== null && text !== source.baseline
+      : documentName !== null && tab.dirty;
   const size = side === "left" && tab.text === null ? tab.source?.size : byteLength(text);
   const lines = lineCount(text);
   return {
@@ -540,7 +549,7 @@ async function openCompareSource(id: string, side: CompareSide) {
       throw new Error("The left side is a read-only preview. Open a smaller file in a new tab to edit it.");
     meta[side] = { label: opened.name, baseline: text, issue: null };
     if (side === "left") controller.edit(id, text);
-    else controller.right(id, text);
+    else controller.right(id, text, text);
     notify(`Opened ${opened.name} as ${sideName(side)}`);
   } catch (error) {
     meta[side].issue = errorText(error);
@@ -562,7 +571,7 @@ async function pasteCompareSource(id: string, side: CompareSide) {
     // The clipboard becomes the whole source for that side.
     meta[side] = emptySide();
     if (side === "left") await controller.paste(id, text, 0, (tab.text ?? "").length);
-    else controller.right(id, text);
+    else controller.right(id, text, null);
   } catch (error) {
     meta[side].issue = errorText(error);
   } finally {
@@ -589,7 +598,7 @@ function swapCompareSources(id: string) {
   meta.right = previousLeft;
   const left = tab.text;
   const right = tab.rightText;
-  controller.right(id, left);
+  controller.right(id, left, previousLeft.baseline);
   controller.edit(id, right);
   render();
   notify("Swapped the left and right sources");
@@ -1420,7 +1429,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 window.addEventListener("beforeunload", (event) => {
-  if (state.tabs.some((tab) => tab.dirty)) {
+  if (state.tabs.some((tab) => tab.dirty || tab.rightDirty)) {
     event.preventDefault();
     event.returnValue = "";
   }

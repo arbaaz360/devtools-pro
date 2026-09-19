@@ -33,6 +33,10 @@ export interface TabState {
   operation: string;
   options: Readonly<Record<string, unknown>>;
   rightText: string;
+  /** File-backed text the right side was opened from; null when typed, pasted or empty. */
+  rightBaseline: string | null;
+  /** The right side holds text that closing the tab would lose. */
+  rightDirty: boolean;
   revision: number;
   generation: number;
   dirty: boolean;
@@ -78,6 +82,13 @@ export function matches(
 ): tab is TabState {
   return !!tab && tab.id === token.tabId && tab.generation === token.generation;
 }
+/** True when a comparison cannot run yet because a side has no text. A
+ * read-only left preview of unknown size is not treated as empty. The shell's
+ * status line and the controller's host boundary share this rule. */
+export function compareInputMissing(tab: TabState): boolean {
+  const left = tab.text !== null ? tab.text.length : tab.source?.size;
+  return left === 0 || tab.rightText.length === 0;
+}
 export function makeTab(
   id: string,
   name: string,
@@ -96,6 +107,8 @@ export function makeTab(
     operation: "",
     options: {},
     rightText: "",
+    rightBaseline: null,
+    rightDirty: false,
     revision: 0,
     generation: 0,
     dirty: false,
@@ -164,7 +177,13 @@ export type Action =
       operation: string;
       options: Record<string, unknown>;
     }
-  | { type: "right"; id: string; text: string }
+  | {
+      type: "right";
+      id: string;
+      text: string;
+      /** When present, replaces the right side's file baseline (null: no file). */
+      baseline?: string | null;
+    }
   | {
       type: "find-options";
       id: string;
@@ -179,6 +198,8 @@ export type Action =
       >;
     }
   | { type: "queue" | "cancel"; id: string }
+  /** A compare side became empty: nothing is sent to the host and the previous result no longer describes the inputs. */
+  | { type: "gated"; id: string }
   | { type: "error"; id: string; message: string }
   | { type: "started"; token: RunToken; jobId: string; identity?: ExecutionIdentity }
   | { type: "progress"; token: RunToken; progress: JobProgress }
@@ -279,12 +300,22 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
             operation: action.operation,
             options: action.options,
           };
-        case "right":
-          return { ...reset(tab), rightText: action.text };
+        case "right": {
+          const rightBaseline =
+            action.baseline === undefined ? tab.rightBaseline : action.baseline;
+          return {
+            ...reset(tab),
+            rightText: action.text,
+            rightBaseline,
+            rightDirty: action.text !== "" && action.text !== rightBaseline,
+          };
+        }
         case "find-options":
           return { ...tab, ...action.patch };
         case "queue":
           return { ...reset(tab), phase: "queued" };
+        case "gated":
+          return reset(tab, false);
         case "cancel":
           // Keep the last result visible and mark it stale while the cancelled
           // job is retired; collapsing the result pane changes the workspace.
