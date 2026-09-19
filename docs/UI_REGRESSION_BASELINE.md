@@ -39,7 +39,7 @@ The script reads `apps/desktop/src-tauri/tauri.conf.json`, resolves `build.front
 - `index.html` is missing, loads no script or links no stylesheet;
 - a `<script src>`, `<link href>` or `<base href>` is absolute (`/assets/…`), protocol-relative, a scheme URL, or resolves outside the bundle directory;
 - a referenced asset is missing, is a directory, or matches the file on disk only case-insensitively (Tauri's embedded asset lookup is case-sensitive even on Windows);
-- the linked stylesheet lacks a top-level `[hidden] { display: none !important }`, or `.app-shell`, `.app-body`, `.sidebar` and `.workspace` lack their flex declarations outside every `@media` block — a narrow-width override cannot stand in for the base layout;
+- the linked stylesheet lacks a top-level `[hidden] { display: none !important }`, or `.app-shell`, `.app-body`, `.sidebar` and `.workspace` lack their flex declarations outside every at-rule (`@media`, `@layer`, `@supports`) — a narrow-width override cannot stand in for the base layout;
 - the CSP is removed, or its effective `script-src` or `style-src` no longer allows `'self'`.
 
 The tests build throwaway bundles shaped like the Vite output and break one property each, so every failure is deterministic: absolute, protocol-relative and scheme URLs, a `../` escape, a deleted script, a stale stylesheet hash, a case-only match, a layout rule that survives only inside a media query, a blocked CSP, and the command-line exit codes. `--dist <dir>` and `--tauri-config <file>` point the script at another bundle for such checks.

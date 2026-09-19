@@ -105,7 +105,9 @@ function attributesOf(text) {
 
 export function assetReferencesIn(html) {
   const references = [];
-  for (const match of html.matchAll(/<(script|link|base)\b([^>]*)>/gi)) {
+  // Commented-out markup is never fetched, so it is not a reference.
+  const markup = html.replace(/<!--[\s\S]*?-->/g, '');
+  for (const match of markup.matchAll(/<(script|link|base)\b([^>]*)>/gi)) {
     const tag = match[1].toLowerCase();
     const attributes = attributesOf(match[2]);
     if (tag === 'script' && attributes.has('src')) {

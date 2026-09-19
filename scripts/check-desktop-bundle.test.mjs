@@ -259,6 +259,11 @@ describe('parsers', () => {
     ]);
   });
 
+  test('assetReferencesIn ignores references inside HTML comments', () => {
+    const html = '<!-- <script src="/legacy/old.js"></script> --><script type="module" src="./a.js"></script><!--\n<link rel="stylesheet" href="/old.css">\n-->';
+    assert.deepEqual(assetReferencesIn(html), [{ tag: 'script', kind: 'script', url: './a.js' }]);
+  });
+
   test('topLevelRules skips at-rules, comments and braces inside strings', () => {
     const css = '@charset "utf-8";@import url("x.css");/* {comment} */.a,.b{content:"{";color:red}@media (x){.a{color:blue}}@font-face{font-family:"F"}.c{display:flex}';
     assert.deepEqual(topLevelRules(css), [
