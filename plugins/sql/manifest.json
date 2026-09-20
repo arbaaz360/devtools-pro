@@ -1,0 +1,50 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "format.sql",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "SQL Formatter",
+  "description": "Beautify or minify SQL text.",
+  "tools": [
+    {"id":"format.sql","title":"SQL Formatter","category":"converter","operationIds":["beautify","minify"],"workspaceId":"sql-formatter","searchAliases":["sql beautifier","sql minifier"]}
+  ],
+  "operations": [
+    {
+      "id":"beautify",
+      "title":"Beautify SQL",
+      "executor":{"kind":"javascriptWorker","id":"format.sql.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"sql","cancellation":"cooperative"},
+      "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+      "outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["code","properties"],"mime":["text/x-sql"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+      "options":[
+        {"id":"dialect","type":"enum","label":"Dialect","default":"sql","choices":[{"id":"sql","label":"Standard SQL"},{"id":"mysql","label":"MySQL"},{"id":"mariadb","label":"MariaDB"},{"id":"postgresql","label":"PostgreSQL"},{"id":"plsql","label":"PL/SQL"}],"persistence":"instance","sensitive":false},
+        {"id":"keyword-case","type":"enum","label":"Keyword case","default":"upper","choices":[{"id":"upper","label":"UPPERCASE"},{"id":"lower","label":"lowercase"},{"id":"preserve","label":"Preserve"}],"persistence":"instance","sensitive":false},
+        {"id":"indent","type":"enum","label":"Indentation","default":"space-2","choices":[{"id":"space-2","label":"2 spaces"},{"id":"space-4","label":"4 spaces"},{"id":"tab","label":"Tabs"}],"persistence":"instance","sensitive":false},
+        {"id":"comma-position","type":"enum","label":"Comma position","default":"end","choices":[{"id":"end","label":"After previous item"},{"id":"start","label":"Before next item"}],"persistence":"instance","sensitive":false}
+      ],
+      "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100","changedPorts":["input"]},
+      "limits":{"maxInputBytes":"4194304","maxOutputBytes":"8388608","maxChunkBytes":"8388608","deadlineMs":"2000"}
+    },
+    {
+      "id":"minify",
+      "title":"Minify SQL",
+      "executor":{"kind":"javascriptWorker","id":"format.sql.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"sql","cancellation":"cooperative"},
+      "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+      "outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["code","properties"],"mime":["text/x-sql"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+      "options":[
+        {"id":"dialect","type":"enum","label":"Dialect","default":"sql","choices":[{"id":"sql","label":"Standard SQL"},{"id":"mysql","label":"MySQL"},{"id":"mariadb","label":"MariaDB"},{"id":"postgresql","label":"PostgreSQL"},{"id":"plsql","label":"PL/SQL"}],"persistence":"instance","sensitive":false},
+        {"id":"keyword-case","type":"enum","label":"Keyword case","default":"upper","choices":[{"id":"upper","label":"UPPERCASE"},{"id":"lower","label":"lowercase"},{"id":"preserve","label":"Preserve"}],"persistence":"instance","sensitive":false},
+        {"id":"indent","type":"enum","label":"Indentation","default":"space-2","choices":[{"id":"space-2","label":"2 spaces"},{"id":"space-4","label":"4 spaces"},{"id":"tab","label":"Tabs"}],"persistence":"instance","sensitive":false},
+        {"id":"comma-position","type":"enum","label":"Comma position","default":"end","choices":[{"id":"end","label":"After previous item"},{"id":"start","label":"Before next item"}],"persistence":"instance","sensitive":false}
+      ],
+      "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100","changedPorts":["input"]},
+      "limits":{"maxInputBytes":"4194304","maxOutputBytes":"8388608","maxChunkBytes":"8388608","deadlineMs":"2000"}
+    }
+  ],
+  "workspaces":[
+    {"id":"sql-formatter","kind":"transform","bindings":[{"id":"source","component":"editor","inputPort":"input"},{"id":"options","component":"form","optionIds":["dialect","keyword-case","indent","comma-position"]},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}
+  ],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-26"],"fixtures":["beautify","minify","invalid"],"uiScenarios":[]}
+}

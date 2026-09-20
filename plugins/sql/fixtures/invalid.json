@@ -1,0 +1,38 @@
+[
+  {
+    "name": "invalid dialect",
+    "operationId": "beautify",
+    "options": {
+      "dialect": "nosql"
+    },
+    "input": "SELECT 1;",
+    "error": "dialect must be one of"
+  },
+  {
+    "name": "invalid keywordCase",
+    "operationId": "beautify",
+    "options": {
+      "keywordCase": "camel"
+    },
+    "input": "SELECT 1;",
+    "error": "keyword-case must be one of"
+  },
+  {
+    "name": "invalid indent",
+    "operationId": "beautify",
+    "options": {
+      "indent": "3"
+    },
+    "input": "SELECT 1;",
+    "error": "indent must be one of"
+  },
+  {
+    "name": "invalid commaPosition",
+    "operationId": "beautify",
+    "options": {
+      "commaPosition": "middle"
+    },
+    "input": "SELECT 1;",
+    "error": "comma-position must be one of"
+  }
+]

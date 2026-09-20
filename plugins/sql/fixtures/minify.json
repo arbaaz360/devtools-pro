@@ -1,0 +1,93 @@
+[
+  {
+    "name": "basic minify",
+    "dialect": "sql",
+    "options": {
+      "keywordCase": "upper"
+    },
+    "input": "SELECT\n  a,\n  b\nFROM\n  c\nWHERE\n  d = 1;",
+    "output": "SELECT a,b FROM c WHERE d=1;"
+  },
+  {
+    "name": "remove comments",
+    "dialect": "sql",
+    "options": {},
+    "input": "select /* comment */ a -- comment\n from t;",
+    "output": "select a from t;"
+  },
+  {
+    "name": "leading line comment",
+    "dialect": "sql",
+    "options": {},
+    "input": "-- leading\nSELECT 1;",
+    "output": "SELECT 1;"
+  },
+  {
+    "name": "trailing line comment",
+    "dialect": "sql",
+    "options": {},
+    "input": "SELECT a -- trailing\nFROM t;",
+    "output": "SELECT a FROM t;"
+  },
+  {
+    "name": "inline block comment",
+    "dialect": "sql",
+    "options": {},
+    "input": "SELECT a /* block */ , b FROM t;",
+    "output": "SELECT a,b FROM t;"
+  },
+  {
+    "name": "string keeps its spaces and keywords",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT   'a  b  FROM x'   AS s\nFROM   t",
+    "output": "SELECT'a  b  FROM x'AS s FROM t"
+  },
+  {
+    "name": "quoted identifiers untouched",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT  \"first name\" ,  [last name]  FROM  t",
+    "output": "SELECT \"first name\",[last name] FROM t"
+  },
+  {
+    "name": "mysql backtick and hash comment",
+    "dialect": "mysql",
+    "options": {
+      "dialect": "mysql"
+    },
+    "input": "SELECT  `a`  # note\nFROM  `t`",
+    "output": "SELECT `a` FROM `t`"
+  },
+  {
+    "name": "postgres dollar quoting and cast",
+    "dialect": "postgresql",
+    "options": {
+      "dialect": "postgresql"
+    },
+    "input": "SELECT  $$a  ;  b$$ ,  x :: int\nFROM  t",
+    "output": "SELECT $$a  ;  b$$,x::int FROM t"
+  },
+  {
+    "name": "operators and parameters keep their tokens",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT a <> b , c >= ? , d || e\nFROM t WHERE f = :name",
+    "output": "SELECT a<>b,c>=?,d||e FROM t WHERE f=:name"
+  },
+  {
+    "name": "block comment across lines removed",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT a\n/* multi\n   line */\nFROM t",
+    "output": "SELECT a FROM t"
+  }
+]
