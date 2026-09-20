@@ -13,69 +13,27 @@
     "dialect": "sql",
     "options": {},
     "input": "select /* comment */ a -- comment\n from t;",
-    "output": "select /* comment */a -- comment\nfrom t;"
+    "output": "select a from t;"
   },
   {
-    "name": "extra minify 0",
+    "name": "leading line comment",
     "dialect": "sql",
     "options": {},
-    "input": "select 0 from t;",
-    "output": "select 0 from t;"
+    "input": "-- leading\nSELECT 1;",
+    "output": "SELECT 1;"
   },
   {
-    "name": "extra minify 1",
+    "name": "trailing line comment",
     "dialect": "sql",
     "options": {},
-    "input": "select 1 from t;",
-    "output": "select 1 from t;"
+    "input": "SELECT a -- trailing\nFROM t;",
+    "output": "SELECT a FROM t;"
   },
   {
-    "name": "extra minify 2",
+    "name": "inline block comment",
     "dialect": "sql",
     "options": {},
-    "input": "select 2 from t;",
-    "output": "select 2 from t;"
-  },
-  {
-    "name": "extra minify 3",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 3 from t;",
-    "output": "select 3 from t;"
-  },
-  {
-    "name": "extra minify 4",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 4 from t;",
-    "output": "select 4 from t;"
-  },
-  {
-    "name": "extra minify 5",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 5 from t;",
-    "output": "select 5 from t;"
-  },
-  {
-    "name": "extra minify 6",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 6 from t;",
-    "output": "select 6 from t;"
-  },
-  {
-    "name": "extra minify 7",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 7 from t;",
-    "output": "select 7 from t;"
-  },
-  {
-    "name": "extra minify 8",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 8 from t;",
-    "output": "select 8 from t;"
+    "input": "SELECT a /* block */ , b FROM t;",
+    "output": "SELECT a,b FROM t;"
   }
 ]

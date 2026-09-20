@@ -195,7 +195,7 @@
       "dialect": "postgresql"
     },
     "input": "select distinct on (a) a, b from c;",
-    "output": "SELECT\n  distinct\nON (a)a, b\nFROM c;"
+    "output": "SELECT\n  distinct\nON (a) a, b\nFROM c;"
   },
   {
     "name": "comma-position start",

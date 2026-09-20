@@ -232,21 +232,30 @@ function tokenize(text, dialect, context) {
 function processTokens(tokens, options, isMinify, context) {
   let indentStr = options.indent === 'tab' ? '\t' : (options.indent === '4' ? '    ' : '  ');
 
+  let statements = 0;
+  let hasTokensThisStatement = false;
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i];
+    if (t.type !== 'whitespace' && t.type !== 'comment') {
+      if (t.value === ';') {
+        if (hasTokensThisStatement) statements++;
+        hasTokensThisStatement = false;
+      } else {
+        hasTokensThisStatement = true;
+      }
+    }
+  }
+  if (hasTokensThisStatement) statements++;
+
   if (isMinify) {
     let out = "";
     let lastNeedsSpace = false;
-    let statements = 1;
     for (let i = 0; i < tokens.length; i++) {
       if (i % 4096 === 0) check(context);
       const t = tokens[i];
       if (t.type === 'whitespace') continue;
-      if (t.type === 'symbol' && t.value === ';') statements++;
 
       if (t.type === 'comment') {
-        if (lastNeedsSpace) out += " ";
-        out += t.value;
-        if (t.isLineComment) out += "\n";
-        lastNeedsSpace = false;
         continue;
       }
 
@@ -302,7 +311,6 @@ function processTokens(tokens, options, isMinify, context) {
 
   let out = "";
   let indentLevel = 0;
-  let statements = 1;
   let newlinesToEmit = 0;
   let inSelectList = false;
   let inSetList = false;
@@ -417,11 +425,6 @@ function processTokens(tokens, options, isMinify, context) {
       emitNewline();
     }
 
-    // Split statements on ;
-    if (t.value === ';') {
-      statements++;
-    }
-
     if (t.value === ')') {
       let top = listContext[listContext.length - 1];
       if (top === 'SUBSELECT' || top === 'WRAPPED_PARENS') {
@@ -457,7 +460,8 @@ function processTokens(tokens, options, isMinify, context) {
            (t.type === 'identifier' && prevCt.token.type === 'number') ||
            (t.type === 'number' && prevCt.token.type === 'identifier') ||
            (t.type === 'identifier' && prevCt.token.type === 'keyword') ||
-           (t.type === 'keyword' && prevCt.token.type === 'identifier')
+           (t.type === 'keyword' && prevCt.token.type === 'identifier') ||
+           (prevCt.token.value === ')' && (t.type === 'identifier' || t.type === 'keyword'))
         )) {
           needsSpace = true;
         }

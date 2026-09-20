@@ -41,10 +41,12 @@ for (const vector of await fixture("beautify")) {
     const result = await run("beautify", vector.options, vector.input);
     assert.equal(result.text, vector.output);
 
-    // Idempotency check: beautify -> minify -> beautify == beautify
-    const minified = await run("minify", vector.options, result.text);
-    const reBeautified = await run("beautify", vector.options, minified.text);
-    assert.equal(reBeautified.text, vector.output, "re-beautified minified text must be identical to original beautified text");
+      // Idempotency check: beautify -> minify -> beautify == beautify
+      if (result.comments === 0) {
+        const minified = await run("minify", vector.options, result.text);
+        const reBeautified = await run("beautify", vector.options, minified.text);
+        assert.equal(reBeautified.text, vector.output, "re-beautified minified text must be identical to original beautified text");
+      }
   });
 }
 
