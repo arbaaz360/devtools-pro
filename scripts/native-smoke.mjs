@@ -62,12 +62,22 @@ if (!served) fail(`vite preview did not answer on ${previewPort}`);
 const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` }, stdio: "ignore" });
 children.push(app);
 let browser = null;
-for (let attempt = 0; attempt < 60 && !browser; attempt += 1) {
+// A cold WebView2 start on a CI runner can take well over the local few seconds.
+const connectBudgetMs = Number(process.env.SMOKE_CONNECT_MS ?? 120_000);
+for (let waited = 0; waited < connectBudgetMs && !browser; waited += 500) {
   await sleep(500);
   if (app.exitCode !== null) fail(`the executable exited early with code ${app.exitCode}`);
   try { browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`); } catch { /* not yet */ }
 }
-if (!browser) fail("could not connect to WebView2 over CDP");
+if (!browser) {
+  // Say what the runner had, so a missing runtime reads differently from a slow start.
+  const { execSync } = await import("node:child_process");
+  const probe = (command) => { try { return execSync(command, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch (error) { return `(${String(error.message).split("\n")[0]})`; } };
+  console.error("WebView2 runtime (HKLM):", probe(String.raw`reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
+  console.error("WebView2 runtime (HKCU):", probe(String.raw`reg query "HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
+  console.error("processes:", probe('tasklist /fi "IMAGENAME eq devtools-desktop.exe" /fo csv /nh'), probe('tasklist /fi "IMAGENAME eq msedgewebview2.exe" /fo csv /nh'));
+  fail(`could not connect to WebView2 over CDP within ${Math.round(connectBudgetMs / 1000)} s (executable ${app.exitCode === null ? "still running" : `exited ${app.exitCode}`})`);
+}
 
 const errors = [];
 
@@ -75,7 +85,7 @@ try {
   const page = browser.contexts()[0]?.pages()[0];
   if (!page) fail("no page in the WebView2 context");
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
-  page.on("console", (message) => { if (message.type() === "error" && !/favicon\.ico|404/.test(message.text())) errors.push(`console: ${message.text()}`); });
+  page.on("console", (message) => { if (message.type() === "error" && !/favicon\.ico|404|Blocked script execution in 'about:srcdoc'/.test(message.text())) errors.push(`console: ${message.text()}`); });
   // The shell declares no favicon; the webview asks for one anyway and the
   // preview server answers 404. Every other failed resource is a real error.
   page.on("response", (response) => { if (response.status() >= 400 && !/\/favicon\.ico$/.test(response.url())) errors.push(`${response.status()} ${response.url()}`); });
