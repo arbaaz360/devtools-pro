@@ -117,7 +117,7 @@ is combined. Rejections, each with a byte offset: `json.expected-string`,
 (`\x`, `\'`, `\0`, `\v`, `\U`, line continuations, with the JSON spelling in the hint),
 `json.invalid-unicode-escape`, `json.incomplete-escape` and `json.lone-surrogate`. For every
 valid literal the result equals `JSON.parse`; lone surrogates are the one place this operation
-is stricter, because the artifact must be valid UTF-8.
+is stricter, because the artifact must be valid UTF-8. `sequences` counts a surrogate-pair `\u` escape as two.
 
 ## Backslash sequences (`text.backslash`)
 

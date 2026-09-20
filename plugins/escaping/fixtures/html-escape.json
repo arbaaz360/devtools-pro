@@ -149,7 +149,7 @@
     "options": {
       "mode": "escape"
     },
-    "input": "tab\tlf\ncr\resc\u001bdel\u007f",
+    "input": "tab\tlf\ncr\resc\u001bdel",
     "output": "tab\tlf\ncr\resc&#27;del&#127;"
   },
   {
@@ -170,8 +170,8 @@
     "options": {
       "mode": "escape"
     },
-    "input": "a\u0085b\u009f",
-    "output": "a\u0085b\u009f",
+    "input": "ab",
+    "output": "ab",
     "value": {
       "sequences": 0
     }
@@ -183,8 +183,8 @@
       "mode": "escape",
       "encode-everything": true
     },
-    "input": "\u0080x",
-    "output": "\u0080&#120;",
+    "input": "x",
+    "output": "&#120;",
     "value": {
       "sequences": 1
     }
@@ -195,7 +195,7 @@
     "options": {
       "mode": "escape"
     },
-    "input": "\u00a0\u00ad",
+    "input": " ­",
     "output": "&nbsp;&shy;"
   },
   {
@@ -227,5 +227,14 @@
     "value": {
       "sequences": 0
     }
+  },
+  {
+    "name": "combining marks code point handling",
+    "operationId": "text.html",
+    "options": {
+      "mode": "escape"
+    },
+    "input": "é 😀⃣",
+    "output": "e&#769; &#128512;&#8419;"
   }
 ]
