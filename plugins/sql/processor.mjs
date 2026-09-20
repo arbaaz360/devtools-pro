@@ -1,7 +1,7 @@
 import { ProcessorCancelled } from "../../packages/plugin-sdk/src/index.ts";
 
-export const OPERATION_ID_BEAUTIFY = "sql.beautify";
-export const OPERATION_ID_MINIFY = "sql.minify";
+export const OPERATION_ID_BEAUTIFY = "beautify";
+export const OPERATION_ID_MINIFY = "minify";
 
 export class SqlFormatterError extends Error {
   constructor(code, message, data) {

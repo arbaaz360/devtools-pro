@@ -1,7 +1,7 @@
 [
   {
     "name": "invalid dialect",
-    "operationId": "sql.beautify",
+    "operationId": "beautify",
     "options": {
       "dialect": "nosql"
     },
@@ -10,7 +10,7 @@
   },
   {
     "name": "invalid keywordCase",
-    "operationId": "sql.beautify",
+    "operationId": "beautify",
     "options": {
       "keywordCase": "camel"
     },
@@ -19,7 +19,7 @@
   },
   {
     "name": "invalid indent",
-    "operationId": "sql.beautify",
+    "operationId": "beautify",
     "options": {
       "indent": "3"
     },
@@ -28,7 +28,7 @@
   },
   {
     "name": "invalid commaPosition",
-    "operationId": "sql.beautify",
+    "operationId": "beautify",
     "options": {
       "commaPosition": "middle"
     },

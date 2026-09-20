@@ -38,19 +38,19 @@ async function rejects(operationId, options, input, expected, settings) {
 
 for (const vector of await fixture("beautify")) {
   test(`beautify fixture: ${vector.name}`, async () => {
-    const result = await run("sql.beautify", vector.options, vector.input);
+    const result = await run("beautify", vector.options, vector.input);
     assert.equal(result.text, vector.output);
 
     // Idempotency check: beautify -> minify -> beautify == beautify
-    const minified = await run("sql.minify", vector.options, result.text);
-    const reBeautified = await run("sql.beautify", vector.options, minified.text);
+    const minified = await run("minify", vector.options, result.text);
+    const reBeautified = await run("beautify", vector.options, minified.text);
     assert.equal(reBeautified.text, vector.output, "re-beautified minified text must be identical to original beautified text");
   });
 }
 
 for (const vector of await fixture("minify")) {
   test(`minify fixture: ${vector.name}`, async () => {
-    const result = await run("sql.minify", vector.options, vector.input);
+    const result = await run("minify", vector.options, vector.input);
     assert.equal(result.text, vector.output);
   });
 }

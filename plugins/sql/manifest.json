@@ -7,11 +7,11 @@
   "title": "SQL Formatter",
   "description": "Beautify or minify SQL text.",
   "tools": [
-    {"id":"format.sql","title":"SQL Formatter","category":"converter","operationIds":["sql.beautify","sql.minify"],"workspaceId":"sql-formatter","searchAliases":["sql beautifier","sql minifier"]}
+    {"id":"format.sql","title":"SQL Formatter","category":"converter","operationIds":["beautify","minify"],"workspaceId":"sql-formatter","searchAliases":["sql beautifier","sql minifier"]}
   ],
   "operations": [
     {
-      "id":"sql.beautify",
+      "id":"beautify",
       "title":"Beautify SQL",
       "executor":{"kind":"javascriptWorker","id":"format.sql.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"sql","cancellation":"cooperative"},
       "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
@@ -26,7 +26,7 @@
       "limits":{"maxInputBytes":"4194304","maxOutputBytes":"8388608","maxChunkBytes":"8388608","deadlineMs":"2000"}
     },
     {
-      "id":"sql.minify",
+      "id":"minify",
       "title":"Minify SQL",
       "executor":{"kind":"javascriptWorker","id":"format.sql.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"sql","cancellation":"cooperative"},
       "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],

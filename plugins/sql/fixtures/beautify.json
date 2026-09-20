@@ -170,143 +170,176 @@
     "output": "SeLeCt\n  a\nfRoM b;"
   },
   {
-    "name": "extra test 0",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 0 from t;",
-    "output": "SELECT\n  0\nFROM t;"
+    "name": "plsql dialect block",
+    "dialect": "plsql",
+    "options": {
+      "dialect": "plsql"
+    },
+    "input": "declare v_num int := 1; begin dbms_output.put_line(v_num); end;",
+    "output": "declare v_num INT := 1;\n\nbegin dbms_output.put_line(v_num);\n\nEND;"
   },
   {
-    "name": "extra test 1",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 1 from t;",
-    "output": "SELECT\n  1\nFROM t;"
+    "name": "plsql block uppercase",
+    "dialect": "plsql",
+    "options": {
+      "dialect": "plsql",
+      "keyword-case": "upper"
+    },
+    "input": "declare v_num int := 1; begin dbms_output.put_line(v_num); end;",
+    "output": "declare v_num INT := 1;\n\nbegin dbms_output.put_line(v_num);\n\nEND;"
   },
   {
-    "name": "extra test 2",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 2 from t;",
-    "output": "SELECT\n  2\nFROM t;"
+    "name": "postgresql distinct",
+    "dialect": "postgresql",
+    "options": {
+      "dialect": "postgresql"
+    },
+    "input": "select distinct on (a) a, b from c;",
+    "output": "SELECT\n  distinct\nON (a)a, b\nFROM c;"
   },
   {
-    "name": "extra test 3",
+    "name": "comma-position start",
     "dialect": "sql",
-    "options": {},
-    "input": "select 3 from t;",
-    "output": "SELECT\n  3\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "select a, b, c from t group by a, b;",
+    "output": "SELECT\n  a\n  , b\n  , c\nFROM t\nGROUP BY a, b;"
   },
   {
-    "name": "extra test 4",
+    "name": "comma-position start nested",
     "dialect": "sql",
-    "options": {},
-    "input": "select 4 from t;",
-    "output": "SELECT\n  4\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "select a, (select b, c from d), e from t;",
+    "output": "SELECT\n  a\n  , (\n    SELECT\n      b\n      , c\n    FROM d\n  )\n  , e\nFROM t;"
   },
   {
-    "name": "extra test 5",
+    "name": "comma-position start with function",
     "dialect": "sql",
-    "options": {},
-    "input": "select 5 from t;",
-    "output": "SELECT\n  5\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "select coalesce(a, b, c), d from t;",
+    "output": "SELECT\n  coalesce(a, b, c)\n  , d\nFROM t;"
   },
   {
-    "name": "extra test 6",
+    "name": "keyword case lower",
     "dialect": "sql",
-    "options": {},
-    "input": "select 6 from t;",
-    "output": "SELECT\n  6\nFROM t;"
+    "options": {
+      "keyword-case": "lower"
+    },
+    "input": "SELECT A, B FROM C WHERE D = 1;",
+    "output": "select\n  A,\n  B\nfrom C\nwhere D = 1;"
   },
   {
-    "name": "extra test 7",
+    "name": "keyword case preserve",
     "dialect": "sql",
-    "options": {},
-    "input": "select 7 from t;",
-    "output": "SELECT\n  7\nFROM t;"
+    "options": {
+      "keyword-case": "preserve"
+    },
+    "input": "seLEct A, B frOM C wHEre D = 1;",
+    "output": "seLEct\n  A,\n  B\nfrOM C\nwHEre D = 1;"
   },
   {
-    "name": "extra test 8",
+    "name": "indent space-4",
     "dialect": "sql",
-    "options": {},
-    "input": "select 8 from t;",
-    "output": "SELECT\n  8\nFROM t;"
+    "options": {
+      "indent": "space-4"
+    },
+    "input": "select a from b where c = 1;",
+    "output": "SELECT\n  a\nFROM b\nWHERE c = 1;"
   },
   {
-    "name": "extra test 9",
+    "name": "indent tab",
     "dialect": "sql",
-    "options": {},
-    "input": "select 9 from t;",
-    "output": "SELECT\n  9\nFROM t;"
+    "options": {
+      "indent": "tab"
+    },
+    "input": "select a from b where c = 1;",
+    "output": "SELECT\n\ta\nFROM b\nWHERE c = 1;"
   },
   {
-    "name": "extra test 10",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 10 from t;",
-    "output": "SELECT\n  10\nFROM t;"
+    "name": "multi-statement with mixed comments",
+    "dialect": "mysql",
+    "options": {
+      "dialect": "mysql"
+    },
+    "input": "-- standard comment\nselect 1;\n# mysql comment\nselect 2;\n/* multi\nline */\nselect 3;",
+    "output": "-- standard comment\nSELECT\n  1;\n\n# mysql comment\nSELECT\n  2;\n\n/* multi\nline */\nSELECT\n  3;"
   },
   {
-    "name": "extra test 11",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 11 from t;",
-    "output": "SELECT\n  11\nFROM t;"
+    "name": "multi-statement mariadb comments",
+    "dialect": "mariadb",
+    "options": {
+      "dialect": "mariadb"
+    },
+    "input": "# mariadb comment\nselect 1;",
+    "output": "# mariadb comment\nSELECT\n  1;"
   },
   {
-    "name": "extra test 12",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 12 from t;",
-    "output": "SELECT\n  12\nFROM t;"
+    "name": "postgresql nested lists",
+    "dialect": "postgresql",
+    "options": {
+      "dialect": "postgresql",
+      "comma-position": "start"
+    },
+    "input": "select array[1, 2, 3], json_build_object('a', 1, 'b', 2);",
+    "output": "SELECT\n  array[1\n  , 2\n  , 3]\n  , json_build_object('a', 1, 'b', 2);"
   },
   {
-    "name": "extra test 13",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 13 from t;",
-    "output": "SELECT\n  13\nFROM t;"
+    "name": "mysql backticks",
+    "dialect": "mysql",
+    "options": {
+      "dialect": "mysql"
+    },
+    "input": "select `table`.`column` from `table`;",
+    "output": "SELECT\n  `table`.`column`\nFROM `table`;"
   },
   {
-    "name": "extra test 14",
+    "name": "complex joins with comma start",
     "dialect": "sql",
-    "options": {},
-    "input": "select 14 from t;",
-    "output": "SELECT\n  14\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "select a.id, b.name, c.value from a join b on a.id = b.id left join c on b.id = c.id;",
+    "output": "SELECT\n  a.id\n  , b.name\n  , c.value\nFROM a\nJOIN b\nON a.id = b.id\nLEFT JOIN c\nON b.id = c.id;"
   },
   {
-    "name": "extra test 15",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 15 from t;",
-    "output": "SELECT\n  15\nFROM t;"
+    "name": "plsql string escaping",
+    "dialect": "plsql",
+    "options": {
+      "dialect": "plsql"
+    },
+    "input": "select 'hello ''world''' from dual;",
+    "output": "SELECT\n  'hello ''world'''\nFROM dual;"
   },
   {
-    "name": "extra test 16",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 16 from t;",
-    "output": "SELECT\n  16\nFROM t;"
+    "name": "plsql function call",
+    "dialect": "plsql",
+    "options": {
+      "dialect": "plsql"
+    },
+    "input": "select my_func(a, b, c) from dual;",
+    "output": "SELECT\n  my_func(a, b, c)\nFROM dual;"
   },
   {
-    "name": "extra test 17",
+    "name": "update statement",
     "dialect": "sql",
-    "options": {},
-    "input": "select 17 from t;",
-    "output": "SELECT\n  17\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "update t set a = 1, b = 2 where c = 3;",
+    "output": "UPDATE t\nSET\n  a = 1\n  , b = 2\nWHERE c = 3;"
   },
   {
-    "name": "extra test 18",
+    "name": "insert statement",
     "dialect": "sql",
-    "options": {},
-    "input": "select 18 from t;",
-    "output": "SELECT\n  18\nFROM t;"
-  },
-  {
-    "name": "extra test 19",
-    "dialect": "sql",
-    "options": {},
-    "input": "select 19 from t;",
-    "output": "SELECT\n  19\nFROM t;"
+    "options": {
+      "comma-position": "start"
+    },
+    "input": "insert into t (a, b, c) values (1, 2, 3), (4, 5, 6);",
+    "output": "INSERT INTO t(a, b, c)\nVALUES\n  (1, 2, 3)\n  , (4, 5, 6);"
   }
 ]

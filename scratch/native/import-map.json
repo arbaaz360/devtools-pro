@@ -1,0 +1,66 @@
+[
+  {
+    "id": "convert.yaml",
+    "processor": "yaml/processor.mjs"
+  },
+  {
+    "id": "encoding.base64-text",
+    "processor": "base64-text/processor.mjs"
+  },
+  {
+    "id": "encoding.hash",
+    "processor": "hash/processor.mjs"
+  },
+  {
+    "id": "examples.echo",
+    "processor": "examples/processor.mjs"
+  },
+  {
+    "id": "format.html",
+    "processor": "html/processor.mjs"
+  },
+  {
+    "id": "generate.examples",
+    "processor": "example-strings/processor.mjs"
+  },
+  {
+    "id": "identity.uuid",
+    "processor": "uuid/processor.mjs"
+  },
+  {
+    "id": "number.base",
+    "processor": "number-base/processor.mjs"
+  },
+  {
+    "id": "security.jwt",
+    "processor": "jwt/processor.mjs"
+  },
+  {
+    "id": "structured.json",
+    "processor": "json/processor.mjs"
+  },
+  {
+    "id": "text.case",
+    "processor": "string-case/processor.mjs"
+  },
+  {
+    "id": "text.compare",
+    "processor": "diff/processor.mjs"
+  },
+  {
+    "id": "text.escaping",
+    "processor": "escaping/processor.mjs"
+  },
+  {
+    "id": "text.find-replace",
+    "processor": "find-replace/processor.mjs"
+  },
+  {
+    "id": "time.unix",
+    "processor": "time/processor.mjs"
+  },
+  {
+    "id": "web.url",
+    "processor": "url/processor.mjs"
+  }
+]

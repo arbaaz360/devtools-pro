@@ -1,0 +1,169 @@
+[
+  {
+    "id": "convert.yaml",
+    "version": "0.1.0",
+    "manifest": "yaml/manifest.json",
+    "processor": "yaml/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "convert.yaml-json",
+      "convert.json-yaml"
+    ]
+  },
+  {
+    "id": "encoding.base64-text",
+    "version": "0.2.0",
+    "manifest": "base64-text/manifest.json",
+    "processor": "base64-text/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "encoding.base64-text"
+    ]
+  },
+  {
+    "id": "encoding.hash",
+    "version": "0.1.0",
+    "manifest": "hash/manifest.json",
+    "processor": "hash/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "encoding.hash"
+    ]
+  },
+  {
+    "id": "examples.echo",
+    "version": "0.1.0",
+    "manifest": "examples/manifest.json",
+    "processor": "examples/processor.mjs",
+    "frontend": "examples/frontend.ts",
+    "operationIds": [
+      "echo"
+    ]
+  },
+  {
+    "id": "format.html",
+    "version": "0.1.0",
+    "manifest": "html/manifest.json",
+    "processor": "html/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "beautify",
+      "minify"
+    ]
+  },
+  {
+    "id": "generate.examples",
+    "version": "0.1.0",
+    "manifest": "example-strings/manifest.json",
+    "processor": "example-strings/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "generate.examples"
+    ]
+  },
+  {
+    "id": "identity.uuid",
+    "version": "0.2.0",
+    "manifest": "uuid/manifest.json",
+    "processor": "uuid/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "identity.uuid"
+    ]
+  },
+  {
+    "id": "number.base",
+    "version": "0.1.0",
+    "manifest": "number-base/manifest.json",
+    "processor": "number-base/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "number.base"
+    ]
+  },
+  {
+    "id": "security.jwt",
+    "version": "0.1.0",
+    "manifest": "jwt/manifest.json",
+    "processor": "jwt/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "security.jwt"
+    ]
+  },
+  {
+    "id": "structured.json",
+    "version": "0.1.0",
+    "manifest": "json/manifest.json",
+    "processor": "json/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "format",
+      "minify",
+      "inspect"
+    ]
+  },
+  {
+    "id": "text.case",
+    "version": "0.1.0",
+    "manifest": "string-case/manifest.json",
+    "processor": "string-case/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "text.case"
+    ]
+  },
+  {
+    "id": "text.compare",
+    "version": "0.1.0",
+    "manifest": "diff/manifest.json",
+    "processor": "diff/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "text.compare"
+    ]
+  },
+  {
+    "id": "text.escaping",
+    "version": "0.2.0",
+    "manifest": "escaping/manifest.json",
+    "processor": "escaping/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "text.html",
+      "text.json-string",
+      "text.backslash"
+    ]
+  },
+  {
+    "id": "text.find-replace",
+    "version": "0.2.0",
+    "manifest": "find-replace/manifest.json",
+    "processor": "find-replace/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "text.find-replace"
+    ]
+  },
+  {
+    "id": "time.unix",
+    "version": "0.1.0",
+    "manifest": "time/manifest.json",
+    "processor": "time/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "time.unix"
+    ]
+  },
+  {
+    "id": "web.url",
+    "version": "0.1.0",
+    "manifest": "url/manifest.json",
+    "processor": "url/processor.mjs",
+    "frontend": null,
+    "operationIds": [
+      "url.transform",
+      "url.parse-query"
+    ]
+  }
+]
