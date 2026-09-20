@@ -1,0 +1,106 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "generate.examples",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Example String Generator",
+  "description": "Produce deterministic sample text from various categories like paragraphs, sentences, names, emails, and URLs.",
+  "tools": [
+    {
+      "id": "generate.examples",
+      "title": "Example String Generator",
+      "category": "generator",
+      "operationIds": ["generate.examples"],
+      "workspaceId": "generator"
+    }
+  ],
+  "operations": [
+    {
+      "id": "generate.examples",
+      "title": "Generate Example Strings",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "generate.examples.processor",
+        "version": "0.1.0",
+        "engine": "node",
+        "engineVersion": "20",
+        "syntax": "javascript",
+        "cancellation": "cooperative"
+      },
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "output",
+          "label": "Result",
+          "kind": "value",
+          "multiplicity": "many",
+          "representations": ["text", "properties"],
+          "sensitive": false,
+          "exports": ["copyText", "save"]
+        }
+      ],
+      "limits": {
+        "maxInputBytes": "0",
+        "maxOutputBytes": "1048576",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "1000"
+      },
+      "options": [
+        {
+          "id": "category",
+          "type": "enum",
+          "label": "Category",
+          "default": "sentence",
+          "choices": [
+            { "id": "paragraph", "label": "Paragraph" },
+            { "id": "sentence", "label": "Sentence" },
+            { "id": "word", "label": "Word" },
+            { "id": "title", "label": "Title" },
+            { "id": "first-name", "label": "First Name" },
+            { "id": "last-name", "label": "Last Name" },
+            { "id": "full-name", "label": "Full Name" },
+            { "id": "email", "label": "Email" },
+            { "id": "url", "label": "URL" },
+            { "id": "short-tweet", "label": "Short Tweet" },
+            { "id": "long-tweet", "label": "Long Tweet" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "count",
+          "type": "integer",
+          "label": "Count",
+          "default": "1",
+          "minimum": "1",
+          "maximum": "100",
+          "persistence": "instance",
+          "sensitive": false
+        }
+      ],
+      "trigger": {
+        "modes": ["explicit", "heldRepeat"],
+        "debounceMs": "0"
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "generator",
+      "kind": "generator",
+      "bindings": [
+        { "id": "result", "component": "editor", "outputPort": "output" }
+      ],
+      "commands": [],
+      "presentationSettings": []
+    }
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {
+    "requirementIds": ["DU-20"],
+    "fixtures": ["deterministic"],
+    "uiScenarios": []
+  }
+}
