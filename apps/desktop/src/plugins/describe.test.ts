@@ -55,3 +55,25 @@ test("an operation with no document input is still engine-runnable; two inputs a
   assert.equal(engineRunnable({ ...generate, inputs: [...generate.inputs, { ...generate.inputs[0]!, id: "second" }] }), false);
   assert.equal(engineRunnable({ ...generate, executor: { ...generate.executor, kind: "rust" } }), false);
 });
+
+test("annotations are lifted out of a result value, validated and capped", async () => {
+  const { splitAnnotations, MAX_ANNOTATIONS } = await import("./describe.ts");
+  const { properties, annotations } = splitAnnotations({ count: 2, annotations: [{ start: 0, end: 3, kind: "match", label: "#1" }, { start: 5, end: 2 }, { start: "x", end: 2 }, null, { start: 4, end: 6 }] });
+  assert.deepEqual(properties, { count: 2 });
+  assert.deepEqual(annotations, [{ start: 0, end: 3, kind: "match", label: "#1" }, { start: 4, end: 6, kind: "match", label: undefined }]);
+  assert.deepEqual(splitAnnotations("text"), { properties: "text", annotations: [] });
+  assert.deepEqual(splitAnnotations({ a: 1 }), { properties: { a: 1 }, annotations: [] });
+  const many = splitAnnotations({ annotations: Array.from({ length: MAX_ANNOTATIONS + 5 }, (_, i) => ({ start: i, end: i + 1 })) });
+  assert.equal(many.annotations.length, MAX_ANNOTATIONS);
+});
+
+test("the renderer follows the port's mime and representations", async () => {
+  const { rendererFor } = await import("./describe.ts");
+  const port = (mime: string[], representations: string[]) => ({ id: "output", kind: "artifact" as const, multiplicity: "one" as const, mime, representations: representations as never, sensitive: false, exports: [] });
+  assert.equal(rendererFor(port(["text/html"], ["previewDocument", "code"]), true, undefined), "preview");
+  assert.equal(rendererFor(port(["text/html"], ["code"]), true, undefined), "text");
+  assert.equal(rendererFor(port(["image/svg+xml"], ["image", "code"]), true, undefined), "svg");
+  assert.equal(rendererFor(port(["application/json"], ["text"]), true, undefined), "json");
+  assert.equal(rendererFor(port([], ["properties"]), false, { a: 1 }), "json");
+  assert.equal(rendererFor(port(["text/plain"], ["text"]), true, {}), "text");
+});

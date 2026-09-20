@@ -227,9 +227,20 @@ export function validation(
   }
   return null;
 }
+const MIME_EXTENSIONS: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/svg+xml": "svg",
+  "text/html": "html",
+  "text/css": "css",
+  "text/javascript": "js",
+  "application/xml": "xml",
+  "application/yaml": "yaml",
+  "text/x-sql": "sql",
+  "text/markdown": "md",
+};
 export function resultExtension(tab: TabState, mime?: string | null): string {
-  if (mime === "image/jpeg") return "jpg";
-  if (mime === "image/png") return "png";
+  if (mime && MIME_EXTENSIONS[mime]) return MIME_EXTENSIONS[mime];
   if (
     tab.toolId === "structured.json" ||
     tab.toolId === "text.compare" ||

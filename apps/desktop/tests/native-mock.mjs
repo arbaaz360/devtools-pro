@@ -97,10 +97,17 @@ class NativeMock {
         return { mime: doc.mime, bytes: doc.bytes.length, truncated: false, data: `data:${doc.mime};base64,${doc.bytes.toString('base64')}` };
       }
       case 'close_document': this.documents.delete(args.documentId); return;
-      case 'list_tools': return ['structured.json', 'encoding.image-base64', 'encoding.base64-image', 'text.compare', 'text.url'].map((id) => ({
-        id, label: id, contractVersion: 1, inputKinds: ['text', 'bytes'],
-        limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: {}, operations: [], renderer: 'text',
-      }));
+      case 'list_tools': return [
+        ...['structured.json', 'encoding.image-base64', 'encoding.base64-image', 'text.compare', 'text.url'].map((id) => ({
+          id, label: id, contractVersion: 1, inputKinds: ['text', 'bytes'],
+          limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: {}, operations: [], renderer: 'text',
+        })),
+        // Renderer probes: each returns a text result the shell shows in a different way.
+        ...[['mock.preview', 'Preview (mock)', 'preview'], ['mock.svg', 'SVG (mock)', 'svg'], ['mock.annotate', 'Annotate (mock)', 'text']].map(([id, label, renderer]) => ({
+          id, label, contractVersion: 1, inputKinds: ['text'], group: 'MOCKS', auto: true,
+          limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: {}, operations: [{ id: 'run', label: 'Run', defaultOptions: {} }], renderer,
+        })),
+      ];
       case 'run_tool': return this.run(args);
       case 'run_compare': return this.compare(args);
       case 'job_status': return this.jobs.get(args.jobId)?.event ?? null;
@@ -144,6 +151,22 @@ class NativeMock {
           event.renderer = 'binary'; event.resultMime = 'image/png';
         } else if (args.toolId === 'text.url') {
           output = this.document('result.txt', Buffer.from(encodeURIComponent(doc.bytes.toString('utf8'))));
+        } else if (args.toolId === 'mock.preview') {
+          output = this.document('result.html', Buffer.from(`<!DOCTYPE html><html><body>${doc.bytes.toString('utf8')}<script>document.body.dataset.ran='yes'</script></body></html>`));
+          event.renderer = 'preview'; event.resultMime = 'text/html';
+        } else if (args.toolId === 'mock.svg') {
+          output = this.document('result.svg', Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20"><rect width="20" height="20" fill="#000"/></svg>'));
+          event.renderer = 'svg'; event.resultMime = 'image/svg+xml';
+        } else if (args.toolId === 'mock.annotate') {
+          // Every word is a match; the first character of each is a group.
+          const text = doc.bytes.toString('utf8');
+          const annotations = [];
+          for (const match of text.matchAll(/\S+/g)) {
+            annotations.push({ start: match.index, end: match.index + match[0].length, kind: 'match', label: `#${annotations.length / 2 + 1}` });
+            annotations.push({ start: match.index, end: match.index + 1, kind: 'group', label: 'first' });
+          }
+          output = this.document('result.txt', Buffer.from(`${annotations.length / 2} words`));
+          event.annotations = annotations;
         } else throw new Error(`Unmocked tool ${args.toolId}`);
         if (output) { event.resultDocumentId = output.id; event.outputBytes = output.size; }
       } catch (error) { event.ok = false; event.error = error.message; }

@@ -9,7 +9,11 @@ export type Operation = 'inspect' | 'format' | 'minify';
 export type CompareNewline = 'preserve' | 'lf' | 'cr_lf' | 'ignore';
 export type TextUtilityOperation = 'encode' | 'decode' | 'escape' | 'unescape';
 export type InputKind = 'bytes' | 'text' | 'json' | 'csv' | 'nd_json' | 'xml' | 'table' | 'scalar' | 'patch' | 'any';
-export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json';
+/** `preview` (a text/html document in a sandboxed frame) and `svg` (an image/svg+xml
+ * document shown as an image) are produced by the webview engine only. */
+export type RendererKind = 'text' | 'tree' | 'table' | 'diff' | 'binary' | 'json' | 'preview' | 'svg';
+/** A span of the input text to highlight in the editor; offsets are UTF-16 code units. */
+export interface Annotation { start: number; end: number; kind: string; label?: string; }
 export interface ToolLimits { maxInputBytes: number | null; maxOutputBytes: number | null; }
 export interface ToolCapabilities {
   deterministic: boolean;
@@ -91,6 +95,8 @@ export interface JobFinished {
   resultKind?: InputKind | null;
   resultMime?: string | null;
   diagnostics?: Array<{ severity: 'info' | 'warning' | 'error'; message: string; start: number; end: number }>;
+  /** Editor highlights lifted from a package result's `annotations` array. */
+  annotations?: Annotation[];
   sourceDocumentId?: string | null;
   operationId?: string | null;
 }

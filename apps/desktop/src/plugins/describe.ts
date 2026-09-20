@@ -1,4 +1,4 @@
-import type { ToolManifest, ToolOperation } from "../bridge";
+import type { Annotation, ToolManifest, ToolOperation } from "../bridge";
 import type {
   OperationSpec,
   OptionSpec,
@@ -102,6 +102,38 @@ export function engineRunnable(operation: OperationSpec): boolean {
 
 export function primaryOutput(operation: OperationSpec): OperationSpec["outputs"][number] | undefined {
   return operation.outputs[0];
+}
+
+export const MAX_ANNOTATIONS = 20_000;
+
+/**
+ * Splits a package result value into the properties the result pane lists and the
+ * editor annotations it carries. Anything that is not a well-formed span is dropped;
+ * the list is capped so a runaway result cannot stall the editor.
+ */
+export function splitAnnotations(value: unknown): { properties: unknown; annotations: Annotation[] } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return { properties: value, annotations: [] };
+  const { annotations: raw, ...properties } = value as Record<string, unknown>;
+  if (!Array.isArray(raw)) return { properties: value, annotations: [] };
+  const annotations: Annotation[] = [];
+  for (const item of raw) {
+    if (annotations.length >= MAX_ANNOTATIONS) break;
+    if (!item || typeof item !== "object") continue;
+    const { start, end, kind, label } = item as Record<string, unknown>;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || (start as number) < 0 || (end as number) < (start as number)) continue;
+    annotations.push({ start: start as number, end: end as number, kind: typeof kind === "string" ? kind : "match", label: typeof label === "string" ? label : undefined });
+  }
+  return { properties, annotations };
+}
+
+/** How the shell shows an output port: by mime first, then by declared representation. */
+export function rendererFor(port: OperationSpec["outputs"][number] | undefined, produced: boolean, value: unknown): "text" | "json" | "preview" | "svg" {
+  const mime = port?.mime ?? [];
+  const representations = port?.representations ?? [];
+  if (mime.includes("text/html") && representations.includes("previewDocument")) return "preview";
+  if (mime.includes("image/svg+xml")) return "svg";
+  if (mime.includes("application/json") || (!produced && value !== undefined)) return "json";
+  return "text";
 }
 
 export function describePackage(manifest: PluginManifest, packageDir: string): EngineTool[] {
