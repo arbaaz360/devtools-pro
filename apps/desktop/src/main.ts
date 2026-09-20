@@ -36,6 +36,8 @@ import {
   validation,
   type ToolDefinition,
 } from "./workbench/tools";
+import { WorkerEngine } from "./plugins/engine";
+import type { OptionSpec } from "../../../packages/plugin-contract/ts/generated.ts";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
 import {
@@ -423,7 +425,63 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
       });
     label.append(select);
     host.append(label, granularityControl());
+    return;
   }
+  if (tool.optionSchema?.length)
+    host.append(...optionControls(tab, tool.optionSchema));
+}
+/** Controls for a package tool's declared options: one dense control per option. */
+function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLElement[] {
+  const set = (id: string, value: unknown) =>
+    controller.options(tab.id, tab.operation, { ...tab.options, [id]: value });
+  const controls: HTMLElement[] = [];
+  for (const option of schema) {
+    if (option.type === "boolean") {
+      const label = document.createElement("label");
+      label.className = "check-option";
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.checked = tab.options[option.id] === true;
+      check.setAttribute("aria-label", option.label);
+      check.onchange = () => set(option.id, check.checked);
+      label.append(check, document.createTextNode(option.label));
+      controls.push(label);
+      continue;
+    }
+    if (option.type !== "enum" && option.type !== "string" && option.type !== "integer" && option.type !== "decimal") continue;
+    const label = document.createElement("label");
+    label.className = "dynamic-option";
+    label.textContent = option.label;
+    if (option.type === "enum") {
+      const select = document.createElement("select");
+      select.setAttribute("aria-label", option.label);
+      for (const choice of option.choices) {
+        const item = document.createElement("option");
+        item.value = choice.id;
+        item.textContent = choice.label;
+        item.selected = choice.id === (tab.options[option.id] ?? option.default);
+        select.append(item);
+      }
+      select.onchange = () => set(option.id, select.value);
+      label.append(select);
+    } else {
+      const input = document.createElement("input");
+      const numeric = option.type !== "string";
+      input.type = numeric ? "number" : "text";
+      input.setAttribute("aria-label", option.label);
+      const current = tab.options[option.id];
+      input.value = current === undefined ? String(option.default) : String(current);
+      if (numeric) {
+        if (option.minimum !== undefined) input.min = option.minimum;
+        if (option.maximum !== undefined) input.max = option.maximum;
+        if (option.type === "integer") input.step = "1";
+      }
+      input.onchange = () => set(option.id, numeric ? Number(input.value) : input.value);
+      label.append(input);
+    }
+    controls.push(label);
+  }
+  return controls;
 }
 /* ------------------------------------------------------- Diff & Compare */
 let compareWorkspace: CompareWorkspace | null = null;
@@ -1196,7 +1254,10 @@ const api: WorkbenchApi = {
   subscribeJobs,
   listTools,
 };
-controller = new WorkbenchController(api, hooks);
+// Package tools run on the webview's worker engine behind the same API; the
+// native host keeps every id it serves itself.
+const engine = new WorkerEngine(api);
+controller = new WorkbenchController(engine.wrap(api), hooks);
 state = controller.state;
 $("#new-document").onclick = () => controller.newDocument();
 $("#empty-new").onclick = () => controller.newDocument();

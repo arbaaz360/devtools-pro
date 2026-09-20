@@ -756,7 +756,7 @@ export class WorkbenchController {
     const tab = this.tab(id);
     const tool = tab && this.toolDefinition(tab.toolId);
     if (!tab || !tool?.auto || tab.phase === "importing") return;
-    if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare) return;
+    if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare && !tool.emptyInput) return;
     this.timers.set(
       id,
       setTimeout(() => {

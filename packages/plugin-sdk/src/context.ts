@@ -1,4 +1,10 @@
-import { createHash } from "node:crypto";
+// Browser-safe on purpose: processors and this context run in the desktop
+// webview's worker engine as well as under Node, so only web platform APIs
+// are used here. Node-only discovery lives in discovery.ts.
+async function sha256Hex(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes.slice());
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
 
 export interface Limits { maxInputBytes: number; maxOutputBytes: number; maxChunkBytes: number; deadlineMs: number; }
 export const defaultLimits = (): Limits => ({ maxInputBytes: 16 * 1024 * 1024, maxOutputBytes: 16 * 1024 * 1024, maxChunkBytes: 1024 * 1024, deadlineMs: 0 });
@@ -66,7 +72,7 @@ export class MemoryReader implements NamedReader {
 }
 export class MemoryOutputSink implements OutputSink {
   readonly artifacts = new Map<string, OutputArtifact>(); readonly bytes = new Map<string, Uint8Array>(); readonly values = new Map<string, unknown>();
-  write(port: string, bytes: Uint8Array, limits: Limits): OutputArtifact { if (bytes.byteLength > limits.maxChunkBytes) throw new Error("output chunk exceeds limit"); if (bytes.byteLength > limits.maxOutputBytes) throw new Error("output exceeds limit"); const contentHash = createHash("sha256").update(bytes).digest("hex"); const artifact = { handle: `memory:${port}`, byteLength: bytes.byteLength, contentHash }; this.bytes.set(port, bytes.slice()); this.artifacts.set(port, artifact); return artifact; }
+  async write(port: string, bytes: Uint8Array, limits: Limits): Promise<OutputArtifact> { if (bytes.byteLength > limits.maxChunkBytes) throw new Error("output chunk exceeds limit"); if (bytes.byteLength > limits.maxOutputBytes) throw new Error("output exceeds limit"); const contentHash = await sha256Hex(bytes); const artifact = { handle: `memory:${port}`, byteLength: bytes.byteLength, contentHash }; this.bytes.set(port, bytes.slice()); this.artifacts.set(port, artifact); return artifact; }
   value(port: string, value: unknown): void { this.values.set(port, value); }
 }
 export class FixedClock implements Clock { readonly value: string; constructor(value: string) { this.value = value; } now(): string { return this.value; } }

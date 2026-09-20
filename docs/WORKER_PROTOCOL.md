@@ -52,6 +52,10 @@ and take the next packet.
 - Keep source documents immutable, outputs complete by handle, and limits,
   cancellation, structured errors and provenance intact.
 - No new dependencies. Files in the index are LF.
+- A package processor runs in the desktop webview's Worker engine as well as
+  under Node, so it may use only web platform APIs: no `node:` imports (use
+  `crypto.subtle`, `TextEncoder`, `Uint8Array`). A processor that needs a
+  Node built-in is not reachable from the app.
 - Commit and push only your branch. Never merge.
 
 ## Self-review before handoff
