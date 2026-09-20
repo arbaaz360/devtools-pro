@@ -30,6 +30,16 @@
   that packet again first. A review that lands after a release, a timeout or a loop
   restart is therefore still relayed. Forwarded comment ids persist in the state file.
 
+  Agents stop early: they push a branch and forget the pull request, or pause to ask for
+  confirmation nobody will give. While a packet has no pull request, the loop nudges the
+  conversation, at most once every 30 minutes: when the packet's branch is on origin and
+  its last commit is older than 10 minutes, it asks for the PR; when no branch exists
+  45 minutes after dispatch, it asks the agent to continue or post BLOCKED or QUESTION.
+
+  When -Root points at another checkout, the loop's own checkout is pulled every tick
+  and the loop restarts itself when this script changes, so merged fixes take effect
+  without anyone restarting it.
+
 .PARAMETER IntervalMinutes
   Minutes between GitHub polls. Default 5.
 .PARAMETER MaxWaitMinutes
@@ -57,6 +67,10 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = 'arbaaz360/devtools-pro'
 $root = if ($Root) { (Resolve-Path $Root).Path } else { Split-Path -Parent $PSScriptRoot }
+$self = Split-Path -Parent $PSScriptRoot
+$selfUpdates = $Root -and ((Resolve-Path $self).Path -ne $root)
+$selfHash = (Get-FileHash $PSCommandPath).Hash
+$scriptArgs = $PSBoundParameters
 $promptPath = Join-Path $root 'docs/antigravity/WORKER_PROMPT.md'
 $statePath = Join-Path $root '.antigravity-worker-state.json'   # ignored by git; see .gitignore
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Error 'gh is not on PATH' }
@@ -123,7 +137,23 @@ function Read-State {
 function Set-Tracked($state, $issue, $packet) {
   $startedAt = if ($issue) { (Get-Date).ToString('o') } else { $null }
   $conversation = if ($issue) { $ConversationId } else { $null }
-  Write-State ([pscustomobject]@{ issue = $issue; packet = $packet; conversation = $conversation; startedAt = $startedAt; forwarded = @($state.forwarded) })
+  Write-State ([pscustomobject]@{ issue = $issue; packet = $packet; conversation = $conversation; startedAt = $startedAt; forwarded = @($state.forwarded); nudgedAt = $null })
+}
+
+# Pull the loop's own checkout and restart when this script changed. Only when the loop
+# runs from a checkout other than the agent's, which must never be pulled under it.
+function Update-Self {
+  if (-not $selfUpdates) { return }
+  $null = git -C $self pull -q --ff-only 2>&1
+  if ((Get-FileHash $PSCommandPath).Hash -eq $selfHash) { return }
+  Write-Host ('{0}  script updated on main; restarting' -f (Get-Date -Format 'HH:mm'))
+  $restartArgs = @()
+  foreach ($k in $scriptArgs.Keys) {
+    $v = $scriptArgs[$k]
+    if ($v -is [switch]) { if ($v) { $restartArgs += "-$k" } } else { $restartArgs += "-$k"; $restartArgs += "$v" }
+  }
+  & pwsh -NoProfile -File $PSCommandPath @restartArgs
+  exit $LASTEXITCODE
 }
 $packetLine = '(?m)^\s*Packet:\s*(docs/packets/[A-Za-z0-9._-]+\.md)'
 $verdictLine = '^\s*\[[A-Z]+-\d+\]\[(CHANGES_REQUESTED|CI_BLOCKED|READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]'
@@ -162,6 +192,42 @@ function Get-PendingReview($state) {
   return $null
 }
 
+# The branch a packet prescribes, from its "## Branch" section, and when origin last saw it.
+function Get-PacketBranch($packet) {
+  $path = Join-Path $root $packet
+  if (-not (Test-Path $path)) { return $null }
+  $m = [regex]::Match((Get-Content $path -Raw), '(?s)## Branch.*?`(antigravity/[^`]+)`')
+  if ($m.Success) { return $m.Groups[1].Value }
+  return $null
+}
+function Get-BranchCommitDate($branch) {
+  $out = gh api "repos/$repo/branches/$branch" --jq '.commit.commit.committer.date' 2>&1 | Out-String
+  if ($LASTEXITCODE -ne 0 -or $out -notmatch '\d{4}-\d{2}-\d{2}T') { return $null }
+  return [datetime]::Parse($out.Trim()).ToUniversalTime()
+}
+
+# No pull request yet: remind a stopped agent, at most once every 30 minutes.
+function Send-Nudge($state) {
+  if ($state.nudgedAt -and ((Get-Date) - [datetime]$state.nudgedAt) -lt [timespan]::FromMinutes(30)) { return }
+  $id = ([regex]::Match($state.packet, 'packets/([A-Z]+-\d+)')).Groups[1].Value
+  $branch = Get-PacketBranch $state.packet
+  $pushed = if ($branch) { Get-BranchCommitDate $branch } else { $null }
+  $text = $null
+  if ($pushed) {
+    if (((Get-Date).ToUniversalTime() - $pushed) -gt [timespan]::FromMinutes(10)) {
+      $text = "Packet #$($state.issue) ([$id]): branch $branch is pushed to origin but no pull request exists. Finish Step 5 now: open the PR against main with the line Packet: $($state.packet) first in the body and the [$id][STATUS] block, then report the PR number. If something blocks you, post [$id][BLOCKED] on issue #$($state.issue) instead."
+    }
+  } elseif (((Get-Date) - [datetime]$state.startedAt) -gt [timespan]::FromMinutes(45)) {
+    $text = "Packet #$($state.issue) ([$id]): no branch has been pushed and no [BLOCKED] or [QUESTION] posted 45 minutes after dispatch. Continue the packet through Step 6 without waiting for confirmation. If you are stuck, post [$id][BLOCKED] or [$id][QUESTION] on issue #$($state.issue)."
+  }
+  if (-not $text) { return }
+  Write-Host ('{0}  nudging Antigravity about packet #{1}' -f (Get-Date -Format 'HH:mm'), $state.issue)
+  $out = Invoke-AgentApi send-message "--title=[nudge] packet #$($state.issue)" $ConversationId $text
+  if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "nudge failed: $out"; return }
+  $state | Add-Member -NotePropertyName nudgedAt -NotePropertyValue (Get-Date).ToString('o') -Force
+  Write-State $state
+}
+
 function Test-InFlight($state) {
   if (-not $state.issue) { return $false }
   $started = [datetime]$state.startedAt
@@ -172,7 +238,7 @@ function Test-InFlight($state) {
   $open = gh issue view $state.issue --repo $repo --json state --jq .state
   if ($open -ne 'OPEN') { return $false }
   $prs = gh pr list --repo $repo --state all --search "`"Packet: $($state.packet)`" in:body" --json number,state | ConvertFrom-Json
-  if (-not $prs -or $prs.Count -eq 0) { return $true }   # still working, no PR yet
+  if (-not $prs -or $prs.Count -eq 0) { Send-Nudge $state; return $true }   # still working, no PR yet
   $pr = $prs[0]
   if ($pr.state -ne 'OPEN') {
     Write-Host "packet #$($state.issue): PR #$($pr.number) is $($pr.state); releasing"
@@ -210,6 +276,7 @@ function Start-Packet($issue) {
 
 Write-Host "Antigravity worker loop: polling $repo every $IntervalMinutes min; Ctrl+C to stop."
 while ($true) {
+  Update-Self
   $state = Read-State
   if (Test-InFlight $state) {
     Write-Host ("{0}  packet #{1} in flight" -f (Get-Date -Format 'HH:mm'), $state.issue)
