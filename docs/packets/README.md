@@ -32,3 +32,5 @@ parses **Allowed files** from the fenced block under that heading:
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).
+
+<!-- webhook probe: temporary, this branch is closed without merging -->
