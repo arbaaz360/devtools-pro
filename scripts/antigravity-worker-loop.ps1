@@ -3,9 +3,12 @@
   Starts an Antigravity agent on each ready packet, one at a time, without a human kickoff.
 
 .DESCRIPTION
-  Run this from Antigravity's integrated terminal, in the repository checkout. That terminal
-  already carries ANTIGRAVITY_LS_ADDRESS and ANTIGRAVITY_CSRF_TOKEN, which the `agentapi`
-  command needs to reach the running language server; nothing is copied or stored.
+  Run this in any terminal while Antigravity is open with this repository (or a parent
+  folder) as its workspace. The `agentapi` command needs the address and CSRF token of
+  Antigravity's running language server; if ANTIGRAVITY_LS_ADDRESS and
+  ANTIGRAVITY_CSRF_TOKEN are not already set, the script reads them from that server's
+  own process on this machine and keeps them in this process only. Nothing is written
+  to disk or sent anywhere.
 
   Every interval the loop asks GitHub (with `gh`, no model tokens) for open issues labelled
   packet + ready + antigravity. If one exists and no packet is in flight, it starts a new
@@ -38,13 +41,49 @@ $repo = 'arbaaz360/devtools-pro'
 $root = Split-Path -Parent $PSScriptRoot
 $promptPath = Join-Path $root 'docs/antigravity/WORKER_PROMPT.md'
 $statePath = Join-Path $root '.antigravity-worker-state.json'   # ignored by git; see .gitignore
-$agentapi = Join-Path $env:USERPROFILE '.gemini/antigravity-ide/bin/agentapi.bat'
-
-if (-not $env:ANTIGRAVITY_LS_ADDRESS -or -not $env:ANTIGRAVITY_CSRF_TOKEN) {
-  Write-Error 'ANTIGRAVITY_LS_ADDRESS and ANTIGRAVITY_CSRF_TOKEN are not set. Start this script from the terminal inside Antigravity, with the repository open as the workspace.'
-}
-if (-not (Test-Path $agentapi)) { Write-Error "agentapi not found at $agentapi" }
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Error 'gh is not on PATH' }
+
+# The agentapi wrapper is a .bat that forwards to the language server binary. Call the
+# binary directly so a long prompt with && and quotes is passed through untouched.
+$wrapper = Join-Path $env:USERPROFILE '.gemini/antigravity-ide/bin/agentapi.bat'
+if (-not (Test-Path $wrapper)) { Write-Error "agentapi wrapper not found at $wrapper; is Antigravity installed?" }
+$serverExe = ([regex]::Match((Get-Content $wrapper -Raw), '"([^"]+language_server[^"]*\.exe)"')).Groups[1].Value
+if (-not $serverExe -or -not (Test-Path $serverExe)) { Write-Error "could not resolve the language server binary from $wrapper" }
+
+function Invoke-AgentApi { & $serverExe agentapi @args 2>&1 | Out-String }
+
+function Connect-LanguageServer {
+  if ($env:ANTIGRAVITY_LS_ADDRESS -and $env:ANTIGRAVITY_CSRF_TOKEN) { return }
+  $repoTokens = ($root -split '[^A-Za-z0-9]+' | Where-Object { $_ }) | ForEach-Object { $_.ToLowerInvariant() }
+  $servers = Get-CimInstance Win32_Process -Filter "Name = 'language_server_windows_x64.exe'" |
+    Where-Object { $_.CommandLine -match '--workspace_id' -and $_.CommandLine -match '--csrf_token' }
+  if (-not $servers) { Write-Error 'No Antigravity workspace language server is running. Open the repository (or its parent folder) in Antigravity first.' }
+  # Prefer the server whose workspace id shares the most path segments with this repository.
+  $ranked = $servers | ForEach-Object {
+    $id = ([regex]::Match($_.CommandLine, '--workspace_id\s+(\S+)')).Groups[1].Value.ToLowerInvariant()
+    $score = ($repoTokens | Where-Object { $id -match "(^|_)$([regex]::Escape($_))(_|$)" }).Count
+    [pscustomobject]@{ Process = $_; Score = $score }
+  } | Sort-Object Score -Descending
+  foreach ($candidate in $ranked) {
+    $p = $candidate.Process
+    $token = ([regex]::Match($p.CommandLine, '--csrf_token\s+([0-9A-Fa-f-]{36})')).Groups[1].Value
+    if (-not $token) { continue }
+    $ports = Get-NetTCPConnection -OwningProcess $p.ProcessId -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty LocalPort -Unique
+    foreach ($port in $ports) {
+      $env:ANTIGRAVITY_LS_ADDRESS = "127.0.0.1:$port"
+      $env:ANTIGRAVITY_CSRF_TOKEN = $token
+      $probe = Invoke-AgentApi get-conversation-metadata probe
+      if ($probe -notmatch 'connection error|Unavailable|missing CSRF|Unauthenticated|not set') {
+        Write-Host "connected to Antigravity language server (pid $($p.ProcessId), port $port)"
+        return
+      }
+    }
+  }
+  Remove-Item Env:ANTIGRAVITY_LS_ADDRESS, Env:ANTIGRAVITY_CSRF_TOKEN -ErrorAction SilentlyContinue
+  Write-Error 'Found Antigravity language servers but none accepted agentapi calls. Last probe output above.'
+}
+
+Connect-LanguageServer
 
 function Read-State {
   if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
@@ -79,10 +118,10 @@ function Test-InFlight($state) {
 }
 
 function Start-Packet($issue) {
-  $prompt = (Get-Content $promptPath -Raw).Replace('{{ISSUE}}', "$($issue.number)").Replace('{{TITLE}}', $issue.title).Replace('{{PACKET}}', $issue.packet)
+  $prompt = (Get-Content $promptPath -Raw).Replace('{{ISSUE}}', "$($issue.number)").Replace('{{TITLE}}', $issue.title).Replace('{{PACKET}}', $issue.packet).Replace('{{ROOT}}', $root)
   $title = "[worker] $($issue.title)"
   Write-Host ("{0}  starting Antigravity ({1}) on issue #{2}: {3}" -f (Get-Date -Format 'HH:mm'), $Model, $issue.number, $issue.title)
-  $out = & $agentapi new-conversation "--model=$Model" "--title=$title" $prompt 2>&1 | Out-String
+  $out = Invoke-AgentApi new-conversation "--model=$Model" "--title=$title" $prompt
   $conversation = ([regex]::Match($out, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')).Value
   if (-not $conversation) { Write-Warning "agentapi did not return a conversation id: $out"; return $null }
   Write-Host "  conversation $conversation"
