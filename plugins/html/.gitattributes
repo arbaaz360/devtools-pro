@@ -1,0 +1,4 @@
+# Fixtures and the processor are compared/loaded assuming LF; force LF on
+# checkout so a Windows runner's git doesn't rewrite them to CRLF and break
+# the "every package file uses LF line endings" test.
+* text=auto eol=lf

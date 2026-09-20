@@ -1,0 +1,104 @@
+[
+  {
+    "name": "unknown option key",
+    "options": { "indentation": "2" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "unknown camelCase option key",
+    "options": { "preserveComment": true },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "options is an array",
+    "options": [],
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "options is a string",
+    "options": "indent=2",
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "indent is not a choice",
+    "options": { "indent": "3" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "indent is a boolean",
+    "options": { "indent": true },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "indent is an object",
+    "options": { "indent": { "width": 2 } },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "preserve-comments is a string",
+    "options": { "preserve-comments": "true" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "preserveComments is a number",
+    "options": { "preserveComments": 1 },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "preserve-comments aliases disagree",
+    "options": { "preserve-comments": true, "preserveComments": false },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "wrap-attributes is not a choice",
+    "options": { "wrap-attributes": "always" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "wrap-attributes is a boolean",
+    "options": { "wrapAttributes": true },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "wrap-attributes aliases disagree",
+    "options": { "wrap-attributes": "auto", "wrapAttributes": "force" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "indent-inner-html is a string",
+    "options": { "indent-inner-html": "yes" },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "indent-inner-html aliases disagree",
+    "options": { "indent-inner-html": true, "indentInnerHtml": false },
+    "input": "<p>x</p>",
+    "errorCode": "html.invalid-option"
+  },
+  {
+    "name": "empty document",
+    "options": {},
+    "input": "",
+    "errorCode": "html.empty"
+  },
+  {
+    "name": "whitespace-only document",
+    "options": {},
+    "input": "   \n\t  \n",
+    "errorCode": "html.empty"
+  }
+]
