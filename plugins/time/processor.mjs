@@ -100,9 +100,18 @@ function evaluateArithmetic(expr) {
   return { value: val, isExpr: hasArithmetic };
 }
 
-function parseInput(input) {
+function parseInput(input, interpretation) {
   input = input.trim();
-  if (ISO_REGEX.test(input)) {
+  const isIsoForm = ISO_REGEX.test(input);
+
+  if (interpretation === "iso" && !isIsoForm) {
+    throw new TimeError("interpretation-mismatch", "Input must be an ISO 8601 date when interpretation is iso");
+  }
+  if ((interpretation === "seconds" || interpretation === "milliseconds") && isIsoForm) {
+    throw new TimeError("interpretation-mismatch", `Input must be numeric when interpretation is ${interpretation}`);
+  }
+
+  if (isIsoForm) {
     const millis = Date.parse(input);
     if (isNaN(millis)) throw new TimeError("invalid-date", "Invalid ISO 8601 date");
 
@@ -122,7 +131,7 @@ function parseInput(input) {
   }
 
 
-  if (/^\d{1,4}\/\d{1,2}\/\d{1,4}$/.test(input.replace(/\s+/g, '')) && !ISO_REGEX.test(input)) {
+  if (/^\d{1,4}\/\d{1,2}\/\d{1,4}$/.test(input.replace(/\s+/g, '')) && !isIsoForm) {
     throw new TimeError("ambiguous-date", "Ambiguous date format. Use ISO 8601 (YYYY-MM-DD)");
   }
 
@@ -185,12 +194,26 @@ function getOutputs(millis, nowISO) {
   };
 }
 
+function normalizeOptions(options) {
+  const interpretation = options?.interpretation ?? "auto";
+  if (!["auto", "seconds", "milliseconds", "iso"].includes(interpretation)) {
+    throw new TimeError("invalid-option", "interpretation must be auto, seconds, milliseconds, or iso", { option: "interpretation" });
+  }
+
+  const msDigitsRaw = options?.["milliseconds-from-digits"];
+  const msDigits = typeof msDigitsRaw === "string" && /^-?\d+$/.test(msDigitsRaw) ? Number(msDigitsRaw) : (msDigitsRaw ?? 12);
+  if (!Number.isInteger(msDigits) || msDigits < 1) {
+    throw new TimeError("invalid-option", "milliseconds-from-digits must be an integer >= 1", { option: "milliseconds-from-digits" });
+  }
+
+  return { interpretation, msDigits };
+}
+
 export async function execute(request, context) {
   if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
 
   const options = request?.options ?? {};
-  const interpOption = options.interpretation ?? "auto";
-  const msDigits = options["milliseconds-from-digits"] ?? 12;
+  const { interpretation: interpOption, msDigits } = normalizeOptions(options);
 
   let bytes;
   try {
@@ -216,7 +239,7 @@ export async function execute(request, context) {
     millis = Date.parse(nowISO);
     interpretation = "now";
   } else {
-    const parsed = parseInput(inputStr);
+    const parsed = parseInput(inputStr, interpOption);
     if (parsed.type === "iso") {
       millis = parsed.value;
       interpretation = "iso";
