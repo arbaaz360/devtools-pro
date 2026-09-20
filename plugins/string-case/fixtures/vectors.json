@@ -143,15 +143,25 @@
       "target": "camel"
     },
     "input": "\n\n",
-    "output": "\n\n"
+    "output": "\n\n",
+    "expectedProperties": {
+      "lines": 3,
+      "converted": false,
+      "acronymsApplied": 0
+    }
   },
   {
-    "name": "multiple lines CRLF",
+    "name": "CRLF with blank line",
     "options": {
       "target": "camel"
     },
-    "input": "userID\r\nloader",
-    "output": "userID\r\nloader"
+    "input": "foo bar\r\n\r\nbaz qux\r\n",
+    "output": "fooBar\r\n\r\nbazQux\r\n",
+    "expectedProperties": {
+      "lines": 4,
+      "converted": true,
+      "acronymsApplied": 0
+    }
   },
   {
     "name": "leading and trailing WS",
@@ -247,7 +257,7 @@
     "name": "custom acronyms",
     "options": {
       "target": "camel",
-      "acronyms": "FOO,BAR"
+      "acronyms": "BAR"
     },
     "input": "fooBar",
     "output": "fooBAR"
@@ -256,7 +266,7 @@
     "name": "custom acronyms snake",
     "options": {
       "target": "snake",
-      "acronyms": "FOO,BAR"
+      "acronyms": "BAR"
     },
     "input": "fooBar",
     "output": "foo_bar"
@@ -266,8 +276,8 @@
     "options": {
       "target": "kebab"
     },
-    "input": "aB",
-    "output": "a-b"
+    "input": "fooBar",
+    "output": "foo-bar"
   },
   {
     "name": "mixed digits",
@@ -308,5 +318,18 @@
     },
     "input": "fooBar   ",
     "output": "foo-bar   "
+  },
+  {
+    "name": "constant acronym on",
+    "options": {
+      "target": "constant"
+    },
+    "input": "userID",
+    "output": "USER_ID",
+    "expectedProperties": {
+      "lines": 1,
+      "converted": true,
+      "acronymsApplied": 1
+    }
   }
 ]

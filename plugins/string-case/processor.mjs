@@ -29,13 +29,13 @@ export function normalizeOptions(raw) {
   if (raw === undefined || raw === null) raw = {};
   if (typeof raw !== "object" || Array.isArray(raw)) throw invalid("options must be an object", { received: Array.isArray(raw) ? "array" : typeof raw });
   for (const key of Object.keys(raw)) if (!KNOWN_OPTIONS.has(key)) throw invalid(`unknown option ${key}`, { option: key, known: [...KNOWN_OPTIONS] });
-  
+
   const target = raw.target === undefined ? "camel" : raw.target;
   if (!TARGETS.includes(target)) throw invalid(`target must be one of ${TARGETS.join(", ")}`, { option: "target", received: target });
-  
+
   const acronymsRaw = raw.acronyms === undefined ? "ID,API,DB,URL,HTTP" : raw.acronyms;
   if (typeof acronymsRaw !== "string") throw invalid(`acronyms must be a string`, { option: "acronyms", received: typeof acronymsRaw });
-  
+
   let preserveAcronyms = true;
   const suppliedPreserve = PRESERVE_ACRONYMS.filter((id) => raw[id] !== undefined);
   if (suppliedPreserve.length > 0) {
@@ -45,7 +45,7 @@ export function normalizeOptions(raw) {
   }
 
   const acronymsList = acronymsRaw.split(',').map(s => s.trim()).filter(s => s.length > 0).map(s => s.toUpperCase());
-  
+
   return {
     target,
     acronyms: new Set(acronymsList),
@@ -115,35 +115,41 @@ export async function execute(request, context) {
   const options = normalizeOptions(request?.options);
   const { text, inputBytes } = await readText(context);
 
-  const lines = text.split(/(?=\r?\n)|(?<=\r?\n)/);
-  const outLines = [];
+  const parts = text.split(/(\r\n|\n)/);
+  const outParts = [];
   let acronymsApplied = 0;
-  
+
   let steps = 0;
-  for (const token of lines) {
+  for (let idx = 0; idx < parts.length; idx++) {
+    const token = parts[idx];
+    if (idx % 2 === 1) {
+      outParts.push(token);
+      continue;
+    }
+
     if ((steps++ & 1023) === 0) check(context);
-    if (token === '\n' || token === '\r\n') {
-      outLines.push(token);
+    if (token === "") {
+      outParts.push(token);
       continue;
     }
     const leadingMatch = token.match(/^\s*/);
     const trailingMatch = token.match(/\s*$/);
     const leading = leadingMatch[0];
     const trailing = trailingMatch[0];
-    
+
     if (leading.length === token.length) {
       outLines.push(token);
       continue;
     }
-    
+
     const middle = token.slice(leading.length, token.length - trailing.length);
     const words = splitWords(middle);
-    
+
     if (words.length === 0) {
-      outLines.push(token);
+      outParts.push(token);
       continue;
     }
-    
+
     const convertedWords = [];
     for (let i = 0; i < words.length; i++) {
       const w = words[i];
@@ -151,23 +157,23 @@ export async function execute(request, context) {
       if (isAcronym) acronymsApplied++;
       convertedWords.push(convertWord(w, i, options.target, isAcronym));
     }
-    
+
     let sep = "";
     if (options.target === 'snake' || options.target === 'constant') sep = "_";
     if (options.target === 'kebab' || options.target === 'screaming-kebab') sep = "-";
-    
-    outLines.push(leading + convertedWords.join(sep) + trailing);
+
+    outParts.push(leading + convertedWords.join(sep) + trailing);
   }
-  
-  const output = outLines.join('');
+
+  const output = outParts.join('');
   const outputBytes = encoder.encode(output);
-  
+
   if (outputBytes.byteLength > context.limits.maxOutputBytes) {
     throw new StringCaseError("case.output-limit", `output exceeds ${context.limits.maxOutputBytes} bytes`, { bytes: outputBytes.byteLength, limit: context.limits.maxOutputBytes });
   }
 
   const report = {
-    lines: lines.filter(l => l !== '\n' && l !== '\r\n').length,
+    lines: Math.floor((parts.length + 1) / 2),
     converted: output !== text,
     acronymsApplied,
     text: output

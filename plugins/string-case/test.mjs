@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import {
   CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorCancelled, ProcessorContext, SeededRandom,
 } from "../../packages/plugin-sdk/src/context.ts";
-import { StringCaseError, execute } from "./processor.mjs";
+import { StringCaseError, execute, TARGETS } from "./processor.mjs";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
@@ -42,10 +42,19 @@ test("vectors convert correctly and are idempotent", async () => {
   for (const vector of vectors) {
     const converted = await run(vector.options, vector.input);
     assert.equal(converted.text, vector.output, `${vector.name}: expected ${JSON.stringify(vector.output)} but got ${JSON.stringify(converted.text)}`);
-    
-    // Idempotence check
-    const reconverted = await run(vector.options, converted.text);
-    assert.equal(reconverted.text, vector.output, `${vector.name} (idempotence): expected ${JSON.stringify(vector.output)} but got ${JSON.stringify(reconverted.text)}`);
+
+    if (vector.expectedProperties) {
+      assert.equal(converted.value.lines, vector.expectedProperties.lines, `${vector.name}: expected lines ${vector.expectedProperties.lines}`);
+      assert.equal(converted.value.converted, vector.expectedProperties.converted, `${vector.name}: expected converted ${vector.expectedProperties.converted}`);
+      assert.equal(converted.value.acronymsApplied, vector.expectedProperties.acronymsApplied, `${vector.name}: expected acronymsApplied ${vector.expectedProperties.acronymsApplied}`);
+    }
+
+    for (const target of TARGETS) {
+      const options = { ...vector.options, target };
+      const pass1 = await run(options, vector.input);
+      const pass2 = await run(options, pass1.text);
+      assert.equal(pass2.text, pass1.text, `${vector.name} (idempotence ${target}): expected ${JSON.stringify(pass1.text)} but got ${JSON.stringify(pass2.text)}`);
+    }
   }
 });
 
