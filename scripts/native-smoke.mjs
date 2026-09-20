@@ -58,8 +58,13 @@ for (let attempt = 0; attempt < 60 && !served; attempt += 1) {
 }
 if (!served) fail(`vite preview did not answer on ${previewPort}`);
 
-// 2. Launch the executable with WebView2's debugging port open.
-const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}` }, stdio: "ignore" });
+// 2. Launch the executable with WebView2's debugging port open. A CI runner has no
+// usable GPU and runs the process under a service-like session; WebView2's browser
+// process then stalls at start-up unless told to skip the GPU and sandbox. The log
+// file is printed if the port never answers.
+const browserLog = resolve(desktop, "test-results", "webview2-smoke.log");
+const ciArguments = process.env.CI ? ` --disable-gpu --disable-gpu-compositing --no-sandbox --enable-logging --v=0 --log-file=${browserLog}` : "";
+const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}${ciArguments}` }, stdio: "ignore" });
 children.push(app);
 let browser = null;
 // A cold WebView2 start on a CI runner can take well over the local few seconds.
@@ -76,6 +81,8 @@ if (!browser) {
   console.error("WebView2 runtime (HKLM):", probe(String.raw`reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
   console.error("WebView2 runtime (HKCU):", probe(String.raw`reg query "HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
   console.error("processes:", probe('tasklist /fi "IMAGENAME eq devtools-desktop.exe" /fo csv /nh'), probe('tasklist /fi "IMAGENAME eq msedgewebview2.exe" /fo csv /nh'));
+  if (existsSync(browserLog)) { const { readFileSync } = await import("node:fs"); console.error("webview2 log tail:", readFileSync(browserLog, "utf8").split("\n").slice(-40).join("\n")); }
+  else console.error("webview2 log: none written at", browserLog);
   fail(`could not connect to WebView2 over CDP within ${Math.round(connectBudgetMs / 1000)} s (executable ${app.exitCode === null ? "still running" : `exited ${app.exitCode}`})`);
 }
 
