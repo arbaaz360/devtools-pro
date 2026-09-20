@@ -1,0 +1,44 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "format.css",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "CSS Beautifier / Minifier",
+  "description": "Beautifies or minifies CSS with a tolerant tokenizer that reports malformed constructs as diagnostics instead of failing.",
+  "tools": [{ "id": "format.css", "title": "CSS", "category": "converter", "operationIds": ["beautify", "minify"], "workspaceId": "css" }],
+  "operations": [
+    {
+      "id": "beautify",
+      "title": "Beautify",
+      "executor": { "kind": "javascriptWorker", "id": "format.css.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "CSS", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["text/css"], "language": "css", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indent", "default": "sp2", "choices": [{ "id": "sp2", "label": "2 spaces" }, { "id": "sp4", "label": "4 spaces" }, { "id": "tab", "label": "Tab" }], "persistence": "instance", "sensitive": false },
+        { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "blank-line-between-rules", "type": "boolean", "label": "Blank line between rules", "default": true, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
+    },
+    {
+      "id": "minify",
+      "title": "Minify",
+      "executor": { "kind": "javascriptWorker", "id": "format.css.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "CSS", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["text/css"], "language": "css", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indent", "default": "sp2", "choices": [{ "id": "sp2", "label": "2 spaces" }, { "id": "sp4", "label": "4 spaces" }, { "id": "tab", "label": "Tab" }], "persistence": "instance", "sensitive": false },
+        { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "blank-line-between-rules", "type": "boolean", "label": "Blank line between rules", "default": true, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{ "id": "css", "kind": "transform", "bindings": [{ "id": "input", "component": "editor", "inputPort": "input" }, { "id": "output", "component": "output", "outputPort": "output" }], "commands": [], "presentationSettings": [] }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-14"], "fixtures": ["beautify", "minify"], "uiScenarios": ["beautify", "minify"] }
+}

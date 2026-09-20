@@ -1,0 +1,441 @@
+[
+  {
+    "name": "du-14 sample",
+    "options": {},
+    "input": ".container{display:flex;justify-content:center;align-items:center;padding:10px 20px;background-color:#fff;border-radius:4px}",
+    "output": ".container {\n  display: flex;\n  justify-content: center;\n  align-items: center;\n  padding: 10px 20px;\n  background-color: #fff;\n  border-radius: 4px;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "selector list, two selectors",
+    "options": {},
+    "input": "h1, h2 { margin: 0; }",
+    "output": "h1, h2 {\n  margin: 0;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "selector list, three selectors with combinators",
+    "options": {},
+    "input": ".a, .b>.c, .d~.e { color: red; }",
+    "output": ".a, .b>.c, .d~.e {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute selector with comma inside string",
+    "options": {},
+    "input": "[data-list=\"a,b,c\"] { color: red; }",
+    "output": "[data-list=\"a,b,c\"] {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute selector list with commas inside strings",
+    "options": {},
+    "input": "[data-a=\"1,2\"], [data-b='3,4'] { color: red; }",
+    "output": "[data-a=\"1,2\"], [data-b='3,4'] {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": ":is() list is not split",
+    "options": {},
+    "input": ":is(.a,.b,.c) { color: red; }",
+    "output": ":is(.a,.b,.c) {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": ":not() list is not split",
+    "options": {},
+    "input": ".a:not(.b,.c) { color: red; }",
+    "output": ".a:not(.b,.c) {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "selector list with :is() among top-level selectors",
+    "options": {},
+    "input": ".x, :is(.a,.b), .y { color: red; }",
+    "output": ".x, :is(.a,.b), .y {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "pseudo-elements",
+    "options": {},
+    "input": "a::before, a::after { content: ''; }",
+    "output": "a::before, a::after {\n  content: '';\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "pseudo-classes with functional notation",
+    "options": {},
+    "input": "li:nth-child(2n+1):hover { color: red; }",
+    "output": "li:nth-child(2n+1):hover {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@media with one nested rule",
+    "options": {},
+    "input": "@media (min-width:600px) { .a { color: red; } }",
+    "output": "@media (min-width:600px) {\n  .a {\n    color: red;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@media with multiple nested rules",
+    "options": {},
+    "input": "@media screen and (min-width:600px) { .a { color: red; } .b { color: blue; } }",
+    "output": "@media screen and (min-width:600px) {\n  .a {\n    color: red;\n  }\n  .b {\n    color: blue;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@supports",
+    "options": {},
+    "input": "@supports (display:grid) { .a { display: grid; } }",
+    "output": "@supports (display:grid) {\n  .a {\n    display: grid;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@container",
+    "options": {},
+    "input": "@container (min-width:400px) { .a { color: red; } }",
+    "output": "@container (min-width:400px) {\n  .a {\n    color: red;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@layer with block",
+    "options": {},
+    "input": "@layer base { .a { color: red; } }",
+    "output": "@layer base {\n  .a {\n    color: red;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@layer statement form",
+    "options": {},
+    "input": "@layer reset,base,utilities;",
+    "output": "@layer reset,base,utilities;\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@keyframes with percentage frames",
+    "options": {},
+    "input": "@keyframes spin { 0% { transform: rotate(0deg); } 50% { transform: rotate(180deg); } 100% { transform: rotate(360deg); } }",
+    "output": "@keyframes spin {\n  0% {\n    transform: rotate(0deg);\n  }\n  50% {\n    transform: rotate(180deg);\n  }\n  100% {\n    transform: rotate(360deg);\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@keyframes with from/to and combined selector",
+    "options": {},
+    "input": "@keyframes fade { from { opacity: 0; } 100%, to { opacity: 1; } }",
+    "output": "@keyframes fade {\n  from {\n    opacity: 0;\n  }\n  100%, to {\n    opacity: 1;\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@font-face",
+    "options": {},
+    "input": "@font-face { font-family: 'MyFont'; src: url('a.woff2')format('woff2'); font-weight: 400; }",
+    "output": "@font-face {\n  font-family: 'MyFont';\n  src: url('a.woff2')format('woff2');\n  font-weight: 400;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@import url() form",
+    "options": {},
+    "input": "@import url(a.css);",
+    "output": "@import url(a.css);\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@import string form with media query",
+    "options": {},
+    "input": "@import 'b.css'screen and (min-width:400px);",
+    "output": "@import 'b.css'screen and (min-width:400px);\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@charset",
+    "options": {},
+    "input": "@charset \"UTF-8\";\n.a { color: red; }",
+    "output": "@charset \"UTF-8\";\n.a {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@namespace",
+    "options": {},
+    "input": "@namespace svg url(http://www.w3.org/2000/svg);",
+    "output": "@namespace svg url(http://www.w3.org/2000/svg);\n",
+    "diagnostics": []
+  },
+  {
+    "name": "@page",
+    "options": {},
+    "input": "@page { margin: 1in; }",
+    "output": "@page {\n  margin: 1in;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "!important with no space before bang",
+    "options": {},
+    "input": ".a { color: red!important; }",
+    "output": ".a {\n  color: red !important;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "!important with space between bang and word",
+    "options": {},
+    "input": ".a { color: red ! important; }",
+    "output": ".a {\n  color: red !important;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "!important with irregular spacing",
+    "options": {},
+    "input": ".a { color: red   !   important; }",
+    "output": ".a {\n  color: red !important;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "url() unquoted, no internal spaces",
+    "options": {},
+    "input": ".a { background: url(image.png); }",
+    "output": ".a {\n  background: url(image.png);\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "url() unquoted with leading/trailing spaces",
+    "options": {},
+    "input": ".a { background: url( image.png ); }",
+    "output": ".a {\n  background: url( image.png );\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "url() double-quoted",
+    "options": {},
+    "input": ".a { background: url(\"image.png\"); }",
+    "output": ".a {\n  background: url(\"image.png\");\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "url() single-quoted with an internal space",
+    "options": {},
+    "input": ".a { background: url('my image.png'); }",
+    "output": ".a {\n  background: url('my image.png');\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "string containing { and ;",
+    "options": {},
+    "input": ".a::before { content: \"{ a; b }\"; }",
+    "output": ".a::before {\n  content: \"{ a; b }\";\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "custom property with a complex brace value",
+    "options": {},
+    "input": ":root { --x: { a: b }; }",
+    "output": ":root {\n  --x: { a: b };\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "custom property, ordinary value",
+    "options": {},
+    "input": ":root { --gap: 10px; }",
+    "output": ":root {\n  --gap: 10px;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "calc() with nested parentheses",
+    "options": {},
+    "input": ".a { width: calc(100% - (2*10px)); }",
+    "output": ".a {\n  width: calc(100% - (2*10px));\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "unicode-range",
+    "options": {},
+    "input": "@font-face { unicode-range: U+0025-00FF,U+4??; }",
+    "output": "@font-face {\n  unicode-range: U+0025-00FF,U+4??;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "standalone comment before a rule",
+    "options": {},
+    "input": "/* header */\n.a { color: red; }",
+    "output": "/* header */\n.a {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "standalone comment indented before a declaration",
+    "options": {},
+    "input": ".a {\n  /* note */\n  color: red;\n}",
+    "output": ".a {\n  /* note */\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "trailing comment after a declaration",
+    "options": {},
+    "input": ".a { color: red; /* was blue */ }",
+    "output": ".a {\n  color: red; /* was blue */\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "comment immediately after the opening brace",
+    "options": {},
+    "input": ".a { /* start */\n  color: red;\n}",
+    "output": ".a { /* start */\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "standalone comment between two top-level rules",
+    "options": {},
+    "input": ".a { color: red; }\n/* divider */\n.b { color: blue; }",
+    "output": ".a {\n  color: red;\n}\n/* divider */\n\n.b {\n  color: blue;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "license comment kept in beautify",
+    "options": {},
+    "input": "/*! Copyright 2026 */\n.a { color: red; }",
+    "output": "/*! Copyright 2026 */\n.a {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "blank line between three top-level rules",
+    "options": {},
+    "input": ".a{color:red}.b{color:blue}.c{color:green}",
+    "output": ".a {\n  color: red;\n}\n\n.b {\n  color: blue;\n}\n\n.c {\n  color: green;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "blank line between an at-rule block and a qualified rule",
+    "options": {},
+    "input": "@media (min-width:1px){.a{color:red}}.b{color:blue}",
+    "output": "@media (min-width:1px) {\n  .a {\n    color: red;\n  }\n}\n\n.b {\n  color: blue;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "tolerant: unclosed block",
+    "options": {},
+    "input": ".a { color: red;",
+    "output": ".a {\n  color: red;\n}\n",
+    "diagnostics": [
+      {
+        "code": "css.unclosed-block",
+        "severity": "warning",
+        "message": "unclosed block is closed at end of input",
+        "offset": 3,
+        "end": 4,
+        "line": 1,
+        "column": 4
+      }
+    ]
+  },
+  {
+    "name": "tolerant: unclosed comment",
+    "options": {},
+    "input": ".a { color: red; /* oops",
+    "output": ".a {\n  color: red; /* oops\n}\n",
+    "diagnostics": [
+      {
+        "code": "css.unclosed-block",
+        "severity": "warning",
+        "message": "unclosed block is closed at end of input",
+        "offset": 3,
+        "end": 4,
+        "line": 1,
+        "column": 4
+      },
+      {
+        "code": "css.unclosed-comment",
+        "severity": "warning",
+        "message": "unterminated comment runs to end of input",
+        "offset": 17,
+        "end": 24,
+        "line": 1,
+        "column": 18
+      }
+    ]
+  },
+  {
+    "name": "tolerant: declaration without a colon",
+    "options": {},
+    "input": ".a { broken-decl; color: red; }",
+    "output": ".a {\n  broken-decl;\n  color: red;\n}\n",
+    "diagnostics": [
+      {
+        "code": "css.declaration-no-colon",
+        "severity": "warning",
+        "message": "declaration has no colon; emitted as-is",
+        "offset": 5,
+        "end": 16,
+        "line": 1,
+        "column": 6
+      }
+    ]
+  },
+  {
+    "name": "indent option: 4 spaces",
+    "options": {
+      "indent": "sp4"
+    },
+    "input": ".a { color: red; }",
+    "output": ".a {\n    color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "indent option: tab",
+    "options": {
+      "indent": "tab"
+    },
+    "input": ".a { color: red; }",
+    "output": ".a {\n\tcolor: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "blank-line-between-rules disabled",
+    "options": {
+      "blank-line-between-rules": false
+    },
+    "input": ".a{color:red}.b{color:blue}",
+    "output": ".a {\n  color: red;\n}\n.b {\n  color: blue;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "preserve-comments disabled drops all comments",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "/* a */.x{color:red /* b */}/* c */",
+    "output": ".x {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute selector without a comma",
+    "options": {},
+    "input": "input[type=text] { color: red; }",
+    "output": "input[type=text] {\n  color: red;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "empty rule body",
+    "options": {},
+    "input": ".empty {}",
+    "output": ".empty {\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "nested at-rules: @supports inside @media",
+    "options": {},
+    "input": "@media (min-width:1px) { @supports (display:grid) { .a { display: grid; } } }",
+    "output": "@media (min-width:1px) {\n  @supports (display:grid) {\n    .a {\n      display: grid;\n    }\n  }\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "multiple declarations with varied source spacing",
+    "options": {},
+    "input": ".a {color:red;  margin : 0   auto ;  padding:1px 2px 3px 4px; }",
+    "output": ".a {\n  color: red;\n  margin: 0 auto;\n  padding: 1px 2px 3px 4px;\n}\n",
+    "diagnostics": []
+  },
+  {
+    "name": "vendor-prefixed at-rule-like custom property name",
+    "options": {},
+    "input": ":root { --my-color-1: #fff; }",
+    "output": ":root {\n  --my-color-1: #fff;\n}\n",
+    "diagnostics": []
+  }
+]
