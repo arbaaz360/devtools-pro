@@ -20,11 +20,12 @@ guess.
 
 ## Automatic dispatch (Antigravity)
 
-On the owner's machine, `scripts/antigravity-worker-loop.ps1` run from Antigravity's
-integrated terminal starts an Antigravity agent on each `ready` packet, one at a
-time, using `docs/antigravity/WORKER_PROMPT.md`. It polls GitHub with `gh`, spends
-no model tokens while waiting, and hands over once the packet's pull request
-exists. The steps below are what that agent, or any other worker, then follows.
+On the owner's machine, `scripts/antigravity-worker-loop.ps1` sends each `ready`
+packet, one at a time, into an Antigravity conversation the owner opened and told
+to wait for packets, using `docs/antigravity/WORKER_PROMPT.md`. It polls GitHub
+with `gh`, spends no model tokens while waiting, and hands over once the packet's
+pull request exists. The steps below are what that agent, or any other worker,
+then follows.
 
 ## Claiming
 
