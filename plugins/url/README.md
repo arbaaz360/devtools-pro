@@ -53,7 +53,7 @@ Leading and trailing ASCII whitespace (space, tab, CR, LF) is ignored; the count
 | `reference` | Contains a `?` before any `#` (for example `example.test/p?a=1` or `/p?a=1`) | verbatim text before the `?` |
 | `raw` | No `?` before any `#` | `null` |
 
-In every form the first unencoded `?` starts the query and the first `#` ends it; a second `?` is data (`?a=1?b=2` → `a` = `1?b=2`). Without a `?` the whole text up to `#` is the query. `components.query` and `components.fragment` are always the source text, not WHATWG-normalised. A literal `?` or `#` inside a parameter must be percent-encoded.
+In every form the first unencoded `?` starts the query and the first `#` ends it; a second `?` is data (`?a=1?b=2` → `a` = `1?b=2`). Without a `?` the whole text up to `#` is the query. `components.query` and `components.fragment` are always the source text, not WHATWG-normalised. Interior newlines in the query are kept as data, while the `href` component follows WHATWG and strips them. A literal `?` or `#` inside a parameter must be percent-encoded.
 
 ### Parameters
 
@@ -82,7 +82,7 @@ The artifact is the `parameters` object as JSON in first-encounter order (`b=1&2
 | Limit | `url.transform` | `url.parse-query` | Enforced by |
 |---|---|---|---|
 | `maxInputBytes` | 1 MiB | 1 MiB | SDK `readChunks` |
-| `maxOutputBytes` | 4 MiB | 4 MiB | processor before allocating or writing (`output of N bytes exceeds the M byte output limit`), then the sink |
+| `maxOutputBytes` | 4 MiB | 4 MiB | processor (encode checks before allocating; decode and parse check before writing: `output of N bytes exceeds the M byte output limit`), then the sink |
 | `maxChunkBytes` | 4 MiB | 4 MiB | the artifact is written as one chunk, so the manifest sets it equal to `maxOutputBytes` |
 | `maxRows` | – | 10 000 non-empty segments; the excess is rejected before it is decoded | processor |
 | `maxNodes` | – | 20 000 = properties + array elements of `parameters` | processor |
@@ -92,4 +92,4 @@ Encoding expands at most 3:1, so a full 1 MiB input always fits the output limit
 
 ## Fixtures
 
-`fixtures/transform.json` (encode/decode vectors with round trips), `fixtures/parse-query.json` (artifact text plus expected structured value per case) and `fixtures/invalid.json` (exact error substrings, including raw non-UTF-8 inputs as `inputHex`) are deterministic and are the cases `test.mjs` runs first; the remaining tests cover limits, cancellation polling, reader immutability, chunked reads and the UTF-8 validator against the platform decoder.
+`fixtures/url-transform.json` (encode/decode vectors with round trips), `fixtures/url-parse-query.json` (artifact text plus expected structured value per case) and `fixtures/url-invalid.json` (exact error substrings, including raw non-UTF-8 inputs as `inputHex`) are deterministic and are the cases `test.mjs` runs first; the remaining tests cover limits, cancellation polling, reader immutability, chunked reads and the UTF-8 validator against the platform decoder.

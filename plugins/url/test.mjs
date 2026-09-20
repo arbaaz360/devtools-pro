@@ -44,7 +44,7 @@ async function rejects(operationId, options, input, expected, settings) {
 
 // --- deterministic fixtures -------------------------------------------------
 
-for (const vector of await fixture("transform")) {
+for (const vector of await fixture("url-transform")) {
   test(`transform fixture: ${vector.name}`, async () => {
     const result = await run("url.transform", vector.options, vector.input);
     assert.equal(result.text, vector.output);
@@ -55,7 +55,7 @@ for (const vector of await fixture("transform")) {
   });
 }
 
-for (const vector of await fixture("parse-query")) {
+for (const vector of await fixture("url-parse-query")) {
   test(`parse fixture: ${vector.name}`, async () => {
     const result = await run("url.parse-query", vector.options, vector.input);
     assert.equal(result.text, vector.output);
@@ -66,7 +66,7 @@ for (const vector of await fixture("parse-query")) {
   });
 }
 
-for (const vector of await fixture("invalid")) {
+for (const vector of await fixture("url-invalid")) {
   test(`invalid fixture: ${vector.name}`, async () => {
     await rejects(vector.operationId, vector.options, inputOf(vector), (error) => {
       assert.ok(error instanceof Error && !(error instanceof ProcessorCancelled));
@@ -87,7 +87,7 @@ test("package limits and option ranges match the manifest", () => {
   const transform = operation("url.transform");
   assert.deepEqual(transform.options.find((option) => option.id === "mode").choices.map((choice) => choice.id), ["encode", "decode"]);
   assert.deepEqual(transform.options.find((option) => option.id === "encoding").choices.map((choice) => choice.id), ["rfc3986", "form"]);
-  assert.deepEqual(manifest.tests.fixtures, ["transform", "parse-query", "invalid"]);
+  assert.deepEqual(manifest.tests.fixtures, ["url-transform", "url-parse-query", "url-invalid"]);
 });
 
 test("option defaults are encode, rfc3986 and indent 2; the operation defaults to transform", async () => {
