@@ -282,6 +282,7 @@ function processTokens(text, preserveComments) {
              for (let j = start; j < i + 2; j++) if (text[j] === "\n") lines++;
              stack.pop();
              braceStack.push(braceDepth);
+             braceDepth++;
              i += 2;
              lastCharEmitted = "{";
              lastType = "punct";
@@ -428,6 +429,7 @@ function processTokens(text, preserveComments) {
        if (braceStack.length > 0 && braceDepth === braceStack[braceStack.length - 1]) {
           braceStack.pop();
           stack.push("TEMPLATE");
+          lastType = "template";
        }
        i++;
        continue;

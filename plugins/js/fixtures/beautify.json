@@ -1,8 +1,212 @@
 [
   {
-    "name": "basic",
-    "input": "function foo(a,b){return a+b;}",
+    "name": "DU-15 sample",
     "options": {},
-    "output": "function foo(a, b) {\n  return a + b;\n}\n"
+    "input": "async function fetchResource(id){const url=`/api/v1/resources/${id}`;try{const res=await fetch(url);if(!res.ok){throw new Error('fetch failed');}return await res.json();}catch(e){console.error(e);return null;}}",
+    "output": "async function fetchResource(id) {\n  const url = `/api/v1/resources/${id}`;\n  try {\n    const res = await fetch(url);\n    if (!res.ok) {\n      throw new Error('fetch failed');\n    }\n    return await res.json();\n  } catch (e) {\n    console.error(e);\n    return null;\n  }\n}\n"
+  },
+  {
+    "name": "ES2020 classes",
+    "options": {},
+    "input": "class A extends B { constructor() { super(); } method() { return this; } }",
+    "output": "class A extends B {\n  constructor() {\n    super();\n  }\n  method() {\n    return this;\n  }\n}\n"
+  },
+  {
+    "name": "ES2020 arrow functions",
+    "options": {},
+    "input": "const a = (b, c) => b + c;",
+    "output": "const a = (b, c) => b + c;\n"
+  },
+  {
+    "name": "ES2020 async/await",
+    "options": {},
+    "input": "async function a() { await b(); }",
+    "output": "async function a() {\n  await b();\n}\n"
+  },
+  {
+    "name": "ES2020 optional chaining",
+    "options": {},
+    "input": "const a = b?.c?.d;",
+    "output": "const a = b?.c?.d;\n"
+  },
+  {
+    "name": "ES2020 destructuring",
+    "options": {},
+    "input": "const { a, b } = c;",
+    "output": "const {\n  a,\n  b\n} = c;\n"
+  },
+  {
+    "name": "ES2020 template literals",
+    "options": {},
+    "input": "const a = `b ${c} d`;",
+    "output": "const a = `b ${c} d`;\n"
+  },
+  {
+    "name": "ES2020 generators",
+    "options": {},
+    "input": "function* a() { yield 1; }",
+    "output": "function* a() {\n  yield 1;\n}\n"
+  },
+  {
+    "name": "incomplete input 1",
+    "options": {},
+    "input": "function a() {",
+    "output": "function a() {\n"
+  },
+  {
+    "name": "incomplete input 2",
+    "options": {},
+    "input": "const a = (",
+    "output": "const a = (\n"
+  },
+  {
+    "name": "option indent space-4",
+    "options": {
+      "indent": "space-4"
+    },
+    "input": "function a() { return 1; }",
+    "output": "function a() {\n    return 1;\n}\n"
+  },
+  {
+    "name": "option indent tab",
+    "options": {
+      "indent": "tab"
+    },
+    "input": "function a() { return 1; }",
+    "output": "function a() {\n\treturn 1;\n}\n"
+  },
+  {
+    "name": "option brace-style expand",
+    "options": {
+      "brace-style": "expand"
+    },
+    "input": "if (a) { b(); } else { c(); }",
+    "output": "if (a)\n{\n  b();\n}\nelse\n{\n  c();\n}\n"
+  },
+  {
+    "name": "option brace-style collapse",
+    "options": {
+      "brace-style": "collapse"
+    },
+    "input": "if (a) { b(); } else { c(); }",
+    "output": "if (a) {\n  b();\n} else {\n  c();\n}\n"
+  },
+  {
+    "name": "option brace-style end-expand",
+    "options": {
+      "brace-style": "end-expand"
+    },
+    "input": "if (a) { b(); } else { c(); }",
+    "output": "if (a) {\n  b();\n}\nelse {\n  c();\n}\n"
+  },
+  {
+    "name": "option preserve-newlines false",
+    "options": {
+      "preserve-newlines": false
+    },
+    "input": "const a = 1;\n\n\nconst b = 2;",
+    "output": "const a = 1;\nconst b = 2;\n"
+  },
+  {
+    "name": "option max-preserve-newlines 0",
+    "options": {
+      "max-preserve-newlines": 0
+    },
+    "input": "const a = 1;\n\n\nconst b = 2;",
+    "output": "const a = 1;\n\n\nconst b = 2;\n"
+  },
+  {
+    "name": "option max-preserve-newlines 10",
+    "options": {
+      "max-preserve-newlines": 10
+    },
+    "input": "const a = 1;\n\n\n\n\n\n\n\n\n\n\nconst b = 2;",
+    "output": "const a = 1;\n\n\n\n\n\n\n\n\n\nconst b = 2;\n"
+  },
+  {
+    "name": "option space-in-parens true",
+    "options": {
+      "space-in-parens": true
+    },
+    "input": "function a(b, c) { return d(e, f); }",
+    "output": "function a( b, c ) {\n  return d( e, f );\n}\n"
+  },
+  {
+    "name": "option space-in-parens false",
+    "options": {
+      "space-in-parens": false
+    },
+    "input": "function a( b, c ) { return d( e, f ); }",
+    "output": "function a(b, c) {\n  return d(e, f);\n}\n"
+  },
+  {
+    "name": "option end-with-newline false",
+    "options": {
+      "end-with-newline": false
+    },
+    "input": "const a = 1;",
+    "output": "const a = 1;"
+  },
+  {
+    "name": "option end-with-newline true",
+    "options": {
+      "end-with-newline": true
+    },
+    "input": "const a = 1;",
+    "output": "const a = 1;\n"
+  },
+  {
+    "name": "basic array",
+    "options": {},
+    "input": "const a = [1, 2, 3];",
+    "output": "const a = [1, 2, 3];\n"
+  },
+  {
+    "name": "basic object",
+    "options": {},
+    "input": "const a = { b: 1, c: 2 };",
+    "output": "const a = {\n  b: 1,\n  c: 2\n};\n"
+  },
+  {
+    "name": "comments",
+    "options": {},
+    "input": "/* test */ const a = 1; // test",
+    "output": "/* test */\nconst a = 1; // test\n"
+  },
+  {
+    "name": "regex",
+    "options": {},
+    "input": "const a = /b/g;",
+    "output": "const a = /b/g;\n"
+  },
+  {
+    "name": "mixed syntax 1",
+    "options": {},
+    "input": "class A { m() { return this?.b?.(); } }",
+    "output": "class A {\n  m() {\n    return this?.b?.();\n  }\n}\n"
+  },
+  {
+    "name": "mixed syntax 2",
+    "options": {},
+    "input": "const f = async ({a, b}) => await c(a, b);",
+    "output": "const f = async ({\n  a,\n  b\n}) => await c(a, b);\n"
+  },
+  {
+    "name": "mixed syntax 3",
+    "options": {},
+    "input": "function* g() { yield* [1, 2, 3].map(x => x * 2); }",
+    "output": "function* g() {\n  yield*[1, 2, 3].map(x => x * 2);\n}\n"
+  },
+  {
+    "name": "mixed syntax 4",
+    "options": {},
+    "input": "const html = `<div>${content}</div>`;",
+    "output": "const html = `<div>${content}</div>`;\n"
+  },
+  {
+    "name": "mixed syntax 5",
+    "options": {},
+    "input": "let obj = { ...base, extra: true };",
+    "output": "let obj = {\n  ...base,\n  extra: true\n};\n"
   }
 ]

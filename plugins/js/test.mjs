@@ -54,9 +54,31 @@ try {
 }
 
 test("idempotent round trip", async () => {
-  const input = "function foo(a, b) {\n    return a + b;\n}";
-  const f1 = await expectOk("beautify", input);
-  const m1 = await expectOk("minify", f1.text);
-  const f2 = await expectOk("beautify", m1.text);
-  assert.equal(f1.text, f2.text);
+  const cases = [
+    "function foo(a, b) {\n    return a + b;\n}",
+    "const a = 'hello \\'world\\'';",
+    "const b = `template ${foo} string`;",
+    "const c = /regex\\/here/g;"
+  ];
+  
+  for (const input of cases) {
+    const f1 = await expectOk("beautify", input);
+    const m1 = await expectOk("minify", f1.text);
+    const f2 = await expectOk("beautify", m1.text);
+    assert.equal(f2.text, f1.text, "minify(beautify(x)) beautified again equals beautify(x)");
+  }
+});
+
+test("literal preservation", async () => {
+  const inputs = [
+    { name: "strings", text: "const a = 'hello world';" },
+    { name: "templates", text: "const b = `hello world`;" },
+    { name: "regexes", text: "const c = /hello world/g;" }
+  ];
+  
+  for (const item of inputs) {
+    const minified = await expectOk("minify", item.text);
+    const expectedLiteral = item.text.substring(item.text.indexOf("=") + 2, item.text.length - 1);
+    assert.ok(minified.text.includes(expectedLiteral), `${item.name} must be byte-identical before and after minify`);
+  }
 });
