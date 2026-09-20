@@ -1,0 +1,312 @@
+[
+  {
+    "name": "camel acronym off",
+    "options": {
+      "target": "camel",
+      "preserve-acronyms": false
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "userIdLoaderHttpServerV2Api"
+  },
+  {
+    "name": "camel acronym on",
+    "options": {
+      "target": "camel"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "userIDLoaderHTTPServerV2API"
+  },
+  {
+    "name": "pascal acronym off",
+    "options": {
+      "target": "pascal",
+      "preserve-acronyms": false
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "UserIdLoaderHttpServerV2Api"
+  },
+  {
+    "name": "pascal acronym on",
+    "options": {
+      "target": "pascal"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "UserIDLoaderHTTPServerV2API"
+  },
+  {
+    "name": "snake",
+    "options": {
+      "target": "snake"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "user_id_loader_http_server_v_2_api"
+  },
+  {
+    "name": "kebab",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "user-id-loader-http-server-v-2-api"
+  },
+  {
+    "name": "screaming-kebab",
+    "options": {
+      "target": "screaming-kebab"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "USER-ID-LOADER-HTTP-SERVER-V-2-API"
+  },
+  {
+    "name": "constant",
+    "options": {
+      "target": "constant"
+    },
+    "input": "userID_loaderHTTPServer v2Api",
+    "output": "USER_ID_LOADER_HTTP_SERVER_V_2_API"
+  },
+  {
+    "name": "ID camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "ID",
+    "output": "id"
+  },
+  {
+    "name": "API camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "API",
+    "output": "api"
+  },
+  {
+    "name": "DB camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "DB",
+    "output": "db"
+  },
+  {
+    "name": "URL camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "URL",
+    "output": "url"
+  },
+  {
+    "name": "HTTP camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "HTTP",
+    "output": "http"
+  },
+  {
+    "name": "digits start",
+    "options": {
+      "target": "camel"
+    },
+    "input": "123 HTTP",
+    "output": "123HTTP"
+  },
+  {
+    "name": "digits middle",
+    "options": {
+      "target": "camel"
+    },
+    "input": "v2Api",
+    "output": "v2API"
+  },
+  {
+    "name": "unicode camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "Ünïcödé Straße",
+    "output": "ünïcödéStraße"
+  },
+  {
+    "name": "punctuation camel",
+    "options": {
+      "target": "camel"
+    },
+    "input": "hello-world!_yes",
+    "output": "helloWorldYes"
+  },
+  {
+    "name": "blank lines",
+    "options": {
+      "target": "camel"
+    },
+    "input": "\n\n",
+    "output": "\n\n"
+  },
+  {
+    "name": "multiple lines CRLF",
+    "options": {
+      "target": "camel"
+    },
+    "input": "userID\r\nloader",
+    "output": "userID\r\nloader"
+  },
+  {
+    "name": "leading and trailing WS",
+    "options": {
+      "target": "camel"
+    },
+    "input": "  userID  \n\tHTTP\t",
+    "output": "  userID  \n\thttp\t"
+  },
+  {
+    "name": "snake acronym on",
+    "options": {
+      "target": "snake"
+    },
+    "input": "userID",
+    "output": "user_id"
+  },
+  {
+    "name": "snake acronym off",
+    "options": {
+      "target": "snake",
+      "preserve-acronyms": false
+    },
+    "input": "userID",
+    "output": "user_id"
+  },
+  {
+    "name": "kebab acronym on",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "userID",
+    "output": "user-id"
+  },
+  {
+    "name": "ID pascal",
+    "options": {
+      "target": "pascal"
+    },
+    "input": "ID",
+    "output": "ID"
+  },
+  {
+    "name": "ID constant",
+    "options": {
+      "target": "constant"
+    },
+    "input": "ID",
+    "output": "ID"
+  },
+  {
+    "name": "HTTP pascal",
+    "options": {
+      "target": "pascal"
+    },
+    "input": "HTTP",
+    "output": "HTTP"
+  },
+  {
+    "name": "HTTP pascal no acronym",
+    "options": {
+      "target": "pascal",
+      "preserve-acronyms": false
+    },
+    "input": "HTTP",
+    "output": "Http"
+  },
+  {
+    "name": "URL snake",
+    "options": {
+      "target": "snake"
+    },
+    "input": "URL",
+    "output": "url"
+  },
+  {
+    "name": "DB kebab",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "DB",
+    "output": "db"
+  },
+  {
+    "name": "API screaming",
+    "options": {
+      "target": "screaming-kebab"
+    },
+    "input": "API",
+    "output": "API"
+  },
+  {
+    "name": "custom acronyms",
+    "options": {
+      "target": "camel",
+      "acronyms": "FOO,BAR"
+    },
+    "input": "fooBar",
+    "output": "fooBAR"
+  },
+  {
+    "name": "custom acronyms snake",
+    "options": {
+      "target": "snake",
+      "acronyms": "FOO,BAR"
+    },
+    "input": "fooBar",
+    "output": "foo_bar"
+  },
+  {
+    "name": "hump split",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "aB",
+    "output": "a-b"
+  },
+  {
+    "name": "mixed digits",
+    "options": {
+      "target": "snake"
+    },
+    "input": "foo123bar",
+    "output": "foo_123_bar"
+  },
+  {
+    "name": "no word chars",
+    "options": {
+      "target": "camel"
+    },
+    "input": "---",
+    "output": "---"
+  },
+  {
+    "name": "preserve internal punctuation",
+    "options": {
+      "target": "camel"
+    },
+    "input": "foo-bar!baz",
+    "output": "fooBarBaz"
+  },
+  {
+    "name": "leading WS",
+    "options": {
+      "target": "snake"
+    },
+    "input": "   fooBar",
+    "output": "   foo_bar"
+  },
+  {
+    "name": "trailing WS",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "fooBar   ",
+    "output": "foo-bar   "
+  }
+]

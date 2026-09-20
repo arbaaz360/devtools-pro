@@ -1,0 +1,28 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "text.case",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "String Case Converter",
+  "description": "Converts identifier-style text between cases, line by line, with configurable acronym preservation.",
+  "tools": [{"id":"text.case","title":"String Case Converter","category":"converter","operationIds":["text.case"],"workspaceId":"string-case"}],
+  "operations": [{
+    "id":"text.case",
+    "title":"Convert string case",
+    "executor":{"kind":"javascriptWorker","id":"text.case.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "options":[
+      {"id":"target","type":"enum","label":"Target","default":"camel","choices":[{"id":"camel","label":"camelCase"},{"id":"pascal","label":"PascalCase"},{"id":"snake","label":"snake_case"},{"id":"kebab","label":"kebab-case"},{"id":"screaming-kebab","label":"SCREAMING-KEBAB"},{"id":"constant","label":"CONSTANT_CASE"}],"persistence":"instance","sensitive":false},
+      {"id":"acronyms","type":"string","label":"Acronyms","default":"ID,API,DB,URL,HTTP","persistence":"instance","sensitive":false},
+      {"id":"preserve-acronyms","type":"boolean","label":"Preserve Acronyms","default":true,"persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
+    "limits":{"maxInputBytes":"1048576","maxOutputBytes":"2097152","maxChunkBytes":"1048576","deadlineMs":"1000"}
+  }],
+  "workspaces":[{"id":"string-case","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-27"],"fixtures":["vectors","invalid"],"uiScenarios":[]}
+}

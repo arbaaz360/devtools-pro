@@ -1,0 +1,32 @@
+[
+  {
+    "name": "unknown option",
+    "options": { "foo": "bar" },
+    "input": "abc",
+    "errorCode": "case.invalid-option"
+  },
+  {
+    "name": "unknown target",
+    "options": { "target": "unknown" },
+    "input": "abc",
+    "errorCode": "case.invalid-option"
+  },
+  {
+    "name": "non-string acronyms",
+    "options": { "acronyms": 123 },
+    "input": "abc",
+    "errorCode": "case.invalid-option"
+  },
+  {
+    "name": "non-boolean preserve",
+    "options": { "preserve-acronyms": "true" },
+    "input": "abc",
+    "errorCode": "case.invalid-option"
+  },
+  {
+    "name": "conflicting boolean preserve",
+    "options": { "preserve-acronyms": true, "preserveAcronyms": false },
+    "input": "abc",
+    "errorCode": "case.invalid-option"
+  }
+]
