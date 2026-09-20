@@ -30,7 +30,7 @@ the webview worker engine (see
 | DU-12 | Text diff | `text.compare` | rust | usable |
 | DU-13 | HTML beautify/minify | `format.html` | js | packet ready (AG-114) |
 | DU-14 | CSS beautify/minify | `format.css` | js | packet ready (AG-113) |
-| DU-15 | JavaScript beautify/minify | `format.js` | — | needs a decision: a real JS formatter needs a parser; either vendor `js-beautify` (dependency policy) or accept a tokenizer-grade formatter |
+| DU-15 | JavaScript beautify/minify | `format.js` | js | packet ready (AG-115); beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`), minify is comment and whitespace removal |
 | DU-16 | XML beautify/minify | `format.xml` | js | packet ready (AG-112) |
 | DU-17 | YAML to JSON | `convert.yaml-json` | js | packet ready (AG-110) |
 | DU-18 | JSON to YAML | `convert.json-yaml` | js | packet ready (AG-110) |
@@ -44,8 +44,8 @@ the webview worker engine (see
 | DU-26 | SQL formatter | `format.sql` | js | packet ready (AG-111) |
 | DU-27 | String case converter | `text.case` | js | usable |
 
-Usable: 10 of 27. Queued or in review: 3. Packets ready: 6. Needs shell
-work: 5. Needs a decision: 1. Beyond these 27, the wider catalogue is in
+Usable: 10 of 27. Queued or in review: 3. Packets ready: 7. Needs shell
+work: 5. Beyond these 27, the wider catalogue is in
 [PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
 
 ## DU-01 — Unix Timestamp Converter
