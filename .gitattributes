@@ -1,0 +1,7 @@
+# Fixtures and processors are compared byte-for-byte by tests; a Windows checkout
+# must not turn LF into CRLF. Binary fixtures are left alone.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

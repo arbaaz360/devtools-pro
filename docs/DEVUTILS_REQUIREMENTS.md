@@ -25,17 +25,17 @@ the webview worker engine (see
 | DU-07 | URL / query parser | `web.url-parser` | js | usable |
 | DU-08 | HTML entities | `text.html` | rust | usable |
 | DU-09 | Backslash escaping | `text.backslash` | js | usable |
-| DU-10 | UUID generate/decode | `identity.uuid` | js | package merged, not in app until AG-106 (Node-only processor) |
+| DU-10 | UUID generate/decode | `identity.uuid` | js | in review (AG-106, PR #56) makes it browser-safe |
 | DU-11 | HTML preview | — | — | planned, needs shell work |
 | DU-12 | Text diff | `text.compare` | rust | usable |
-| DU-13 | HTML beautify/minify | `format.html` | js | packet ready (AG-114) |
+| DU-13 | HTML beautify/minify | `format.html` | js | usable |
 | DU-14 | CSS beautify/minify | `format.css` | js | packet ready (AG-113) |
 | DU-15 | JavaScript beautify/minify | `format.js` | js | packet ready (AG-115); beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`), minify is comment and whitespace removal |
 | DU-16 | XML beautify/minify | `format.xml` | js | packet ready (AG-112) |
-| DU-17 | YAML to JSON | `convert.yaml-json` | js | packet ready (AG-110) |
-| DU-18 | JSON to YAML | `convert.json-yaml` | js | packet ready (AG-110) |
-| DU-19 | Number base converter | `number.base` | js | queued (AG-104) |
-| DU-20 | Example string generator | `generate.examples` | js | queued (AG-105) |
+| DU-17 | YAML to JSON | `convert.yaml-json` | js | usable |
+| DU-18 | JSON to YAML | `convert.json-yaml` | js | usable |
+| DU-19 | Number base converter | `number.base` | js | usable |
+| DU-20 | Example string generator | `generate.examples` | js | usable |
 | DU-21 | QR code | — | — | planned, needs shell work |
 | DU-22 | String inspector | `text.inspect` | rust | usable, parity gaps unaudited |
 | DU-23 | Hash generator | `encoding.hash` | rust | usable (SHA-256/512; MD5, SHA-1, SHA-224, SHA-384 only in the package) |
@@ -44,7 +44,7 @@ the webview worker engine (see
 | DU-26 | SQL formatter | `format.sql` | js | packet ready (AG-111) |
 | DU-27 | String case converter | `text.case` | js | usable |
 
-Usable: 12 of 27. Queued: 2. Packets ready: 5. Needs shell
+Usable: 16 of 27. In review: 1. Packets ready: 4. Needs shell
 work: 5. Beyond these 27, the wider catalogue is in
 [PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
 
