@@ -36,6 +36,10 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-113 | CSS beautifier and minifier package (DU-14) | antigravity | ready |
 | AG-114 | HTML beautifier and minifier package (DU-13) | claude | ready |
 | AG-115 | JavaScript beautifier and minifier package (DU-15) | antigravity | ready |
+| AG-116 | Regular expression tester package (DU-03) | claude | ready |
+| AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | ready |
+| AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | ready |
+| AG-119 | QR code generator package (DU-21) | antigravity | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).

@@ -32,8 +32,23 @@ exactly like a native one:
 - The result pane renders a tool's declared options as controls (enum,
   boolean, string, integer, decimal) without per-tool shell code.
 
+Representations the shell renders for package results, beyond text and
+JSON:
+
+- **annotations**: a value whose `annotations` array holds
+  `{ start, end, kind, label }` entries with `start`/`end` as UTF-16
+  code-unit offsets into the input text (not bytes). The engine lifts the
+  array out of the properties and the shell highlights each span in the
+  editor behind the text, `kind` selecting the colour (`match`, `group`,
+  `warning`, `error`). Diagnostics with `line`/`column` are not annotations.
+- **previewDocument**: an artifact with mime `text/html` is shown in a
+  sandboxed frame with scripts, forms and navigation disabled; the code
+  view remains available beside it.
+- **image**: an artifact with mime `image/svg+xml` is shown as an image with
+  its source available as text.
+
 Not yet: multi-document operations on the worker engine (compare-style tools
-stay native), binary outputs, progress events, and the rest of the v2
+stay native), binary inputs, progress events, and the rest of the v2
 `ExecuteRequest` envelope (capability grants, artifact handles).
 
 ## What is live today
