@@ -11,14 +11,14 @@
       "id": "format.js",
       "title": "JavaScript Formatter",
       "category": "converter",
-      "operationIds": ["js.beautify", "js.minify"],
+      "operationIds": ["beautify", "minify"],
       "workspaceId": "js-formatter",
       "searchAliases": ["js beautifier", "js minifier", "javascript beautifier"]
     }
   ],
   "operations": [
     {
-      "id": "js.beautify",
+      "id": "beautify",
       "title": "Beautify JavaScript",
       "executor": {
         "kind": "javascriptWorker",
@@ -88,9 +88,9 @@
           "id": "max-preserve-newlines",
           "type": "integer",
           "label": "Max preserve newlines",
-          "default": 2,
-          "min": 0,
-          "max": 10,
+          "default": "2",
+          "minimum": "0",
+          "maximum": "10",
           "persistence": "instance",
           "sensitive": false
         },
@@ -124,7 +124,7 @@
       }
     },
     {
-      "id": "js.minify",
+      "id": "minify",
       "title": "Minify JavaScript",
       "executor": {
         "kind": "javascriptWorker",

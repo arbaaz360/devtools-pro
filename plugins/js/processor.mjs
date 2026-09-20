@@ -64,10 +64,10 @@ export function normalizeOptions(raw) {
 }
 
 export async function execute(request, context) {
-  const op = request?.operationId ?? "js.beautify";
+  const op = request?.operationId ?? "beautify";
   const options = normalizeOptions(request?.options);
-  if (op === "js.beautify") return await beautify(context, options);
-  else if (op === "js.minify") return await minify(context, options);
+  if (op === "beautify") return await beautify(context, options);
+  else if (op === "minify") return await minify(context, options);
   else throw new Error("unknown operation " + op);
 }
 

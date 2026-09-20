@@ -33,7 +33,7 @@ try {
   const beautifyCases = await fixture("beautify");
   for (const item of beautifyCases) {
     test(`beautify: ${item.name}`, async () => {
-      const formatted = await expectOk("js.beautify", item.input, item.options);
+      const formatted = await expectOk("beautify", item.input, item.options);
       assert.equal(formatted.text, item.output);
     });
   }
@@ -45,7 +45,7 @@ try {
   const minifyCases = await fixture("minify");
   for (const item of minifyCases) {
     test(`minify: ${item.name}`, async () => {
-      const minified = await expectOk("js.minify", item.input, item.options);
+      const minified = await expectOk("minify", item.input, item.options);
       assert.equal(minified.text, item.output);
     });
   }
@@ -55,8 +55,8 @@ try {
 
 test("idempotent round trip", async () => {
   const input = "function foo(a, b) {\n    return a + b;\n}";
-  const f1 = await expectOk("js.beautify", input);
-  const m1 = await expectOk("js.minify", f1.text);
-  const f2 = await expectOk("js.beautify", m1.text);
+  const f1 = await expectOk("beautify", input);
+  const m1 = await expectOk("minify", f1.text);
+  const f2 = await expectOk("beautify", m1.text);
   assert.equal(f1.text, f2.text);
 });
