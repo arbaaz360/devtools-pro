@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Starts an Antigravity agent on each ready packet, one at a time, without a human kickoff.
+  Sends each ready packet, one at a time, to a running Antigravity conversation.
 
 .DESCRIPTION
   Run this in any terminal while Antigravity is open with this repository (or a parent
@@ -10,9 +10,14 @@
   own process on this machine and keeps them in this process only. Nothing is written
   to disk or sent anywhere.
 
+  Antigravity only lets its own agents create conversations, so the loop posts into one
+  you create by hand: open a conversation in Antigravity, tell it to wait for packets,
+  and leave it open. By default the loop targets the most recently used conversation;
+  pass -ConversationId to pin one.
+
   Every interval the loop asks GitHub (with `gh`, no model tokens) for open issues labelled
-  packet + ready + antigravity. If one exists and no packet is in flight, it starts a new
-  Antigravity conversation on the lowest-numbered issue with docs/antigravity/WORKER_PROMPT.md.
+  packet + ready + antigravity. If one exists and no packet is in flight, it sends the
+  lowest-numbered one to that conversation as docs/antigravity/WORKER_PROMPT.md.
   A packet is in flight until a pull request whose body carries its `Packet:` line exists, or
   its issue is no longer open, or the wait limit passes. The reviewer routine takes over from
   the pull request onward.
@@ -21,8 +26,8 @@
   Minutes between GitHub polls. Default 5.
 .PARAMETER MaxWaitMinutes
   How long one packet may stay in flight before the loop moves on. Default 120.
-.PARAMETER Model
-  Antigravity model id: pro, flash or flash_lite. Default pro.
+.PARAMETER ConversationId
+  The Antigravity conversation to send packets to. Default: the most recently used one.
 .PARAMETER Once
   Dispatch at most one packet, then exit.
 
@@ -32,8 +37,7 @@
 param(
   [int]$IntervalMinutes = 5,
   [int]$MaxWaitMinutes = 120,
-  [ValidateSet('pro', 'flash', 'flash_lite')][string]$Model = 'pro',
-  [string]$ProjectId = $env:ANTIGRAVITY_PROJECT_ID,
+  [string]$ConversationId,
   [switch]$Once
 )
 
@@ -88,7 +92,16 @@ function Connect-LanguageServer {
 }
 
 Connect-LanguageServer
-if ($ProjectId) { $env:ANTIGRAVITY_PROJECT_ID = $ProjectId }
+
+# Conversations are stored one file per cascade id; the newest is the one the owner just
+# opened as the dispatcher. Only file names are read.
+if (-not $ConversationId) {
+  $store = Join-Path $env:USERPROFILE '.gemini/antigravity-ide/conversations'
+  $newest = Get-ChildItem (Join-Path $store '*.db') -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if (-not $newest) { Write-Error "No Antigravity conversations found under $store. Open one in Antigravity first." }
+  $ConversationId = $newest.BaseName
+}
+Write-Host "dispatching to conversation $ConversationId"
 
 function Read-State {
   if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
@@ -124,21 +137,18 @@ function Test-InFlight($state) {
 
 function Start-Packet($issue) {
   $prompt = (Get-Content $promptPath -Raw).Replace('{{ISSUE}}', "$($issue.number)").Replace('{{TITLE}}', $issue.title).Replace('{{PACKET}}', $issue.packet).Replace('{{ROOT}}', $root)
-  $title = "[worker] $($issue.title)"
-  Write-Host ("{0}  starting Antigravity ({1}) on issue #{2}: {3}" -f (Get-Date -Format 'HH:mm'), $Model, $issue.number, $issue.title)
-  $out = Invoke-AgentApi new-conversation "--model=$Model" "--title=$title" $prompt
-  $conversation = ([regex]::Match($out, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')).Value
-  if (-not $conversation) {
-    Write-Warning "agentapi did not return a conversation id: $out"
-    if ($out -match 'project_id is required') { Write-Host '  Pass the Antigravity project id with -ProjectId (or set ANTIGRAVITY_PROJECT_ID).' }
-    if ($out -match 'projectsStore is nil') { Write-Host '  This server has no projects store; the manager server (the one without --workspace_id) must be running.' }
+  $title = "[packet] $($issue.title)"
+  Write-Host ("{0}  sending issue #{1} to Antigravity: {2}" -f (Get-Date -Format 'HH:mm'), $issue.number, $issue.title)
+  $out = Invoke-AgentApi send-message "--title=$title" $ConversationId $prompt
+  if ($out -match '"error"\s*:\s*"[^"]') {
+    Write-Warning "agentapi send-message failed: $out"
     return $null
   }
-  Write-Host "  conversation $conversation"
-  return $conversation
+  Write-Host "  sent to conversation $ConversationId"
+  return $ConversationId
 }
 
-Write-Host "Antigravity worker loop: polling $repo every $IntervalMinutes min; model $Model; Ctrl+C to stop."
+Write-Host "Antigravity worker loop: polling $repo every $IntervalMinutes min; Ctrl+C to stop."
 while ($true) {
   $state = Read-State
   if (Test-InFlight $state) {
