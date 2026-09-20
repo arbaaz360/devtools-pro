@@ -1,0 +1,12 @@
+[
+  { "name": "too few segments", "token": "abc", "code": "structure", "segments": 1 },
+  { "name": "too many segments", "token": "a.b.c.d", "code": "structure", "segments": 4 },
+  { "name": "header invalid base64url", "token": "abc!.e30.", "code": "segment-base64", "segment": "header" },
+  { "name": "payload invalid base64url", "token": "eyJhbGciOiJub25lIn0.bad!.", "code": "segment-base64", "segment": "payload" },
+  { "name": "signature invalid base64url", "token": "eyJhbGciOiJIUzI1NiJ9.e30.bad!", "code": "segment-base64", "segment": "signature" },
+  { "name": "header is a JSON array, not an object", "token": "WzEsMiwzXQ.e30.", "code": "segment-json", "segment": "header" },
+  { "name": "header is not valid JSON", "token": "bm90LWpzb24.e30.", "code": "segment-json", "segment": "header" },
+  { "name": "payload is a JSON string, not an object", "token": "eyJhbGciOiJub25lIn0.ImhlbGxvIg.", "code": "segment-json", "segment": "payload" },
+  { "name": "payload is not valid JSON", "token": "eyJhbGciOiJub25lIn0.bm90LWpzb24.", "code": "segment-json", "segment": "payload" },
+  { "name": "empty signature with alg not none", "token": "eyJhbGciOiJIUzI1NiJ9.e30.", "code": "segment-signature", "segment": "signature" }
+]
