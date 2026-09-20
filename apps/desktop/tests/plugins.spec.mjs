@@ -59,3 +59,18 @@ test('a processor error reaches the result pane as a structured failure', async 
   await expect(page.locator('#result-state')).toHaveClass(/failed/);
   await expect(page.locator('#result-state')).toContainText('●');
 });
+
+test('a sensitive package option is a masked input and the tool runs with it', async ({ page, host }) => {
+  void host;
+  await newText(page, 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c');
+  await chooseTool(page, 'JWT Decoder & Verifier');
+  await completed(page);
+  await expect(page.locator('#result-summary')).toContainText('signature: not-checked');
+  const key = page.getByLabel('Key');
+  await expect(key).toHaveAttribute('type', 'password');
+  await key.fill('your-256-bit-secret');
+  await key.press('Tab');
+  await completed(page);
+  await expect(page.locator('#result-summary')).toContainText('signature: valid');
+  await expect(page.locator('#result-content')).not.toContainText('your-256-bit-secret');
+});

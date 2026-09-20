@@ -467,7 +467,10 @@ function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLEleme
     } else {
       const input = document.createElement("input");
       const numeric = option.type !== "string";
-      input.type = numeric ? "number" : "text";
+      // A sensitive option (a signing key, a secret) is masked and never
+      // offered to autofill; its value lives only in the tab's options.
+      input.type = numeric ? "number" : option.sensitive ? "password" : "text";
+      if (option.sensitive) input.autocomplete = "off";
       input.setAttribute("aria-label", option.label);
       const current = tab.options[option.id];
       input.value = current === undefined ? String(option.default) : String(current);
