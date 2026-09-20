@@ -30,6 +30,9 @@
 .PARAMETER MaxWaitMinutes
   How long one packet may stay in flight, including review rounds, before the loop
   moves on. Default 240.
+.PARAMETER Root
+  The repository checkout the agent works in. Default: the checkout this script lives in.
+  Point it elsewhere when the loop runs from a separate checkout that stays on main.
 .PARAMETER ConversationId
   The Antigravity conversation to send packets to. Default: the most recently used one.
 .PARAMETER Once
@@ -42,12 +45,13 @@ param(
   [int]$IntervalMinutes = 5,
   [int]$MaxWaitMinutes = 240,
   [string]$ConversationId,
+  [string]$Root,
   [switch]$Once
 )
 
 $ErrorActionPreference = 'Stop'
 $repo = 'arbaaz360/devtools-pro'
-$root = Split-Path -Parent $PSScriptRoot
+$root = if ($Root) { (Resolve-Path $Root).Path } else { Split-Path -Parent $PSScriptRoot }
 $promptPath = Join-Path $root 'docs/antigravity/WORKER_PROMPT.md'
 $statePath = Join-Path $root '.antigravity-worker-state.json'   # ignored by git; see .gitignore
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Write-Error 'gh is not on PATH' }
