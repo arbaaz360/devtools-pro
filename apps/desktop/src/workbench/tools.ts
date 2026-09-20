@@ -1,4 +1,5 @@
 import type { FileDocument, Format, ToolManifest } from "../bridge";
+import type { OptionSpec } from "../../../../packages/plugin-contract/ts/generated.ts";
 import type { TabState } from "./state";
 
 export interface ToolDefinition {
@@ -11,6 +12,10 @@ export interface ToolDefinition {
   input: "text" | "image" | "bytes";
   auto: boolean;
   compare?: boolean;
+  /** Generators may run with an empty document. */
+  emptyInput?: boolean;
+  /** Declared options rendered as generic controls (package tools). */
+  optionSchema?: readonly OptionSpec[];
   operations: readonly { id: string; label: string }[];
 }
 const op = (id: string, label: string) => ({ id, label });
@@ -137,12 +142,12 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
       ? "image"
       : "bytes"
     : "text";
-  const group = manifest.id.split(".")[0] === "structured"
+  const group = manifest.group ?? (manifest.id.split(".")[0] === "structured"
     ? "STRUCTURED DATA"
     : manifest.id.includes("compare")
       ? "COMPARE"
-      : "PLUGINS";
-  const icon = manifest.renderer === "binary" ? "▧" : manifest.renderer === "diff" ? "⇄" : "◇";
+      : "PLUGINS");
+  const icon = manifest.icon ?? (manifest.renderer === "binary" ? "▧" : manifest.renderer === "diff" ? "⇄" : "◇");
   const operations = manifest.operations.map((operation) => op(operation.id, operation.label));
   return {
     id: manifest.id,
@@ -153,8 +158,10 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
     operations,
     defaultOperation: operations[0]?.id ?? "",
     defaultOptions: manifest.operations[0]?.defaultOptions ?? {},
-    auto: operations.length > 0,
+    auto: manifest.auto ?? operations.length > 0,
     compare: manifest.renderer === "diff",
+    emptyInput: manifest.emptyInput,
+    optionSchema: manifest.optionSchema,
   };
 }
 

@@ -5,6 +5,37 @@ The registry owns the relationship between a tool manifest and its executor. The
 the registry for a manifest and executor; it does not need a new `match tool_id` branch when a
 tool is added.
 
+## The webview worker engine
+
+Since 2026-09-20 the second trusted engine runs inside the webview, in
+`apps/desktop/src/plugins/`. It sits behind the same `WorkbenchApi` the
+controller drives, so a package tool starts, reports, completes and cancels
+exactly like a native one:
+
+- `catalog.ts` inlines every `plugins/*/manifest.json` at build time (Vite
+  glob) and `describe.ts` turns each v2 tool into the shell's `ToolManifest`
+  shape plus the extras the engine needs: group, icon, option schema, whether
+  it accepts an empty document (generators).
+- `engine.ts` merges those tools behind the native `list_tools` result; an id
+  the native host serves stays native (`structured.json`, `text.compare`,
+  `text.url`, `text.html`, `text.json-string`, `encoding.hash`,
+  `text.find-replace` today). For a package tool it reads the complete input
+  from the host document, runs the processor in a fresh module Worker, and
+  registers the complete output as a host-owned result document, so preview,
+  copy and save are unchanged. Cancel and deadline terminate the Worker; the
+  deadline is enforced at four times the declared budget (minimum 2 s) to
+  cover Worker start-up.
+- `engine.worker.ts` bundles every processor except the Node-only ones named
+  in `catalog.ts` (`hash`, `uuid`), builds a `ProcessorContext` over immutable
+  bytes, and posts one outcome per run. Processors therefore must use only
+  web platform APIs: no `node:` imports.
+- The result pane renders a tool's declared options as controls (enum,
+  boolean, string, integer, decimal) without per-tool shell code.
+
+Not yet: multi-document operations on the worker engine (compare-style tools
+stay native), binary outputs, progress events, and the rest of the v2
+`ExecuteRequest` envelope (capability grants, artifact handles).
+
 ## What is live today
 
 - Built-in v1 manifests are registered once when `HostState` is created.

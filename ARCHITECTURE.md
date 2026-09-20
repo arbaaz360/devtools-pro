@@ -1,6 +1,8 @@
 # DevTools Pro architecture
 
-Implementation audit and design direction, 2026-09-15. The application is a Rust/Tauri desktop workbench with a TypeScript UI. It is **not yet a fully dynamic plugin system**.
+Implementation audit and design direction, 2026-09-15. The application is a Rust/Tauri desktop workbench with a TypeScript UI. It is **not yet a fully dynamic plugin system**: packages are discovered at build time, and there is no runtime installation.
+
+Since 2026-09-20 the two trusted engines of the plugin design are both live. The native host runs Rust executors for the tool ids it serves; the webview runs every other v2 package tool in a dedicated Worker (`apps/desktop/src/plugins/`, see [Plugin host implementation](docs/PLUGIN_HOST_IMPLEMENTATION.md#the-webview-worker-engine)). A package directory under `plugins/` appears in the sidebar without any hand-maintained list.
 
 The current design documents are:
 
@@ -18,7 +20,7 @@ Those documents describe the intended architecture. They do not claim the runtim
 
 **TypeScript, HTML/CSS and Vite** implement the current UI in `apps/desktop/src`. The architecture retains this stack during migration. Shared components and pure state transitions must replace tool-specific shell wiring. No additional frontend framework or external plugin runtime has been selected by this design.
 
-Future bundled processors may use Rust or a dedicated JavaScript worker where library compatibility warrants it. They must use the same versioned request/result and lifecycle contract. A trusted worker is an execution boundary, not an untrusted-code security sandbox.
+Bundled processors use Rust or a dedicated JavaScript worker; a tool id the native host serves stays Rust, every other package tool runs on the worker engine. They must use the same versioned request/result and lifecycle contract. A trusted worker is an execution boundary, not an untrusted-code security sandbox.
 
 ## Current boundaries and gaps
 
@@ -31,7 +33,7 @@ main.ts: DOM rendering and tool-specific UI decisions
   -> devtools-core: parsing and transformations
 ```
 
-`workbench/tools.ts` contains a static catalog. The controller and host still branch for particular tools, including compare. The experimental Rust `GenericTool`/`ToolRegistry` does not replace the production host's dispatch logic. The earlier `toolViews/registry.ts` exists but the current `main.ts` does not consume it. These are real integration gaps; external manifest loading alone will not solve them.
+`workbench/tools.ts` still contains the static v1 catalog for the Rust tools; package tools are appended from `plugins/catalog.ts`. The controller and host still branch for particular tools, including compare. The experimental Rust `GenericTool`/`ToolRegistry` does not replace the production host's dispatch logic. The earlier `toolViews/registry.ts` exists but the current `main.ts` does not consume it. These are real integration gaps; external manifest loading alone will not solve them.
 
 Reusable foundations include immutable source snapshots, temporary result handles, safe explicit exports, bounded previews and per-tab generation checks. These need regression coverage while migration moves tool-specific behavior into packages. Build success alone does not demonstrate correct native interaction or visual layout.
 

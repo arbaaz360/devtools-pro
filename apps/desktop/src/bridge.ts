@@ -2,6 +2,7 @@ import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { open, save } from '@tauri-apps/plugin-dialog';
+import type { OptionSpec } from '../../../packages/plugin-contract/ts/generated.ts';
 
 export type Format = 'json' | 'csv' | 'text';
 export type Operation = 'inspect' | 'format' | 'minify';
@@ -41,6 +42,15 @@ export interface ToolManifest {
   capabilities: ToolCapabilities;
   operations: ToolOperation[];
   renderer: RendererKind;
+  /** Set by the webview's worker engine for v2 package tools; absent on native manifests. */
+  engine?: 'worker';
+  group?: string;
+  icon?: string;
+  auto?: boolean;
+  /** Generators run without input text. */
+  emptyInput?: boolean;
+  /** The v2 option declarations the shell renders as controls. */
+  optionSchema?: OptionSpec[];
 }
 export interface FileDocument {
   id: string;
