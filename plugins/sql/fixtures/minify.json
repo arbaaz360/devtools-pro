@@ -35,5 +35,59 @@
     "options": {},
     "input": "SELECT a /* block */ , b FROM t;",
     "output": "SELECT a,b FROM t;"
+  },
+  {
+    "name": "string keeps its spaces and keywords",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT   'a  b  FROM x'   AS s\nFROM   t",
+    "output": "SELECT'a  b  FROM x'AS s FROM t"
+  },
+  {
+    "name": "quoted identifiers untouched",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT  \"first name\" ,  [last name]  FROM  t",
+    "output": "SELECT \"first name\",[last name] FROM t"
+  },
+  {
+    "name": "mysql backtick and hash comment",
+    "dialect": "mysql",
+    "options": {
+      "dialect": "mysql"
+    },
+    "input": "SELECT  `a`  # note\nFROM  `t`",
+    "output": "SELECT `a` FROM `t`"
+  },
+  {
+    "name": "postgres dollar quoting and cast",
+    "dialect": "postgresql",
+    "options": {
+      "dialect": "postgresql"
+    },
+    "input": "SELECT  $$a  ;  b$$ ,  x :: int\nFROM  t",
+    "output": "SELECT $$a  ;  b$$,x::int FROM t"
+  },
+  {
+    "name": "operators and parameters keep their tokens",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT a <> b , c >= ? , d || e\nFROM t WHERE f = :name",
+    "output": "SELECT a<>b,c>=?,d||e FROM t WHERE f=:name"
+  },
+  {
+    "name": "block comment across lines removed",
+    "dialect": "sql",
+    "options": {
+      "dialect": "sql"
+    },
+    "input": "SELECT a\n/* multi\n   line */\nFROM t",
+    "output": "SELECT a FROM t"
   }
 ]
