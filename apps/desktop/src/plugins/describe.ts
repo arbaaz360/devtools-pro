@@ -87,10 +87,17 @@ export function prepareOptions(
   return options;
 }
 
-/** The engine handles one document input per run; compare-style tools stay native. */
+/** The engine feeds at most one document per run; compare-style tools stay native. */
 export function primaryInput(operation: OperationSpec): OperationSpec["inputs"][number] | undefined {
   const documents = operation.inputs.filter((input) => input.kind === "document");
   return documents.length === 1 ? documents[0] : undefined;
+}
+/** Generators may declare no document input at all; two or more stay native. */
+export function engineRunnable(operation: OperationSpec): boolean {
+  return (
+    operation.executor.kind === "javascriptWorker" &&
+    operation.inputs.filter((input) => input.kind === "document").length <= 1
+  );
 }
 
 export function primaryOutput(operation: OperationSpec): OperationSpec["outputs"][number] | undefined {
@@ -104,7 +111,7 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
     const operations = tool.operationIds
       .map((id) => manifest.operations.find((operation) => operation.id === id))
       .filter((operation): operation is OperationSpec => !!operation)
-      .filter((operation) => operation.executor.kind === "javascriptWorker" && !!primaryInput(operation));
+      .filter(engineRunnable);
     if (!operations.length) continue;
     const workspace = manifest.workspaces.find((item) => item.id === tool.workspaceId);
     const first = operations[0]!;

@@ -29,6 +29,12 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-106 | UUID package follow-ups | antigravity | ready |
 | AG-107 | Escaping package follow-ups | antigravity | ready |
 | AG-108 | URL package follow-ups | antigravity | ready |
+| AG-109 | JWT decoder and verifier package (DU-04) | claude | ready |
+| AG-110 | YAML ↔ JSON package (DU-17, DU-18) | claude | ready |
+| AG-111 | SQL formatter package (DU-26) | antigravity | ready |
+| AG-112 | XML beautifier and minifier package (DU-16) | antigravity | ready |
+| AG-113 | CSS beautifier and minifier package (DU-14) | antigravity | ready |
+| AG-114 | HTML beautifier and minifier package (DU-13) | claude | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).

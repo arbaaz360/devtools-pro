@@ -6,6 +6,48 @@ Source root: `F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/d
 
 Status legend: **partial** means a related implementation exists, not parity; **planned** means no corresponding complete workbench tool is established by this audit. No entry below is marked parity-complete. Each entry's Required, UX, and Acceptance paragraphs are separate acceptance obligations. Cross-cutting UX requirements are in [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md#shared-workspace-vocabulary-and-ux-contract).
 
+## Status, verified 2026-09-20
+
+Kept current by the integrator when a packet merges. "Usable" means the tool
+runs in the desktop app; it is not a parity sign-off against the card below.
+Engine: **rust** is a native executor in the host, **js** is a v2 package on
+the webview worker engine (see
+[PLUGIN_HOST_IMPLEMENTATION.md](PLUGIN_HOST_IMPLEMENTATION.md#the-webview-worker-engine)).
+
+| ID | Tool | Tool id | Engine | State |
+|---|---|---|---|---|
+| DU-01 | Unix timestamp converter | `time.unix` | js | in review (AG-103, PR #36) |
+| DU-02 | JSON formatter/validator | `structured.json` | rust | usable |
+| DU-03 | RegExp tester | `text.regex` | — | planned, needs shell work |
+| DU-04 | JWT decode/verify | `security.jwt` | js | packet ready (AG-109) |
+| DU-05 | URL encode/decode | `text.url` | rust | usable |
+| DU-06 | Base64 text | `encoding.base64-text` | js | usable |
+| DU-07 | URL / query parser | `web.url-parser` | js | usable |
+| DU-08 | HTML entities | `text.html` | rust | usable |
+| DU-09 | Backslash escaping | `text.backslash` | js | usable |
+| DU-10 | UUID generate/decode | `identity.uuid` | js | package merged, not in app until AG-106 (Node-only processor) |
+| DU-11 | HTML preview | — | — | planned, needs shell work |
+| DU-12 | Text diff | `text.compare` | rust | usable |
+| DU-13 | HTML beautify/minify | `format.html` | js | packet ready (AG-114) |
+| DU-14 | CSS beautify/minify | `format.css` | js | packet ready (AG-113) |
+| DU-15 | JavaScript beautify/minify | `format.js` | — | needs a decision: a real JS formatter needs a parser; either vendor `js-beautify` (dependency policy) or accept a tokenizer-grade formatter |
+| DU-16 | XML beautify/minify | `format.xml` | js | packet ready (AG-112) |
+| DU-17 | YAML to JSON | `convert.yaml-json` | js | packet ready (AG-110) |
+| DU-18 | JSON to YAML | `convert.json-yaml` | js | packet ready (AG-110) |
+| DU-19 | Number base converter | `number.base` | js | queued (AG-104) |
+| DU-20 | Example string generator | `generate.examples` | js | queued (AG-105) |
+| DU-21 | QR code | — | — | planned, needs shell work |
+| DU-22 | String inspector | `text.inspect` | rust | usable, parity gaps unaudited |
+| DU-23 | Hash generator | `encoding.hash` | rust | usable (SHA-256/512; MD5, SHA-1, SHA-224, SHA-384 only in the package) |
+| DU-24 | HTML/SVG to JSX | — | — | planned, needs shell work |
+| DU-25 | Markdown preview | — | — | planned, needs shell work |
+| DU-26 | SQL formatter | `format.sql` | js | packet ready (AG-111) |
+| DU-27 | String case converter | `text.case` | js | usable |
+
+Usable: 10 of 27. Queued or in review: 3. Packets ready: 6. Needs shell
+work: 5. Needs a decision: 1. Beyond these 27, the wider catalogue is in
+[PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
+
 ## DU-01 — Unix Timestamp Converter
 
 Source: `unix-timestamp-converter`; images 0, 2. Status: planned. Workspace: linked fields/property list. Proposed tool: `time.unix`.
