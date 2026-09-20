@@ -11,3 +11,4 @@ dist/
 apps/desktop/test-results/
 apps/desktop/playwright-report/
 **/.git-nested/
+.antigravity-worker-state.json
