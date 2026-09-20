@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
 import { ProcessorCancelled } from "../../packages/plugin-sdk/src/context.ts";
+import { md5 } from "./md5.mjs";
 
 // RFC 4122 §C name-space IDs; any canonical UUID is accepted as a custom namespace.
 const NAMESPACES = {
@@ -48,9 +48,10 @@ function parseCount(value) {
   if (!Number.isInteger(count) || count < 1 || count > MAX_COUNT) throw new Error(`count must be an integer from 1 to ${MAX_COUNT}`);
   return count;
 }
-function parseNamespace(value) {
-  const preset = typeof value === "string" ? NAMESPACES[value.trim().toLowerCase()] : undefined;
-  try { return parseUuid(preset ?? value); } catch { throw new Error("namespace must be dns, url, oid, x500 or a canonical UUID"); }
+function parseNamespace(value, context) {
+  const preset = typeof value === "string" ? value.trim().toLowerCase() : undefined;
+  if (preset === "random") return randomUuid(context);
+  try { return parseUuid(NAMESPACES[preset] ?? value); } catch { throw new Error("namespace must be dns, url, oid, x500, random or a canonical UUID"); }
 }
 function parseName(value, limits) {
   if (typeof value !== "string" || value.length === 0) throw new Error("name is required for v3 and v5");
@@ -89,8 +90,11 @@ function describe(bytes, upper) {
   return properties;
 }
 
-function nameUuid(version, namespace, name) {
-  const digest = createHash(version === 3 ? "md5" : "sha1").update(namespace).update(name).digest();
+async function nameUuid(version, namespace, name) {
+  const payload = new Uint8Array(namespace.length + name.length);
+  payload.set(namespace);
+  payload.set(name, namespace.length);
+  const digest = version === 3 ? md5(payload) : new Uint8Array(await crypto.subtle.digest("SHA-1", payload));
   const bytes = Uint8Array.from(digest.subarray(0, 16));
   bytes[6] = (bytes[6] & 0x0f) | (version << 4);
   bytes[8] = (bytes[8] & 0x3f) | 0x80;
@@ -133,7 +137,11 @@ async function readInput(context) {
 
 async function decode(source, origin, upper, context) {
   if (typeof source !== "string") throw new Error("UUID must be canonical xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
-  const value = { mode: "decode", origin, source, case: upper ? "upper" : "lower", ...describe(parseUuid(source.trim()), upper), complete: true };
+  const parsed = parseUuid(source.trim());
+  let special = null;
+  if (parsed.every(b => b === 0)) special = "nil";
+  else if (parsed.every(b => b === 0xff)) special = "max";
+  const value = { mode: "decode", origin, source, case: upper ? "upper" : "lower", ...describe(parsed, upper), special, complete: true };
   await context.write("uuid", utf8.encode(`${value.uuid}\n`));
   await context.writeValue("uuid", value);
   return value;
@@ -144,21 +152,21 @@ async function generate(options, upper, context) {
   const value = { mode: "generate", version, count, case: upper ? "upper" : "lower" };
   let make;
   if (version === 3 || version === 5) {
-    const namespace = parseNamespace(options.namespace ?? "dns"), name = parseName(options.name, context.limits);
+    const namespace = parseNamespace(options.namespace ?? "dns", context), name = parseName(options.name, context.limits);
     value.namespace = formatUuid(namespace);
     value.name = options.name;
-    make = () => nameUuid(version, namespace, name);
+    make = async () => await nameUuid(version, namespace, name);
   } else if (version === 4) {
     value.randomness = context.randomness.id;
-    make = () => randomUuid(context);
+    make = async () => randomUuid(context);
   } else {
     const base = timeBase(context, count);
     value.clock = base.now;
     value.randomness = context.randomness.id;
-    make = index => timeUuid(base, index);
+    make = async index => timeUuid(base, index);
   }
   const uuids = [];
-  for (let index = 0; index < count; index += 1) { check(context); uuids.push(describe(make(index), upper)); }
+  for (let index = 0; index < count; index += 1) { check(context); uuids.push(describe(await make(index), upper)); }
   value.uuids = uuids;
   value.complete = true;
   await context.write("uuid", utf8.encode(`${uuids.map(item => item.uuid).join("\n")}\n`));

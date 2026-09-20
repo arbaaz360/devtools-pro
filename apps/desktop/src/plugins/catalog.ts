@@ -16,9 +16,9 @@ const manifests = import.meta.glob("../../../../plugins/*/manifest.json", {
 /**
  * Packages whose processors import Node built-ins cannot run in the webview.
  * They stay on the native engine (hash) or wait for a browser-safe processor
- * (uuid, packet AG-106). The worker's glob excludes the same directories.
+ * (packet AG-XXX). The worker's glob excludes the same directories.
  */
-export const NODE_ONLY_PACKAGES: readonly string[] = ["hash", "uuid"];
+export const NODE_ONLY_PACKAGES: readonly string[] = ["hash"];
 
 const packageDir = (path: string): string => path.split("/").at(-2) ?? path;
 
