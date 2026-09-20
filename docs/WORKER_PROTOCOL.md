@@ -51,7 +51,10 @@ and take the next packet.
   root dependencies, or CI, unless the packet lists those paths.
 - Keep source documents immutable, outputs complete by handle, and limits,
   cancellation, structured errors and provenance intact.
-- No new dependencies. Files in the index are LF.
+- No new dependencies. Third-party code a packet needs is vendored by the
+  integrator under `packages/vendor/` with its licence and provenance, and
+  the packet names it; a worker imports it and never edits it. Files in the
+  index are LF.
 - A package processor runs in the desktop webview's Worker engine as well as
   under Node, so it may use only web platform APIs: no `node:` imports (use
   `crypto.subtle`, `TextEncoder`, `Uint8Array`). A processor that needs a
