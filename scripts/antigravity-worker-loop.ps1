@@ -33,6 +33,7 @@ param(
   [int]$IntervalMinutes = 5,
   [int]$MaxWaitMinutes = 120,
   [ValidateSet('pro', 'flash', 'flash_lite')][string]$Model = 'pro',
+  [string]$ProjectId = $env:ANTIGRAVITY_PROJECT_ID,
   [switch]$Once
 )
 
@@ -56,12 +57,15 @@ function Connect-LanguageServer {
   if ($env:ANTIGRAVITY_LS_ADDRESS -and $env:ANTIGRAVITY_CSRF_TOKEN) { return }
   $repoTokens = ($root -split '[^A-Za-z0-9]+' | Where-Object { $_ }) | ForEach-Object { $_.ToLowerInvariant() }
   $servers = Get-CimInstance Win32_Process -Filter "Name = 'language_server_windows_x64.exe'" |
-    Where-Object { $_.CommandLine -match '--workspace_id' -and $_.CommandLine -match '--csrf_token' }
-  if (-not $servers) { Write-Error 'No Antigravity workspace language server is running. Open the repository (or its parent folder) in Antigravity first.' }
-  # Prefer the server whose workspace id shares the most path segments with this repository.
+    Where-Object { $_.CommandLine -match '--csrf_token' }
+  if (-not $servers) { Write-Error 'No Antigravity language server is running. Open Antigravity with the repository (or its parent folder) as the workspace first.' }
+  # Antigravity runs a manager server (no --workspace_id) that owns projects and
+  # conversations, plus one server per workspace that does not. Conversations must be
+  # started on the manager server, so it ranks first; workspace servers follow, closest
+  # path match first, as a fallback.
   $ranked = $servers | ForEach-Object {
     $id = ([regex]::Match($_.CommandLine, '--workspace_id\s+(\S+)')).Groups[1].Value.ToLowerInvariant()
-    $score = ($repoTokens | Where-Object { $id -match "(^|_)$([regex]::Escape($_))(_|$)" }).Count
+    $score = if ($id) { ($repoTokens | Where-Object { $id -match "(^|_)$([regex]::Escape($_))(_|$)" }).Count } else { 1000 }
     [pscustomobject]@{ Process = $_; Score = $score }
   } | Sort-Object Score -Descending
   foreach ($candidate in $ranked) {
@@ -84,6 +88,7 @@ function Connect-LanguageServer {
 }
 
 Connect-LanguageServer
+if ($ProjectId) { $env:ANTIGRAVITY_PROJECT_ID = $ProjectId }
 
 function Read-State {
   if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
@@ -123,7 +128,12 @@ function Start-Packet($issue) {
   Write-Host ("{0}  starting Antigravity ({1}) on issue #{2}: {3}" -f (Get-Date -Format 'HH:mm'), $Model, $issue.number, $issue.title)
   $out = Invoke-AgentApi new-conversation "--model=$Model" "--title=$title" $prompt
   $conversation = ([regex]::Match($out, '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}')).Value
-  if (-not $conversation) { Write-Warning "agentapi did not return a conversation id: $out"; return $null }
+  if (-not $conversation) {
+    Write-Warning "agentapi did not return a conversation id: $out"
+    if ($out -match 'project_id is required') { Write-Host '  Pass the Antigravity project id with -ProjectId (or set ANTIGRAVITY_PROJECT_ID).' }
+    if ($out -match 'projectsStore is nil') { Write-Host '  This server has no projects store; the manager server (the one without --workspace_id) must be running.' }
+    return $null
+  }
   Write-Host "  conversation $conversation"
   return $conversation
 }
