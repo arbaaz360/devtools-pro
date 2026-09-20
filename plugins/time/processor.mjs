@@ -25,7 +25,7 @@ function evaluateArithmetic(expr) {
     }
   }
   if (current) tokens.push(current);
-  
+
   if (tokens.length === 0) return NaN;
 
   for(let t of tokens) {
@@ -33,11 +33,13 @@ function evaluateArithmetic(expr) {
       throw new TimeError("invalid-token", `Invalid token in arithmetic expression: ${t}`);
     }
   }
-  
+
+  let hasArithmetic = false;
   let pos = 0;
   function parseExpr() {
     let val = parseTerm();
     while (pos < tokens.length && (tokens[pos] === '+' || tokens[pos] === '-')) {
+      hasArithmetic = true;
       const op = tokens[pos++];
       const right = parseTerm();
       if (op === '+') val += right;
@@ -45,10 +47,11 @@ function evaluateArithmetic(expr) {
     }
     return val;
   }
-  
+
   function parseTerm() {
     let val = parseFactor();
     while (pos < tokens.length && (tokens[pos] === '*' || tokens[pos] === '/')) {
+      hasArithmetic = true;
       const op = tokens[pos++];
       const right = parseFactor();
       if (op === '*') val *= right;
@@ -59,7 +62,7 @@ function evaluateArithmetic(expr) {
     }
     return val;
   }
-  
+
   function parseFactor() {
     if (pos >= tokens.length) throw new TimeError("invalid-expression", "Unexpected end of expression");
     let sign = 1;
@@ -69,11 +72,12 @@ function evaluateArithmetic(expr) {
     } else if (tokens[pos] === '+') {
       pos++;
     }
-    
+
     if (pos >= tokens.length) throw new TimeError("invalid-expression", "Unexpected end of expression");
-    
+
     if (tokens[pos] === '(') {
       pos++;
+      hasArithmetic = true;
       let val = parseExpr();
       if (pos >= tokens.length || tokens[pos] !== ')') {
         throw new TimeError("unbalanced-parentheses", "Unbalanced parentheses");
@@ -81,19 +85,19 @@ function evaluateArithmetic(expr) {
       pos++;
       return sign * val;
     }
-    
+
     const token = tokens[pos++];
     if (/[+/*()-]/.test(token)) throw new TimeError("invalid-expression", "Unexpected operator");
     if (isNaN(Number(token))) throw new TimeError("invalid-token", `Invalid token: ${token}`);
     return sign * Number(token);
   }
-  
+
   let val = parseExpr();
   if (pos < tokens.length) throw new TimeError("invalid-expression", "Invalid arithmetic expression");
-  
+
   if (!Number.isFinite(val)) throw new TimeError("non-finite", "Arithmetic expression resulted in a non-finite value");
-  
-  return { value: val, isExpr: tokens.length > 1 || (tokens.length === 1 && tokens[0].startsWith('+')) };
+
+  return { value: val, isExpr: hasArithmetic };
 }
 
 function parseInput(input) {
@@ -101,13 +105,13 @@ function parseInput(input) {
   if (ISO_REGEX.test(input)) {
     const millis = Date.parse(input);
     if (isNaN(millis)) throw new TimeError("invalid-date", "Invalid ISO 8601 date");
-    
+
     const match = input.match(/^([+-]?\d{4,})-(\d{2})-(\d{2})/);
     if (match) {
       const yearStr = match[1];
       const mStr = match[2];
       const dStr = match[3];
-      
+
       const test = new Date(Date.UTC(parseInt(yearStr, 10), parseInt(mStr, 10) - 1, parseInt(dStr, 10)));
       if (test.getUTCMonth() + 1 !== parseInt(mStr, 10)) {
         throw new TimeError("invalid-date", "Invalid ISO 8601 date: calendar date does not exist (e.g. leap day in non-leap year)");
@@ -117,11 +121,11 @@ function parseInput(input) {
     return { type: "iso", value: millis };
   }
 
-  
+
   if (/^\d{1,4}\/\d{1,2}\/\d{1,4}$/.test(input.replace(/\s+/g, '')) && !ISO_REGEX.test(input)) {
     throw new TimeError("ambiguous-date", "Ambiguous date format. Use ISO 8601 (YYYY-MM-DD)");
   }
-  
+
   try {
     const res = evaluateArithmetic(input);
     return { type: "numeric", value: res.value, isExpr: res.isExpr };
@@ -135,30 +139,30 @@ function getOutputs(millis, nowISO) {
   if (millis < -8640000000000000 || Math.ceil(millis) > 8640000000000000) {
     throw new TimeError("out-of-range", "Timestamp is outside the ECMAScript date range (±8,640,000,000,000,000 ms)");
   }
-  
+
   const d = new Date(millis);
   if (isNaN(d)) throw new TimeError("invalid-date", "Invalid date");
   const isoUtc = d.toISOString();
   const dateUtc = isoUtc.split("T")[0];
   const timeUtc = isoUtc.split("T")[1];
-  
+
   const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
   const dayOfYear = Math.floor((d - start) / 86400000);
-  
+
   const dateForWeek = new Date(d.getTime());
   dateForWeek.setUTCDate(dateForWeek.getUTCDate() + 4 - (dateForWeek.getUTCDay() || 7));
   const yearStart = new Date(Date.UTC(dateForWeek.getUTCFullYear(), 0, 1));
   const isoWeek = Math.ceil((((dateForWeek - yearStart) / 86400000) + 1) / 7);
-  
+
   const year = d.getUTCFullYear();
   const leapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
-  
+
   const weekdayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   const weekday = weekdayNames[d.getUTCDay()];
-  
+
   const now = new Date(nowISO).getTime();
   const diffSecs = Math.floor((millis - now) / 1000);
-  
+
   let relative;
   const abs = Math.abs(diffSecs);
   if (abs < 60) relative = diffSecs < 0 ? `${abs} seconds ago` : `in ${abs} seconds`;
@@ -166,7 +170,7 @@ function getOutputs(millis, nowISO) {
   else if (abs < 86400) relative = diffSecs < 0 ? `${Math.floor(abs/3600)} hours ago` : `in ${Math.floor(abs/3600)} hours`;
   else relative = diffSecs < 0 ? `${Math.floor(abs/86400)} days ago` : `in ${Math.floor(abs/86400)} days`;
   if (diffSecs === 0) relative = "now";
-  
+
   return {
     epochSeconds: millis / 1000,
     epochMilliseconds: millis,
@@ -183,26 +187,31 @@ function getOutputs(millis, nowISO) {
 
 export async function execute(request, context) {
   if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
-  
+
   const options = request?.options ?? {};
   const interpOption = options.interpretation ?? "auto";
   const msDigits = options["milliseconds-from-digits"] ?? 12;
-  
-  let inputRaw;
+
+  let bytes;
   try {
-    const bytes = await context.read("input");
-    inputRaw = new TextDecoder().decode(bytes);
-  } catch(e) {
-    inputRaw = "";
+    bytes = await context.read("input");
+  } catch (e) {
+    if (e instanceof Error && e.message.includes("named input")) {
+      bytes = undefined;
+    } else {
+      throw e;
+    }
   }
-  
+
+  let inputRaw = bytes ? new TextDecoder().decode(bytes) : "";
+
   const inputStr = inputRaw?.trim();
-  
+
   const nowISO = context.clock.now();
   let millis;
   let interpretation = "auto";
   let expression = false;
-  
+
   if (!inputStr) {
     millis = Date.parse(nowISO);
     interpretation = "now";
@@ -214,7 +223,7 @@ export async function execute(request, context) {
     } else {
       let numericVal = parsed.value;
       expression = parsed.isExpr;
-      
+
       let asMs = false;
       if (interpOption === "milliseconds") {
         asMs = true;
@@ -225,27 +234,27 @@ export async function execute(request, context) {
         if (intStr.length >= msDigits) asMs = true;
         else asMs = false;
       }
-      
+
       interpretation = asMs ? "milliseconds" : "seconds";
       millis = asMs ? numericVal : numericVal * 1000;
     }
   }
-  
+
   const outputs = getOutputs(millis, nowISO);
-  
+
   const resultObj = {
     ...outputs,
     interpretation
   };
   if (expression) resultObj.expression = true;
-  
+
   let textOut = "";
   for (const [k, v] of Object.entries(resultObj)) {
     textOut += `${k}: ${v}\n`;
   }
-  
+
   await context.writeValue("output", resultObj);
   await context.write("output", new TextEncoder().encode(textOut));
-  
+
   return resultObj;
 }

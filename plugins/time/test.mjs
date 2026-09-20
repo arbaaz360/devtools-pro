@@ -20,7 +20,9 @@ function harness(options, { input, clock = CLOCK, cancellation = new Cancellatio
 
 async function run(options, env) {
   const h = harness(options, env);
+  const before = h.reader.inputs.get("input") ? h.reader.inputs.get("input").slice() : null;
   const result = await h.execute();
+  if (before) assert.deepEqual(h.reader.inputs.get("input"), before, "source bytes must be untouched");
   const value = h.outputs.values.get("output");
   assert.deepEqual(result, value, "execute returns the value written to the output port");
   const outputText = text(h.outputs.bytes.get("output"));
@@ -112,5 +114,8 @@ assert.equal(rel2.value.relative, "3 days ago");
 
 // Ambiguous
 await rejects({}, { input: "01/02/2024" }, /Ambiguous date format. Use ISO 8601/);
+
+// Input limit
+await rejects({}, { input: "1".repeat(4097), limits: { maxInputBytes: 4096 } }, /exceeds/);
 
 console.log("Passed!");

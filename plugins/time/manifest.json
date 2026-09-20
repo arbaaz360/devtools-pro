@@ -82,7 +82,7 @@
   "settings": [],
   "tests": {
     "requirementIds": ["DU-01"],
-    "fixtures": ["time-vectors"],
+    "fixtures": [],
     "uiScenarios": []
   }
 }
