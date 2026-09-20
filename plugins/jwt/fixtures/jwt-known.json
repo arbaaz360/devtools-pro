@@ -1,0 +1,16 @@
+{
+  "hs256": {
+    "note": "The canonical jwt.io HS256 example, reused verbatim in this packet's own headless Checks.",
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "secret": "your-256-bit-secret",
+    "header": { "alg": "HS256", "typ": "JWT" },
+    "payload": { "sub": "1234567890", "name": "John Doe", "iat": 1516239022 }
+  },
+  "rs256": {
+    "note": "Self-generated with crypto.subtle (RSASSA-PKCS1-v1_5, 2048-bit): no network access was available in this environment to confirm the literal RFC 7515 Appendix A.2 constants, so this fixture is a self-sourced static RS256 vector instead of that historical one. See README Limitations.",
+    "token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFkYSBMb3ZlbGFjZSIsImlhdCI6MTcwMDAwMDAwMH0.h-zDUwn-Z-MiZKSvaM0F7YTYUThI0CvYDH96we1gMfkR5AtTHM-RnLT25rtnYqWvZ47xpHmcq_98gylPjNljoOmo7MlqID-ht0KfuNFOXx2F5ptTxLGa6caRFuKDYKkLbMl8GLXjJ-udRJ5KDPM4TYTaLCJU5ynyXW_10LmrY42FvF6KaUNQXvvQa4Um4N0t54ZYNWWMs3K5Sx1TctLcnjpJ9pJr6kV7l_h8KIZxksJcjQWPu8GUiMsX3IBJsNZklLK19YRDOCJOGtpiYWt04Lw8IkCf6388CPe4p0CLQCBOr6vukXGBcqySKvZY4dwuEjCw8ou43ERFBMHZ9-U45A",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1mOw2vP5zN20w9778VTy\n6L6Ki9Vw6fO9KpHemtXSRt0ZPXbVZgLKoanunch+1Ovjp1z5nInxKIpTZWpGU74o\na3OIHdmRTqjI5YCZ2zotny5Xb8Ie7Pjm6v3+9uV5Yo1A5XfCsl9qQ6cMCmdGHcM+\nYjSkM3OWkGuOx2HlKziWKD4AnOdu7MWyW875GJFuJ0s1pl9smAvOd51yybyPn0Oh\nhluJIoQuvBEN7FvzbM3PXqcc8g7XJNHXZ4JsQU4p+8Bon1MUcHKrnPm16rS7sJaR\n1vgnOfnySrTJoPl5HD0/PlVytJazIHJc3yt9uJ9NPJk04tX4ZwjjciiP4BTqNKwF\nWwIDAQAB\n-----END PUBLIC KEY-----\n",
+    "header": { "alg": "RS256", "typ": "JWT" },
+    "payload": { "sub": "1234567890", "name": "Ada Lovelace", "iat": 1700000000 }
+  }
+}

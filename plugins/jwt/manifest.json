@@ -1,0 +1,28 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "security.jwt",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "JWT Decoder & Verifier",
+  "description": "Decodes a JSON Web Token into header, payload and signature, verifies HS/RS/PS/ES signatures offline against a caller-supplied key, and reports claim validity (expiry, not-before) separately from signature validity.",
+  "tools": [{"id":"security.jwt","title":"JWT Decoder & Verifier","category":"security","operationIds":["security.jwt"],"workspaceId":"jwt"}],
+  "operations": [{
+    "id":"security.jwt",
+    "title":"Decode and verify a JSON Web Token",
+    "executor":{"kind":"javascriptWorker","id":"security.jwt.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","label":"Token","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain"],"representations":["properties","text"],"sensitive":false,"exports":["copyText","save"]}],
+    "options":[
+      {"id":"key","type":"string","label":"Key","default":"","persistence":"none","sensitive":true},
+      {"id":"secret-encoding","type":"enum","label":"Secret Encoding","default":"utf8","choices":[{"id":"utf8","label":"UTF-8"},{"id":"base64","label":"Base64"},{"id":"base64url","label":"Base64url"}],"persistence":"instance","sensitive":false},
+      {"id":"clock-tolerance-seconds","type":"integer","label":"Clock Tolerance (seconds)","default":"0","minimum":"0","persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
+    "limits":{"maxInputBytes":"65536","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"1000"}
+  }],
+  "workspaces":[{"id":"jwt","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":["DU-04"],"fixtures":["jwt-known","jwt-malformed"],"uiScenarios":[]}
+}
