@@ -1,0 +1,81 @@
+[
+  {
+    "name": "basic minify",
+    "dialect": "sql",
+    "options": {
+      "keywordCase": "upper"
+    },
+    "input": "SELECT\n  a,\n  b\nFROM\n  c\nWHERE\n  d = 1;",
+    "output": "SELECT a,b FROM c WHERE d=1;"
+  },
+  {
+    "name": "remove comments",
+    "dialect": "sql",
+    "options": {},
+    "input": "select /* comment */ a -- comment\n from t;",
+    "output": "select /* comment */a -- comment\nfrom t;"
+  },
+  {
+    "name": "extra minify 0",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 0 from t;",
+    "output": "select 0 from t;"
+  },
+  {
+    "name": "extra minify 1",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 1 from t;",
+    "output": "select 1 from t;"
+  },
+  {
+    "name": "extra minify 2",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 2 from t;",
+    "output": "select 2 from t;"
+  },
+  {
+    "name": "extra minify 3",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 3 from t;",
+    "output": "select 3 from t;"
+  },
+  {
+    "name": "extra minify 4",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 4 from t;",
+    "output": "select 4 from t;"
+  },
+  {
+    "name": "extra minify 5",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 5 from t;",
+    "output": "select 5 from t;"
+  },
+  {
+    "name": "extra minify 6",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 6 from t;",
+    "output": "select 6 from t;"
+  },
+  {
+    "name": "extra minify 7",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 7 from t;",
+    "output": "select 7 from t;"
+  },
+  {
+    "name": "extra minify 8",
+    "dialect": "sql",
+    "options": {},
+    "input": "select 8 from t;",
+    "output": "select 8 from t;"
+  }
+]
