@@ -12,11 +12,16 @@ Open packets are GitHub issues labelled `packet` and `ready`:
 gh issue list --repo arbaaz360/devtools-pro --state open --label packet --label ready
 ```
 
-Take the lowest-numbered issue whose labels include your vendor label
-(`antigravity`, `claude`) or no vendor label. The issue links the packet file
-under `docs/packets/`; read it from `main`. The packet is the whole
-specification. If it is ambiguous, ask (see *Blocked and questions*); do not
-guess.
+Every packet carries exactly one lane label, `antigravity` or `claude`, and a
+worker takes only issues in its own lane; a packet in the other lane is not
+yours even if it is `ready`. The Antigravity worker does not look for work at
+all: the dispatcher on the owner's machine sends it one packet at a time and
+it takes nothing else until that packet is accepted, so review rounds never
+overlap with new work in the same checkout. The Claude worker takes the
+lowest-numbered `ready` issue in the `claude` lane, one per run. The issue
+links the packet file under `docs/packets/`; read it from `main`. The packet
+is the whole specification. If it is ambiguous, ask (see *Blocked and
+questions*); do not guess.
 
 ## Automatic dispatch (Antigravity)
 
