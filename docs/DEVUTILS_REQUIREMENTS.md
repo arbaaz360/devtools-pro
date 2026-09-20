@@ -16,10 +16,10 @@ the webview worker engine (see
 
 | ID | Tool | Tool id | Engine | State |
 |---|---|---|---|---|
-| DU-01 | Unix timestamp converter | `time.unix` | js | in review (AG-103, PR #36) |
+| DU-01 | Unix timestamp converter | `time.unix` | js | usable |
 | DU-02 | JSON formatter/validator | `structured.json` | rust | usable |
 | DU-03 | RegExp tester | `text.regex` | — | planned, needs shell work |
-| DU-04 | JWT decode/verify | `security.jwt` | js | packet ready (AG-109) |
+| DU-04 | JWT decode/verify | `security.jwt` | js | usable |
 | DU-05 | URL encode/decode | `text.url` | rust | usable |
 | DU-06 | Base64 text | `encoding.base64-text` | js | usable |
 | DU-07 | URL / query parser | `web.url-parser` | js | usable |
@@ -44,7 +44,7 @@ the webview worker engine (see
 | DU-26 | SQL formatter | `format.sql` | js | packet ready (AG-111) |
 | DU-27 | String case converter | `text.case` | js | usable |
 
-Usable: 10 of 27. Queued or in review: 3. Packets ready: 7. Needs shell
+Usable: 12 of 27. Queued: 2. Packets ready: 5. Needs shell
 work: 5. Beyond these 27, the wider catalogue is in
 [PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
 
