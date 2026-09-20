@@ -2,7 +2,7 @@
 
 ## Branch
 
-`antigravity/AG-113-css-formatter` from the latest `origin/main`. Record the
+`claude/AG-113-css-formatter` from the latest `origin/main`. Record the
 base SHA.
 
 ## Allowed files

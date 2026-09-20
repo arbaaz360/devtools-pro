@@ -32,8 +32,8 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-109 | JWT decoder and verifier package (DU-04) | claude | ready |
 | AG-110 | YAML ↔ JSON package (DU-17, DU-18) | claude | ready |
 | AG-111 | SQL formatter package (DU-26) | antigravity | ready |
-| AG-112 | XML beautifier and minifier package (DU-16) | antigravity | ready |
-| AG-113 | CSS beautifier and minifier package (DU-14) | antigravity | ready |
+| AG-112 | XML beautifier and minifier package (DU-16) | claude | ready |
+| AG-113 | CSS beautifier and minifier package (DU-14) | claude | ready |
 | AG-114 | HTML beautifier and minifier package (DU-13) | claude | ready |
 | AG-115 | JavaScript beautifier and minifier package (DU-15) | antigravity | ready |
 

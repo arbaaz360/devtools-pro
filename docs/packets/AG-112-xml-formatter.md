@@ -2,7 +2,7 @@
 
 ## Branch
 
-`antigravity/AG-112-xml-formatter` from the latest `origin/main`. Record the
+`claude/AG-112-xml-formatter` from the latest `origin/main`. Record the
 base SHA.
 
 ## Allowed files
