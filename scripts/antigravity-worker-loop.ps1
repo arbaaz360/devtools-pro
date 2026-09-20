@@ -25,6 +25,11 @@
   READY_FOR_NATIVE_REVIEW, when the pull request is merged or closed, when the issue
   closes, or when the wait limit passes.
 
+  Before starting a new packet, the loop looks for any open antigravity/* pull request
+  whose latest verdict is CHANGES_REQUESTED and has not been forwarded yet, and tracks
+  that packet again first. A review that lands after a release, a timeout or a loop
+  restart is therefore still relayed. Forwarded comment ids persist in the state file.
+
 .PARAMETER IntervalMinutes
   Minutes between GitHub polls. Default 5.
 .PARAMETER MaxWaitMinutes
@@ -115,15 +120,46 @@ function Read-State {
   if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
   return [pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @() }
 }
+function Set-Tracked($state, $issue, $packet) {
+  $startedAt = if ($issue) { (Get-Date).ToString('o') } else { $null }
+  $conversation = if ($issue) { $ConversationId } else { $null }
+  Write-State ([pscustomobject]@{ issue = $issue; packet = $packet; conversation = $conversation; startedAt = $startedAt; forwarded = @($state.forwarded) })
+}
+$packetLine = '(?m)^\s*Packet:\s*(docs/packets/[A-Za-z0-9._-]+\.md)'
+$verdictLine = '^\s*\[[A-Z]+-\d+\]\[(CHANGES_REQUESTED|CI_BLOCKED|READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]'
+
+function Get-LatestVerdict($prNumber) {
+  $comments = gh api "repos/$repo/issues/$prNumber/comments?per_page=100" | ConvertFrom-Json
+  $verdicts = @($comments | Where-Object { $_.body -match $verdictLine })
+  if ($verdicts.Count -eq 0) { return $null }
+  return $verdicts[-1]
+}
 function Write-State($state) { $state | ConvertTo-Json | Set-Content $statePath -Encoding UTF8 }
 
 function Get-ReadyIssue {
   $issues = gh issue list --repo $repo --state open --label packet --label ready --label antigravity --json number,title,body | ConvertFrom-Json
   if (-not $issues) { return $null }
   $issue = $issues | Sort-Object number | Select-Object -First 1
-  $packet = ([regex]::Match($issue.body, '(?m)^\s*Packet:\s*(docs/packets/[A-Za-z0-9._-]+\.md)')).Groups[1].Value
+  $packet = ([regex]::Match($issue.body, $packetLine)).Groups[1].Value
   if (-not $packet) { Write-Warning "issue #$($issue.number) has no Packet line; skipping"; return $null }
   return [pscustomobject]@{ number = $issue.number; title = $issue.title; packet = $packet }
+}
+
+# An open antigravity/* pull request whose latest verdict is CHANGES_REQUESTED and not yet
+# forwarded. Its packet is tracked again so the verdict reaches the agent.
+function Get-PendingReview($state) {
+  $prs = gh pr list --repo $repo --state open --json number,body,headRefName | ConvertFrom-Json
+  foreach ($pr in ($prs | Where-Object { $_.headRefName -like 'antigravity/*' } | Sort-Object number)) {
+    $packet = ([regex]::Match($pr.body, $packetLine)).Groups[1].Value
+    if (-not $packet) { continue }
+    $latest = Get-LatestVerdict $pr.number
+    if (-not $latest -or $latest.body -notmatch '\]\[CHANGES_REQUESTED\]' -or ($state.forwarded -contains $latest.id)) { continue }
+    $issues = gh issue list --repo $repo --state open --label packet --json number,body | ConvertFrom-Json
+    $issue = $issues | Where-Object { $_.body -match [regex]::Escape($packet) } | Sort-Object number | Select-Object -First 1
+    if (-not $issue) { continue }
+    return [pscustomobject]@{ number = $issue.number; packet = $packet; pr = $pr.number }
+  }
+  return $null
 }
 
 function Test-InFlight($state) {
@@ -143,10 +179,8 @@ function Test-InFlight($state) {
     return $false
   }
   # Under review. Forward each CHANGES_REQUESTED verdict once; release on acceptance.
-  $comments = gh api "repos/$repo/issues/$($pr.number)/comments?per_page=100" | ConvertFrom-Json
-  $verdicts = @($comments | Where-Object { $_.body -match '^\s*\[[A-Z]+-\d+\]\[(CHANGES_REQUESTED|CI_BLOCKED|READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]' })
-  if ($verdicts.Count -eq 0) { return $true }
-  $latest = $verdicts[-1]
+  $latest = Get-LatestVerdict $pr.number
+  if (-not $latest) { return $true }
   if ($latest.body -match '\]\[(READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]') {
     Write-Host "packet #$($state.issue): reviewer accepted PR #$($pr.number); releasing"
     return $false
@@ -180,16 +214,23 @@ while ($true) {
   if (Test-InFlight $state) {
     Write-Host ("{0}  packet #{1} in flight" -f (Get-Date -Format 'HH:mm'), $state.issue)
   } else {
-    $issue = Get-ReadyIssue
-    if ($issue) {
-      $conversation = Start-Packet $issue
-      if ($conversation) {
-        Write-State ([pscustomobject]@{ issue = $issue.number; packet = $issue.packet; conversation = $conversation; startedAt = (Get-Date).ToString('o'); forwarded = @() })
-        if ($Once) { break }
-      }
+    $pending = Get-PendingReview $state
+    if ($pending) {
+      Write-Host ("{0}  PR #{1} has an unforwarded review; tracking packet #{2} again" -f (Get-Date -Format 'HH:mm'), $pending.pr, $pending.number)
+      Set-Tracked $state $pending.number $pending.packet
+      [void](Test-InFlight (Read-State))
     } else {
-      if ($state.issue) { Write-State ([pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @() }) }
-      Write-Host ("{0}  no ready packets" -f (Get-Date -Format 'HH:mm'))
+      $issue = Get-ReadyIssue
+      if ($issue) {
+        $conversation = Start-Packet $issue
+        if ($conversation) {
+          Set-Tracked $state $issue.number $issue.packet
+          if ($Once) { break }
+        }
+      } else {
+        if ($state.issue) { Set-Tracked $state $null $null }
+        Write-Host ("{0}  no ready packets" -f (Get-Date -Format 'HH:mm'))
+      }
     }
   }
   Start-Sleep -Seconds ($IntervalMinutes * 60)
