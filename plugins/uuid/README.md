@@ -32,12 +32,12 @@ accepted, default `v4`), `count` (integer or decimal string, 1–100, default 1)
 | v1 | `context.clock.now()` parsed as ISO 8601 → 100-ns ticks since 1582-10-15; then **8 randomness bytes per batch**: clock sequence (variant forced) and node (multicast bit forced, RFC 4122 §4.5). Value *i* of the batch uses `ticks + i`, so one batch is sortable and shares clock sequence and node | Same clock and seed → same batch |
 | v3 / v5 | MD5 / SHA-1 over the 16 namespace bytes followed by the UTF-8 name, RFC 4122 §4.3 | Always; clock and randomness are not consulted |
 
-Namespace presets `dns`, `url`, `oid`, `x500` (case-insensitive, surrounding
-whitespace ignored) map to the RFC 4122 Appendix C UUIDs; any canonical UUID is
+Namespace presets `dns`, `url`, `oid`, `x500`, `random` (case-insensitive, surrounding
+whitespace ignored) map to the RFC 4122 Appendix C UUIDs; for `random`, a v4 UUID is generated
+from `context.randomness`. Any canonical UUID is
 accepted as a custom namespace. The default namespace is `dns`. The name must
 be a non-empty string whose UTF-8 length does not exceed
-`context.limits.maxInputBytes`. There is no `random` namespace preset: a host
-that wants one supplies a v4 UUID as a custom namespace.
+`context.limits.maxInputBytes`.
 
 v1 rejects clocks that are not ISO 8601 strings and clocks outside the 60-bit
 range (before `1582-10-15T00:00:00Z` or after `5236-03-31T21:21:00.684Z`,
@@ -72,6 +72,7 @@ Surrounding whitespace on the input port is ignored but kept in `source`.
 - `origin` is `input` (port) or `option` (`uuid` option); the port wins when both exist.
 - `version` is the high nibble of byte 6, reported for every variant (0–15).
 - `variant` follows byte 8: `NCS` (`0xxx`), `RFC 4122` (`10xx`), `Microsoft` (`110x`), `future` (`111x`).
+- `special` is `"nil"` for `00000000-0000-0000-0000-000000000000`, `"max"` for `ffffffff-ffff-ffff-ffff-ffffffffffff`, otherwise `null`.
 - Time fields are emitted only for `version === 1` **and** variant `RFC 4122`:
   `timestamp` (ISO 8601 UTC with all seven fractional digits, floor-divided so
   pre-1970 values are exact), `ticks` (decimal string of the 60-bit count),

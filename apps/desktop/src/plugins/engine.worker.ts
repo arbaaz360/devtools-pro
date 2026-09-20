@@ -14,7 +14,6 @@ import type { RunError, RunOutcome, RunRequest } from "./protocol.ts";
 const processors = import.meta.glob([
   "../../../../plugins/*/processor.mjs",
   "!../../../../plugins/hash/processor.mjs",
-  "!../../../../plugins/uuid/processor.mjs",
 ]) as Record<string, () => Promise<Processor>>;
 
 interface Processor {

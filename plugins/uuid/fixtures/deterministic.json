@@ -3,45 +3,267 @@
     "name": "v4-seed42-count3",
     "clock": "2025-01-01T00:00:00.000Z",
     "seed": 42,
-    "options": {"version": "v4", "count": 3},
+    "options": {
+      "version": "v4",
+      "count": 3
+    },
     "text": "28ac03c0-c4b6-48ae-9337-da3364e0a9d9\nd094e352-6903-446a-a8bf-e4cf7d2df2da\nf8ee5168-15aa-49f8-a486-3815bc8b0f57\n",
-    "value": {"mode": "generate", "version": 4, "count": 3, "case": "lower", "randomness": "seed:42"},
-    "first": {"uuid": "28ac03c0-c4b6-48ae-9337-da3364e0a9d9", "version": 4, "variant": "RFC 4122", "bytes": [40, 172, 3, 192, 196, 182, 72, 174, 147, 55, 218, 51, 100, 224, 169, 217], "hexadecimal": "28ac03c0c4b648ae9337da3364e0a9d9"}
+    "value": {
+      "mode": "generate",
+      "version": 4,
+      "count": 3,
+      "case": "lower",
+      "randomness": "seed:42"
+    },
+    "first": {
+      "uuid": "28ac03c0-c4b6-48ae-9337-da3364e0a9d9",
+      "version": 4,
+      "variant": "RFC 4122",
+      "bytes": [
+        40,
+        172,
+        3,
+        192,
+        196,
+        182,
+        72,
+        174,
+        147,
+        55,
+        218,
+        51,
+        100,
+        224,
+        169,
+        217
+      ],
+      "hexadecimal": "28ac03c0c4b648ae9337da3364e0a9d9"
+    }
   },
   {
     "name": "v1-seed42-count3",
     "clock": "2025-01-01T00:00:00.000Z",
     "seed": 42,
-    "options": {"version": "v1", "count": "3"},
+    "options": {
+      "version": "v1",
+      "count": "3"
+    },
     "text": "57fd0000-c7d3-11ef-a8ac-03c0c4b6d8ae\n57fd0001-c7d3-11ef-a8ac-03c0c4b6d8ae\n57fd0002-c7d3-11ef-a8ac-03c0c4b6d8ae\n",
-    "value": {"mode": "generate", "version": 1, "count": 3, "case": "lower", "clock": "2025-01-01T00:00:00.000Z", "randomness": "seed:42"},
-    "first": {"uuid": "57fd0000-c7d3-11ef-a8ac-03c0c4b6d8ae", "version": 1, "variant": "RFC 4122", "bytes": [87, 253, 0, 0, 199, 211, 17, 239, 168, 172, 3, 192, 196, 182, 216, 174], "hexadecimal": "57fd0000c7d311efa8ac03c0c4b6d8ae", "timestamp": "2025-01-01T00:00:00.0000000Z", "ticks": "139549824000000000", "clockSequence": 10412, "node": "03:c0:c4:b6:d8:ae", "multicast": true}
+    "value": {
+      "mode": "generate",
+      "version": 1,
+      "count": 3,
+      "case": "lower",
+      "clock": "2025-01-01T00:00:00.000Z",
+      "randomness": "seed:42"
+    },
+    "first": {
+      "uuid": "57fd0000-c7d3-11ef-a8ac-03c0c4b6d8ae",
+      "version": 1,
+      "variant": "RFC 4122",
+      "bytes": [
+        87,
+        253,
+        0,
+        0,
+        199,
+        211,
+        17,
+        239,
+        168,
+        172,
+        3,
+        192,
+        196,
+        182,
+        216,
+        174
+      ],
+      "hexadecimal": "57fd0000c7d311efa8ac03c0c4b6d8ae",
+      "timestamp": "2025-01-01T00:00:00.0000000Z",
+      "ticks": "139549824000000000",
+      "clockSequence": 10412,
+      "node": "03:c0:c4:b6:d8:ae",
+      "multicast": true
+    }
   },
   {
     "name": "v1-seed42-upper",
     "clock": "2025-01-01T00:00:00.000Z",
     "seed": 42,
-    "options": {"version": "1", "count": 1, "case": "upper"},
+    "options": {
+      "version": "1",
+      "count": 1,
+      "case": "upper"
+    },
     "text": "57FD0000-C7D3-11EF-A8AC-03C0C4B6D8AE\n",
-    "value": {"mode": "generate", "version": 1, "count": 1, "case": "upper", "clock": "2025-01-01T00:00:00.000Z", "randomness": "seed:42"},
-    "first": {"uuid": "57FD0000-C7D3-11EF-A8AC-03C0C4B6D8AE", "version": 1, "variant": "RFC 4122", "bytes": [87, 253, 0, 0, 199, 211, 17, 239, 168, 172, 3, 192, 196, 182, 216, 174], "hexadecimal": "57FD0000C7D311EFA8AC03C0C4B6D8AE", "timestamp": "2025-01-01T00:00:00.0000000Z", "ticks": "139549824000000000", "clockSequence": 10412, "node": "03:C0:C4:B6:D8:AE", "multicast": true}
+    "value": {
+      "mode": "generate",
+      "version": 1,
+      "count": 1,
+      "case": "upper",
+      "clock": "2025-01-01T00:00:00.000Z",
+      "randomness": "seed:42"
+    },
+    "first": {
+      "uuid": "57FD0000-C7D3-11EF-A8AC-03C0C4B6D8AE",
+      "version": 1,
+      "variant": "RFC 4122",
+      "bytes": [
+        87,
+        253,
+        0,
+        0,
+        199,
+        211,
+        17,
+        239,
+        168,
+        172,
+        3,
+        192,
+        196,
+        182,
+        216,
+        174
+      ],
+      "hexadecimal": "57FD0000C7D311EFA8AC03C0C4B6D8AE",
+      "timestamp": "2025-01-01T00:00:00.0000000Z",
+      "ticks": "139549824000000000",
+      "clockSequence": 10412,
+      "node": "03:C0:C4:B6:D8:AE",
+      "multicast": true
+    }
   },
   {
     "name": "v4-headless-seed1-count2",
     "clock": "2025-01-01T00:00:00Z",
     "seed": 1,
-    "options": {"version": "v4", "count": 2},
+    "options": {
+      "version": "v4",
+      "count": 2
+    },
     "text": "2101c54f-d1d0-4ab2-a574-cb378aaef5b1\n08089119-33b9-4b4f-b229-a5e4db3e5714\n",
-    "value": {"mode": "generate", "version": 4, "count": 2, "case": "lower", "randomness": "seed:1"},
-    "first": {"uuid": "2101c54f-d1d0-4ab2-a574-cb378aaef5b1", "version": 4, "variant": "RFC 4122", "bytes": [33, 1, 197, 79, 209, 208, 74, 178, 165, 116, 203, 55, 138, 174, 245, 177], "hexadecimal": "2101c54fd1d04ab2a574cb378aaef5b1"}
+    "value": {
+      "mode": "generate",
+      "version": 4,
+      "count": 2,
+      "case": "lower",
+      "randomness": "seed:1"
+    },
+    "first": {
+      "uuid": "2101c54f-d1d0-4ab2-a574-cb378aaef5b1",
+      "version": 4,
+      "variant": "RFC 4122",
+      "bytes": [
+        33,
+        1,
+        197,
+        79,
+        209,
+        208,
+        74,
+        178,
+        165,
+        116,
+        203,
+        55,
+        138,
+        174,
+        245,
+        177
+      ],
+      "hexadecimal": "2101c54fd1d04ab2a574cb378aaef5b1"
+    }
   },
   {
     "name": "v1-headless-seed1-count2",
     "clock": "2025-01-01T00:00:00Z",
     "seed": 1,
-    "options": {"version": "v1", "count": 2},
+    "options": {
+      "version": "v1",
+      "count": 2
+    },
     "text": "57fd0000-c7d3-11ef-a101-c54fd1d01ab2\n57fd0001-c7d3-11ef-a101-c54fd1d01ab2\n",
-    "value": {"mode": "generate", "version": 1, "count": 2, "case": "lower", "clock": "2025-01-01T00:00:00Z", "randomness": "seed:1"},
-    "first": {"uuid": "57fd0000-c7d3-11ef-a101-c54fd1d01ab2", "version": 1, "variant": "RFC 4122", "bytes": [87, 253, 0, 0, 199, 211, 17, 239, 161, 1, 197, 79, 209, 208, 26, 178], "hexadecimal": "57fd0000c7d311efa101c54fd1d01ab2", "timestamp": "2025-01-01T00:00:00.0000000Z", "ticks": "139549824000000000", "clockSequence": 8449, "node": "c5:4f:d1:d0:1a:b2", "multicast": true}
+    "value": {
+      "mode": "generate",
+      "version": 1,
+      "count": 2,
+      "case": "lower",
+      "clock": "2025-01-01T00:00:00Z",
+      "randomness": "seed:1"
+    },
+    "first": {
+      "uuid": "57fd0000-c7d3-11ef-a101-c54fd1d01ab2",
+      "version": 1,
+      "variant": "RFC 4122",
+      "bytes": [
+        87,
+        253,
+        0,
+        0,
+        199,
+        211,
+        17,
+        239,
+        161,
+        1,
+        197,
+        79,
+        209,
+        208,
+        26,
+        178
+      ],
+      "hexadecimal": "57fd0000c7d311efa101c54fd1d01ab2",
+      "timestamp": "2025-01-01T00:00:00.0000000Z",
+      "ticks": "139549824000000000",
+      "clockSequence": 8449,
+      "node": "c5:4f:d1:d0:1a:b2",
+      "multicast": true
+    }
+  },
+  {
+    "name": "v5-headless-seed1-random",
+    "clock": "2025-01-01T00:00:00Z",
+    "seed": 1,
+    "options": {
+      "version": "v5",
+      "namespace": "random",
+      "name": "www.example.com"
+    },
+    "text": "f5882713-b619-5809-af17-d7372e520983\n",
+    "value": {
+      "mode": "generate",
+      "version": 5,
+      "count": 1,
+      "case": "lower",
+      "namespace": "2101c54f-d1d0-4ab2-a574-cb378aaef5b1",
+      "name": "www.example.com"
+    },
+    "first": {
+      "uuid": "f5882713-b619-5809-af17-d7372e520983",
+      "version": 5,
+      "variant": "RFC 4122",
+      "bytes": [
+        245,
+        136,
+        39,
+        19,
+        182,
+        25,
+        88,
+        9,
+        175,
+        23,
+        215,
+        55,
+        46,
+        82,
+        9,
+        131
+      ],
+      "hexadecimal": "f5882713b6195809af17d7372e520983"
+    }
   }
 ]
