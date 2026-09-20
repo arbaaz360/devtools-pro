@@ -18,14 +18,18 @@
   Every interval the loop asks GitHub (with `gh`, no model tokens) for open issues labelled
   packet + ready + antigravity. If one exists and no packet is in flight, it sends the
   lowest-numbered one to that conversation as docs/antigravity/WORKER_PROMPT.md.
-  A packet is in flight until a pull request whose body carries its `Packet:` line exists, or
-  its issue is no longer open, or the wait limit passes. The reviewer routine takes over from
-  the pull request onward.
+  A packet stays in flight while the agent works and while its pull request is under
+  review: each `[ID][CHANGES_REQUESTED]` verdict the reviewer posts on that pull request
+  is forwarded into the conversation once, so the agent fixes and re-posts its status.
+  The packet is released when the reviewer posts READY_TO_MERGE or
+  READY_FOR_NATIVE_REVIEW, when the pull request is merged or closed, when the issue
+  closes, or when the wait limit passes.
 
 .PARAMETER IntervalMinutes
   Minutes between GitHub polls. Default 5.
 .PARAMETER MaxWaitMinutes
-  How long one packet may stay in flight before the loop moves on. Default 120.
+  How long one packet may stay in flight, including review rounds, before the loop
+  moves on. Default 240.
 .PARAMETER ConversationId
   The Antigravity conversation to send packets to. Default: the most recently used one.
 .PARAMETER Once
@@ -36,7 +40,7 @@
 #>
 param(
   [int]$IntervalMinutes = 5,
-  [int]$MaxWaitMinutes = 120,
+  [int]$MaxWaitMinutes = 240,
   [string]$ConversationId,
   [switch]$Once
 )
@@ -105,7 +109,7 @@ Write-Host "dispatching to conversation $ConversationId"
 
 function Read-State {
   if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
-  return [pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null }
+  return [pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @() }
 }
 function Write-State($state) { $state | ConvertTo-Json | Set-Content $statePath -Encoding UTF8 }
 
@@ -127,10 +131,28 @@ function Test-InFlight($state) {
   }
   $open = gh issue view $state.issue --repo $repo --json state --jq .state
   if ($open -ne 'OPEN') { return $false }
-  $prs = gh pr list --repo $repo --state all --search "`"Packet: $($state.packet)`" in:body" --json number | ConvertFrom-Json
-  if ($prs -and $prs.Count -gt 0) {
-    Write-Host "packet #$($state.issue) has PR #$($prs[0].number); handing over to the reviewer"
+  $prs = gh pr list --repo $repo --state all --search "`"Packet: $($state.packet)`" in:body" --json number,state | ConvertFrom-Json
+  if (-not $prs -or $prs.Count -eq 0) { return $true }   # still working, no PR yet
+  $pr = $prs[0]
+  if ($pr.state -ne 'OPEN') {
+    Write-Host "packet #$($state.issue): PR #$($pr.number) is $($pr.state); releasing"
     return $false
+  }
+  # Under review. Forward each CHANGES_REQUESTED verdict once; release on acceptance.
+  $comments = gh api "repos/$repo/issues/$($pr.number)/comments?per_page=100" | ConvertFrom-Json
+  $verdicts = @($comments | Where-Object { $_.body -match '^\s*\[[A-Z]+-\d+\]\[(CHANGES_REQUESTED|CI_BLOCKED|READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]' })
+  if ($verdicts.Count -eq 0) { return $true }
+  $latest = $verdicts[-1]
+  if ($latest.body -match '\]\[(READY_TO_MERGE|READY_FOR_NATIVE_REVIEW)\]') {
+    Write-Host "packet #$($state.issue): reviewer accepted PR #$($pr.number); releasing"
+    return $false
+  }
+  if ($latest.body -match '\]\[CHANGES_REQUESTED\]' -and ($state.forwarded -notcontains $latest.id)) {
+    $text = "The integrator reviewed your pull request #$($pr.number) for issue #$($state.issue) and requested changes. Address every numbered item below on the same branch, run the packet's Checks again, push, and post a new [ID][STATUS] comment on the PR. Do not open a new PR. Review comment:`n`n$($latest.body)"
+    Write-Host ("{0}  forwarding CHANGES_REQUESTED on PR #{1} to Antigravity" -f (Get-Date -Format 'HH:mm'), $pr.number)
+    $out = Invoke-AgentApi send-message "--title=[review] PR #$($pr.number)" $ConversationId $text
+    if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "forwarding failed: $out" }
+    else { $state.forwarded = @($state.forwarded) + $latest.id; Write-State $state }
   }
   return $true
 }
@@ -158,11 +180,11 @@ while ($true) {
     if ($issue) {
       $conversation = Start-Packet $issue
       if ($conversation) {
-        Write-State ([pscustomobject]@{ issue = $issue.number; packet = $issue.packet; conversation = $conversation; startedAt = (Get-Date).ToString('o') })
+        Write-State ([pscustomobject]@{ issue = $issue.number; packet = $issue.packet; conversation = $conversation; startedAt = (Get-Date).ToString('o'); forwarded = @() })
         if ($Once) { break }
       }
     } else {
-      if ($state.issue) { Write-State ([pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null }) }
+      if ($state.issue) { Write-State ([pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @() }) }
       Write-Host ("{0}  no ready packets" -f (Get-Date -Format 'HH:mm'))
     }
   }
