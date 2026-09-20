@@ -1,0 +1,88 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "time.unix",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Unix Timestamp Converter",
+  "description": "Convert Unix timestamps to and from ISO dates and relative times.",
+  "tools": [
+    {
+      "id": "time.unix",
+      "title": "Unix Timestamp Converter",
+      "category": "generator",
+      "operationIds": ["time.unix"],
+      "workspaceId": "generator"
+    }
+  ],
+  "operations": [
+    {
+      "id": "time.unix",
+      "title": "Convert Timestamp",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "time.unix.processor",
+        "version": "0.1.0",
+        "engine": "node",
+        "engineVersion": "20",
+        "syntax": "javascript",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        { "id": "input", "label": "Timestamp", "kind": "document", "required": false, "multiplicity": "one", "contentKinds": ["text"], "maxBytes": "4096" }
+      ],
+      "outputs": [
+        { "id": "output", "label": "Output", "kind": "value", "multiplicity": "one", "representations": ["properties", "text"], "sensitive": false, "exports": ["copyText", "save"] }
+      ],
+      "limits": {
+        "maxInputBytes": "4096",
+        "maxOutputBytes": "1048576",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "1000"
+      },
+      "options": [
+        {
+          "id": "interpretation",
+          "type": "enum",
+          "label": "Interpretation",
+          "default": "auto",
+          "choices": [
+            { "id": "auto", "label": "Auto" },
+            { "id": "seconds", "label": "Seconds" },
+            { "id": "milliseconds", "label": "Milliseconds" },
+            { "id": "iso", "label": "ISO 8601" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "milliseconds-from-digits",
+          "type": "integer",
+          "label": "Milliseconds From Digits",
+          "default": "12",
+          "minimum": "1",
+          "maximum": "20",
+          "persistence": "instance",
+          "sensitive": false
+        }
+      ],
+      "trigger": { "modes": ["explicit", "heldRepeat"], "debounceMs": "0" }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "generator",
+      "kind": "generator",
+      "bindings": [{ "id": "result", "component": "editor", "outputPort": "output" }],
+      "commands": [],
+      "presentationSettings": []
+    }
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {
+    "requirementIds": ["DU-01"],
+    "fixtures": [],
+    "uiScenarios": []
+  }
+}
