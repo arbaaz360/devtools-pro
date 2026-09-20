@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { PluginManifest } from "../../../../packages/plugin-contract/ts/generated.ts";
-import { defaultOptions, describePackage, prepareOptions } from "./describe.ts";
+import { defaultOptions, describePackage, engineRunnable, prepareOptions } from "./describe.ts";
 
 const load = (dir: string): PluginManifest =>
   JSON.parse(readFileSync(new URL(`../../../../plugins/${dir}/manifest.json`, import.meta.url), "utf8")) as PluginManifest;
@@ -46,4 +46,12 @@ test("numeric option defaults are numbers and run options are filtered to the de
   assert.deepEqual(defaultOptions(operation), { indent: 2 });
   assert.deepEqual(prepareOptions(operation, { indent: 4, target: "snake" }), { indent: 4 });
   assert.deepEqual(prepareOptions(operation, {}), { indent: 2 });
+});
+
+test("an operation with no document input is still engine-runnable; two inputs are not", () => {
+  const manifest = load("uuid");
+  const generate = manifest.operations[0]!;
+  assert.equal(engineRunnable({ ...generate, inputs: [] }), true);
+  assert.equal(engineRunnable({ ...generate, inputs: [...generate.inputs, { ...generate.inputs[0]!, id: "second" }] }), false);
+  assert.equal(engineRunnable({ ...generate, executor: { ...generate.executor, kind: "rust" } }), false);
 });

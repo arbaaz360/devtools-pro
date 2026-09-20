@@ -98,9 +98,10 @@ export class WorkerEngine {
 
   private async execute(job: WorkerJob, options: Record<string, unknown>) {
     const operation = job.tool.operations.find((item) => item.id === job.operationId)!;
-    const input = primaryInput(operation)!;
+    const input = primaryInput(operation);
     try {
-      const text = await this.readDocument(job.documentId);
+      // A generator without a document port ignores the tab's text.
+      const text = input ? await this.readDocument(job.documentId) : "";
       if (job.finished) return;
       const bytes = new TextEncoder().encode(text);
       job.inputBytes = bytes.byteLength;
@@ -130,7 +131,7 @@ export class WorkerEngine {
           toolId: job.tool.id,
           operationId: job.operationId,
           options,
-          inputs: { [input.id]: bytes },
+          inputs: input ? { [input.id]: bytes } : {},
           limits,
         };
         worker.postMessage(request, [bytes.buffer as ArrayBuffer]);
