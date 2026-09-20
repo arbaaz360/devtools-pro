@@ -1,0 +1,56 @@
+[
+  {
+    "name": "basic",
+    "input": "function foo(a, b) { return a + b; }",
+    "options": {
+      "preserve-comments": "license"
+    },
+    "output": "function foo(a,b){return a+b;}"
+  },
+  {
+    "name": "regex",
+    "input": "a = /b/g",
+    "options": {},
+    "output": "a=/b/g"
+  },
+  {
+    "name": "division",
+    "input": "a = b / c / d",
+    "options": {},
+    "output": "a=b/c/d"
+  },
+  {
+    "name": "template",
+    "input": "`a${`b${c}`}`",
+    "options": {},
+    "output": "`a${`b${c}`}`"
+  },
+  {
+    "name": "asi",
+    "input": "return\nvalue",
+    "options": {},
+    "output": "return\nvalue"
+  },
+  {
+    "name": "asi2",
+    "input": "x = y\n++z",
+    "options": {},
+    "output": "x=y\n++z"
+  },
+  {
+    "name": "comment",
+    "input": "/* hello */ var x = 1;",
+    "options": {
+      "preserve-comments": "none"
+    },
+    "output": "var x=1;"
+  },
+  {
+    "name": "license",
+    "input": "/*! license */ var x = 1;",
+    "options": {
+      "preserve-comments": "license"
+    },
+    "output": "/*! license */var x=1;"
+  }
+]

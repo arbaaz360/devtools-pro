@@ -1,0 +1,8 @@
+[
+  {
+    "name": "basic",
+    "input": "function foo(a,b){return a+b;}",
+    "options": {},
+    "output": "function foo(a, b) {\n  return a + b;\n}\n"
+  }
+]
