@@ -52,7 +52,7 @@ test("2^128 (large powers)", async () => {
   // 2^128 = 340282366920938463463374607431768211456
   const res = await run({ "from-base": 10, "to-base": 16 }, { input: "340282366920938463463374607431768211456" });
   assert.equal(res.value.result, "100000000000000000000000000000000");
-  
+
   const back = await run({ "from-base": 16, "to-base": 10 }, { input: res.value.result });
   assert.equal(back.value.result, "340282366920938463463374607431768211456");
 });

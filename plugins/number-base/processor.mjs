@@ -45,7 +45,7 @@ function parseBigIntWithCancellation(str, base, context) {
     if (code >= 48 && code <= 57) val = code - 48; // 0-9
     else if (code >= 65 && code <= 90) val = code - 65 + 10; // A-Z
     else if (code >= 97 && code <= 122) val = code - 97 + 10; // a-z
-    
+
     res = res * baseN + BigInt(val);
   }
   return res;
@@ -72,13 +72,13 @@ export async function execute(request, context) {
   let inputRaw = new TextDecoder().decode(bytes);
   let str = inputRaw.trim();
   if (str === "") throw new NumberBaseError("empty-input", "Input cannot be empty");
-  
+
   const startOffset = inputRaw.indexOf(str);
-  
+
   for (let i = 0; i < str.length; i++) {
     const c = str[i];
     if (/\s/.test(c)) {
-      throw new NumberBaseError("invalid-character", "Whitespace is not allowed inside the number", { offset: startOffset + i });
+      throw new NumberBaseError("invalid-character", "Whitespace or second line is not allowed inside the number", { offset: startOffset + i });
     }
     if (c === '.' || c === ',') {
       throw new NumberBaseError("invalid-character", `Fractional or separator character '${c}' is not allowed`, { offset: startOffset + i });
@@ -124,7 +124,7 @@ export async function execute(request, context) {
 
   const digitStr = str.slice(offset);
   let val = parseBigIntWithCancellation(digitStr, fromBase, context);
-  
+
   const formatBase = (v, b) => {
     if (v === 0n) return "0";
     let s = v.toString(b);
