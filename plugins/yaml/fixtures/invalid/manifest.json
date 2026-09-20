@@ -1,0 +1,17 @@
+[
+  { "name": "anchor", "file": "anchor.yaml", "code": "yaml.anchor-unsupported" },
+  { "name": "alias", "file": "alias.yaml", "code": "yaml.alias-unsupported" },
+  { "name": "tag", "file": "tag.yaml", "code": "yaml.tag-unsupported" },
+  { "name": "directive", "file": "directive.yaml", "code": "yaml.directive-unsupported" },
+  { "name": "complex-key", "file": "complex-key.yaml", "code": "yaml.complex-key-unsupported" },
+  { "name": "multiple-documents", "file": "multiple-documents.yaml", "code": "yaml.multiple-documents" },
+  { "name": "tab-indentation", "file": "tab-indentation.yaml", "code": "yaml.tab-indentation" },
+  { "name": "duplicate-key", "file": "duplicate-key.yaml", "code": "yaml.duplicate-key" },
+  { "name": "duplicate-key-flow", "file": "duplicate-key-flow.yaml", "code": "yaml.duplicate-key" },
+  { "name": "trailing-comma-sequence", "file": "trailing-comma-sequence.yaml", "code": "yaml.trailing-comma" },
+  { "name": "trailing-comma-mapping", "file": "trailing-comma-mapping.yaml", "code": "yaml.trailing-comma" },
+  { "name": "unterminated-single-quote", "file": "unterminated-single-quote.yaml", "code": "yaml.unterminated-string" },
+  { "name": "unterminated-double-quote", "file": "unterminated-double-quote.yaml", "code": "yaml.unterminated-string" },
+  { "name": "bad-indentation-mapping", "file": "bad-indentation-mapping.yaml", "code": "yaml.bad-indentation" },
+  { "name": "bad-indentation-sequence", "file": "bad-indentation-sequence.yaml", "code": "yaml.bad-indentation" }
+]

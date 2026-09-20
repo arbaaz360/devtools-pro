@@ -1,0 +1,39 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "convert.yaml",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "YAML ↔ JSON",
+  "description": "Converts a YAML document to JSON and JSON back to YAML with a hand-written, dependency-free parser for the supported YAML subset.",
+  "tools": [{ "id": "convert.yaml", "title": "YAML ↔ JSON", "category": "converter", "operationIds": ["convert.yaml-json", "convert.json-yaml"], "workspaceId": "yaml" }],
+  "operations": [
+    {
+      "id": "convert.yaml-json",
+      "title": "YAML to JSON",
+      "executor": { "kind": "javascriptWorker", "id": "convert.yaml.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "YAML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "label": "JSON", "kind": "artifact", "multiplicity": "one", "mime": ["application/json"], "language": "json", "representations": ["code", "properties"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indent", "default": "space2", "choices": [{ "id": "space2", "label": "2 spaces" }, { "id": "space4", "label": "4 spaces" }, { "id": "minified", "label": "Minified" }], "persistence": "instance", "sensitive": false },
+        { "id": "sort-keys", "type": "boolean", "label": "Sort keys", "default": false, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "100" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "1048576", "deadlineMs": "5000" }
+    },
+    {
+      "id": "convert.json-yaml",
+      "title": "JSON to YAML",
+      "executor": { "kind": "javascriptWorker", "id": "convert.yaml.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "JSON", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
+      "outputs": [{ "id": "output", "label": "YAML", "kind": "artifact", "multiplicity": "one", "mime": ["application/yaml"], "language": "yaml", "representations": ["code", "properties"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indent", "default": "space2", "choices": [{ "id": "space2", "label": "2 spaces" }, { "id": "space4", "label": "4 spaces" }], "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "100" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "1048576", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{ "id": "yaml", "kind": "transform", "bindings": [{ "id": "input", "component": "editor", "inputPort": "input" }, { "id": "output", "component": "output", "outputPort": "output" }], "commands": [], "presentationSettings": [] }],
+  "capabilities": [], "settings": [], "tests": { "requirementIds": ["DU-17", "DU-18"], "fixtures": ["valid", "invalid", "json"], "uiScenarios": ["yaml-to-json", "json-to-yaml"] }
+}

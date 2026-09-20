@@ -1,0 +1,7 @@
+# leading comment
+key: value # trailing comment
+# standalone comment
+list:
+  - 1 # item comment
+  - 2
+other: 'quoted # not a comment'
