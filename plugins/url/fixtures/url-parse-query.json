@@ -1,0 +1,665 @@
+[
+  {
+    "name": "absolute URL with duplicates, array, blank value and fragment",
+    "options": {
+      "indent": 0
+    },
+    "input": "https://example.test/p?a=1&a=2&tag[]=x+y&empty=#frag",
+    "output": "{\"a\":[\"1\",\"2\"],\"tag\":[\"x y\"],\"empty\":\"\"}",
+    "value": {
+      "form": "url",
+      "parameters": {
+        "a": [
+          "1",
+          "2"
+        ],
+        "tag": [
+          "x y"
+        ],
+        "empty": ""
+      },
+      "components": {
+        "href": "https://example.test/p?a=1&a=2&tag[]=x+y&empty=#frag",
+        "scheme": "https",
+        "host": "example.test",
+        "path": "/p",
+        "query": "a=1&a=2&tag[]=x+y&empty=",
+        "fragment": "frag"
+      },
+      "counts": {
+        "parameters": 4,
+        "names": 3,
+        "nodes": 6,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "raw query keeps an encoded delimiter, a blank value and a literal nested bracket",
+    "options": {
+      "indent": 0
+    },
+    "input": "one=x%26y&blank&obj[a]=1",
+    "output": "{\"one\":\"x&y\",\"blank\":\"\",\"obj[a]\":\"1\"}",
+    "value": {
+      "form": "raw",
+      "parameters": {
+        "one": "x&y",
+        "blank": "",
+        "obj[a]": "1"
+      },
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": null,
+        "query": "one=x%26y&blank&obj[a]=1",
+        "fragment": null
+      },
+      "entries": [
+        {
+          "key": "one",
+          "name": "one",
+          "value": "x&y",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 0
+        },
+        {
+          "key": "blank",
+          "name": "blank",
+          "value": "",
+          "arrayNotation": false,
+          "hadEquals": false,
+          "offset": 10
+        },
+        {
+          "key": "obj[a]",
+          "name": "obj[a]",
+          "value": "1",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 16
+        }
+      ]
+    }
+  },
+  {
+    "name": "leading question mark with UTF-8 escapes",
+    "options": {
+      "indent": 0
+    },
+    "input": "?q=caf%C3%A9&q=%F0%9F%98%80",
+    "output": "{\"q\":[\"café\",\"😀\"]}",
+    "value": {
+      "form": "query",
+      "parameters": {
+        "q": [
+          "café",
+          "😀"
+        ]
+      },
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": "",
+        "query": "q=caf%C3%A9&q=%F0%9F%98%80",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "relative reference reports its path and fragment",
+    "options": {
+      "indent": 0
+    },
+    "input": "/search?q=a+b#top",
+    "output": "{\"q\":\"a b\"}",
+    "value": {
+      "form": "reference",
+      "parameters": {
+        "q": "a b"
+      },
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": "/search",
+        "query": "q=a+b",
+        "fragment": "top"
+      }
+    }
+  },
+  {
+    "name": "scheme-less host and path is a reference, not a parameter",
+    "options": {
+      "indent": 0
+    },
+    "input": "example.test/p?a=1",
+    "output": "{\"a\":\"1\"}",
+    "value": {
+      "form": "reference",
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": "example.test/p",
+        "query": "a=1",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "a second question mark is data",
+    "options": {
+      "indent": 0
+    },
+    "input": "?a=1?b=2",
+    "output": "{\"a\":\"1?b=2\"}",
+    "value": {
+      "form": "query",
+      "parameters": {
+        "a": "1?b=2"
+      }
+    }
+  },
+  {
+    "name": "empty input",
+    "options": {},
+    "input": "",
+    "output": "{}",
+    "value": {
+      "form": "raw",
+      "parameters": {},
+      "entries": [],
+      "counts": {
+        "parameters": 0,
+        "names": 0,
+        "nodes": 0,
+        "emptySegments": 0
+      },
+      "trimmedBytes": 0
+    }
+  },
+  {
+    "name": "lone question mark",
+    "options": {},
+    "input": "?",
+    "output": "{}",
+    "value": {
+      "form": "query",
+      "parameters": {},
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": "",
+        "query": "",
+        "fragment": null
+      },
+      "counts": {
+        "parameters": 0,
+        "names": 0,
+        "nodes": 0,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "surrounding ASCII whitespace is ignored",
+    "options": {
+      "indent": 0
+    },
+    "input": "  ?a=1 \n",
+    "output": "{\"a\":\"1\"}",
+    "value": {
+      "form": "query",
+      "parameters": {
+        "a": "1"
+      },
+      "trimmedBytes": 4
+    }
+  },
+  {
+    "name": "empty segments are skipped and counted",
+    "options": {
+      "indent": 0
+    },
+    "input": "&a=1&&b=2&",
+    "output": "{\"a\":\"1\",\"b\":\"2\"}",
+    "value": {
+      "parameters": {
+        "a": "1",
+        "b": "2"
+      },
+      "counts": {
+        "parameters": 2,
+        "names": 2,
+        "nodes": 2,
+        "emptySegments": 3
+      }
+    }
+  },
+  {
+    "name": "only the first equals sign splits name and value",
+    "options": {
+      "indent": 0
+    },
+    "input": "a=b=c",
+    "output": "{\"a\":\"b=c\"}",
+    "value": {
+      "parameters": {
+        "a": "b=c"
+      }
+    }
+  },
+  {
+    "name": "empty names are parameters",
+    "options": {
+      "indent": 0
+    },
+    "input": "=1&=2",
+    "output": "{\"\":[\"1\",\"2\"]}",
+    "value": {
+      "parameters": {
+        "": [
+          "1",
+          "2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "plus in a name is a space",
+    "options": {
+      "indent": 0
+    },
+    "input": "first+name=Ann",
+    "output": "{\"first name\":\"Ann\"}",
+    "value": {
+      "parameters": {
+        "first name": "Ann"
+      }
+    }
+  },
+  {
+    "name": "encoded delimiters stay data in names and values",
+    "options": {
+      "indent": 0
+    },
+    "input": "a%3Db=c%26d%3De&x=%2B",
+    "output": "{\"a=b\":\"c&d=e\",\"x\":\"+\"}",
+    "value": {
+      "parameters": {
+        "a=b": "c&d=e",
+        "x": "+"
+      },
+      "counts": {
+        "parameters": 2,
+        "names": 2,
+        "nodes": 2,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "bracket semantics: only one terminal [] is an array marker",
+    "options": {
+      "indent": 0
+    },
+    "input": "t[]=1&t[]=2&s[]=only&n[0]=x&n[a]=y&d[][]=z&[]=e&enc%5B%5D=1&lit%255B%255D=1",
+    "output": "{\"t\":[\"1\",\"2\"],\"s\":[\"only\"],\"n[0]\":\"x\",\"n[a]\":\"y\",\"d[]\":[\"z\"],\"\":[\"e\"],\"enc\":[\"1\"],\"lit%5B%5D\":\"1\"}",
+    "value": {
+      "parameters": {
+        "t": [
+          "1",
+          "2"
+        ],
+        "s": [
+          "only"
+        ],
+        "n[0]": "x",
+        "n[a]": "y",
+        "d[]": [
+          "z"
+        ],
+        "": [
+          "e"
+        ],
+        "enc": [
+          "1"
+        ],
+        "lit%5B%5D": "1"
+      },
+      "counts": {
+        "parameters": 9,
+        "names": 8,
+        "nodes": 14,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "scalar and array notation for one name merge in encounter order",
+    "options": {
+      "indent": 0
+    },
+    "input": "a=1&a[]=2&a=3",
+    "output": "{\"a\":[\"1\",\"2\",\"3\"]}",
+    "value": {
+      "parameters": {
+        "a": [
+          "1",
+          "2",
+          "3"
+        ]
+      },
+      "entries": [
+        {
+          "key": "a",
+          "name": "a",
+          "value": "1",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 0
+        },
+        {
+          "key": "a",
+          "name": "a[]",
+          "value": "2",
+          "arrayNotation": true,
+          "hadEquals": true,
+          "offset": 4
+        },
+        {
+          "key": "a",
+          "name": "a",
+          "value": "3",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 10
+        }
+      ],
+      "counts": {
+        "parameters": 3,
+        "names": 1,
+        "nodes": 4,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "text output keeps encounter order for integer-like names",
+    "options": {
+      "indent": 0
+    },
+    "input": "b=1&2=x&a=3",
+    "output": "{\"b\":\"1\",\"2\":\"x\",\"a\":\"3\"}",
+    "value": {
+      "parameters": {
+        "2": "x",
+        "b": "1",
+        "a": "3"
+      }
+    }
+  },
+  {
+    "name": "prototype property names are ordinary parameters",
+    "options": {
+      "indent": 0
+    },
+    "input": "__proto__=1&constructor=2&toString=3&hasOwnProperty=4",
+    "output": "{\"__proto__\":\"1\",\"constructor\":\"2\",\"toString\":\"3\",\"hasOwnProperty\":\"4\"}",
+    "value": {
+      "parameters": {
+        "__proto__": "1",
+        "constructor": "2",
+        "toString": "3",
+        "hasOwnProperty": "4"
+      },
+      "counts": {
+        "parameters": 4,
+        "names": 4,
+        "nodes": 4,
+        "emptySegments": 0
+      }
+    }
+  },
+  {
+    "name": "a fragment before any question mark ends the raw query",
+    "options": {
+      "indent": 0
+    },
+    "input": "a=1#x?y=2",
+    "output": "{\"a\":\"1\"}",
+    "value": {
+      "form": "raw",
+      "parameters": {
+        "a": "1"
+      },
+      "components": {
+        "href": null,
+        "scheme": null,
+        "host": null,
+        "path": null,
+        "query": "a=1",
+        "fragment": "x?y=2"
+      }
+    }
+  },
+  {
+    "name": "absolute URL without a query",
+    "options": {},
+    "input": "https://example.test/path#frag",
+    "output": "{}",
+    "value": {
+      "form": "url",
+      "parameters": {},
+      "components": {
+        "href": "https://example.test/path#frag",
+        "scheme": "https",
+        "host": "example.test",
+        "path": "/path",
+        "query": "",
+        "fragment": "frag"
+      }
+    }
+  },
+  {
+    "name": "absolute URL whose fragment contains a question mark has no query",
+    "options": {},
+    "input": "https://h/p#f?x=1",
+    "output": "{}",
+    "value": {
+      "form": "url",
+      "components": {
+        "href": "https://h/p#f?x=1",
+        "scheme": "https",
+        "host": "h",
+        "path": "/p",
+        "query": "",
+        "fragment": "f?x=1"
+      }
+    }
+  },
+  {
+    "name": "absolute URL with userinfo, IPv6 host and port",
+    "options": {
+      "indent": 0
+    },
+    "input": "https://user:pw@[::1]:8443/p?x=1",
+    "output": "{\"x\":\"1\"}",
+    "value": {
+      "form": "url",
+      "components": {
+        "href": "https://user:pw@[::1]:8443/p?x=1",
+        "scheme": "https",
+        "host": "[::1]:8443",
+        "path": "/p",
+        "query": "x=1",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "non-special scheme",
+    "options": {
+      "indent": 0
+    },
+    "input": "custom://h/p?k=v",
+    "output": "{\"k\":\"v\"}",
+    "value": {
+      "form": "url",
+      "components": {
+        "href": "custom://h/p?k=v",
+        "scheme": "custom",
+        "host": "h",
+        "path": "/p",
+        "query": "k=v",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "uppercase scheme and host are normalised only in href, scheme and host",
+    "options": {
+      "indent": 0
+    },
+    "input": "HTTPS://EXAMPLE.TEST/Path?A=1",
+    "output": "{\"A\":\"1\"}",
+    "value": {
+      "form": "url",
+      "components": {
+        "href": "https://example.test/Path?A=1",
+        "scheme": "https",
+        "host": "example.test",
+        "path": "/Path",
+        "query": "A=1",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "raw UTF-8 bytes in an absolute URL query pass through unnormalised",
+    "options": {
+      "indent": 0
+    },
+    "input": "https://h/?q=café",
+    "output": "{\"q\":\"café\"}",
+    "value": {
+      "form": "url",
+      "parameters": {
+        "q": "café"
+      },
+      "components": {
+        "href": "https://h/?q=caf%C3%A9",
+        "scheme": "https",
+        "host": "h",
+        "path": "/",
+        "query": "q=café",
+        "fragment": null
+      }
+    }
+  },
+  {
+    "name": "a nested URL in a value decodes exactly once",
+    "options": {
+      "indent": 0
+    },
+    "input": "https://h/?redirect=https%3A%2F%2Fx%2F%3Fa%3D1%26b%3D2%2520c",
+    "output": "{\"redirect\":\"https://x/?a=1&b=2%20c\"}",
+    "value": {
+      "parameters": {
+        "redirect": "https://x/?a=1&b=2%20c"
+      }
+    }
+  },
+  {
+    "name": "default indentation is two spaces",
+    "options": {},
+    "input": "a=1&a=2",
+    "output": "{\n  \"a\": [\n    \"1\",\n    \"2\"\n  ]\n}",
+    "value": {
+      "parameters": {
+        "a": [
+          "1",
+          "2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "indentation of four spaces as a decimal string option",
+    "options": {
+      "indent": "4"
+    },
+    "input": "a=1&b[]=2",
+    "output": "{\n    \"a\": \"1\",\n    \"b\": [\n        \"2\"\n    ]\n}",
+    "value": {
+      "parameters": {
+        "a": "1",
+        "b": [
+          "2"
+        ]
+      }
+    }
+  },
+  {
+    "name": "interior newlines in the query are kept as data while href strips them",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": 0
+    },
+    "input": "http://a.b/?a=1\n&b=2\r",
+    "output": "{\"a\":\"1\\n\",\"b\":\"2\"}",
+    "value": {
+      "form": "url",
+      "parameters": {
+        "a": "1\n",
+        "b": "2"
+      },
+      "entries": [
+        {
+          "key": "a",
+          "name": "a",
+          "value": "1\n",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 12
+        },
+        {
+          "key": "b",
+          "name": "b",
+          "value": "2",
+          "arrayNotation": false,
+          "hadEquals": true,
+          "offset": 17
+        }
+      ],
+      "components": {
+        "href": "http://a.b/?a=1&b=2",
+        "scheme": "http",
+        "host": "a.b",
+        "path": "/",
+        "query": "a=1\n&b=2",
+        "fragment": null
+      },
+      "counts": {
+        "parameters": 2,
+        "names": 2,
+        "nodes": 2,
+        "emptySegments": 0
+      },
+      "limits": {
+        "maxRows": 10000,
+        "maxNodes": 20000
+      },
+      "trimmedBytes": 1,
+      "bracketSemantics": "a decoded name ending in [] is an array parameter under the name without []; every other bracket is literal",
+      "inputBytes": 21,
+      "outputBytes": 19,
+      "complete": true
+    }
+  }
+]

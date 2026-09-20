@@ -1,0 +1,306 @@
+[
+  {
+    "name": "decode: non-hexadecimal escape",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%G0",
+    "error": "percent escape \"%G0\" at byte offset 0 must use two hexadecimal digits"
+  },
+  {
+    "name": "decode: escape with one digit at the end",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "abc%4",
+    "error": "percent escape \"%4\" at byte offset 3 is truncated; expected two hexadecimal digits"
+  },
+  {
+    "name": "decode: bare percent at the end",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "abc%",
+    "error": "percent escape \"%\" at byte offset 3 is truncated"
+  },
+  {
+    "name": "decode: bare percent after a multi-byte character",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "caf%C3%A9%",
+    "error": "percent escape \"%\" at byte offset 9 is truncated"
+  },
+  {
+    "name": "decode: escape followed by a non-ASCII character",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%é",
+    "error": "percent escape \"%é\" at byte offset 0 must use two hexadecimal digits"
+  },
+  {
+    "name": "decode: form mode also rejects malformed escapes",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "form"
+    },
+    "input": "a+%zz",
+    "error": "percent escape \"%zz\" at byte offset 2 must use two hexadecimal digits"
+  },
+  {
+    "name": "decode: continuation byte missing",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%E2%28",
+    "error": "decoded bytes are not valid UTF-8: byte 0xE2 produced at input byte offset 0 does not begin a well-formed sequence"
+  },
+  {
+    "name": "decode: overlong two-byte sequence",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%C0%AF",
+    "error": "not valid UTF-8: byte 0xC0 produced at input byte offset 0"
+  },
+  {
+    "name": "decode: overlong three-byte sequence",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%E0%80%80",
+    "error": "not valid UTF-8: byte 0xE0 produced at input byte offset 0"
+  },
+  {
+    "name": "decode: UTF-16 surrogate encoded as UTF-8",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%ED%A0%80",
+    "error": "not valid UTF-8: byte 0xED produced at input byte offset 0"
+  },
+  {
+    "name": "decode: code point above U+10FFFF",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%F4%90%80%80",
+    "error": "not valid UTF-8: byte 0xF4 produced at input byte offset 0"
+  },
+  {
+    "name": "decode: byte that never appears in UTF-8",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%FF",
+    "error": "not valid UTF-8: byte 0xFF produced at input byte offset 0"
+  },
+  {
+    "name": "decode: sequence truncated at the end of input",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "ok%E2%82",
+    "error": "not valid UTF-8: byte 0xE2 produced at input byte offset 2"
+  },
+  {
+    "name": "decode: stray continuation byte after valid text",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "form"
+    },
+    "input": "a+b%80",
+    "error": "not valid UTF-8: byte 0x80 produced at input byte offset 3"
+  },
+  {
+    "name": "parse: invalid UTF-8 in a value names the parameter",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "a=%E2%28",
+    "error": "decoded bytes in the value of parameter 1 are not valid UTF-8: byte 0xE2 produced at input byte offset 2"
+  },
+  {
+    "name": "parse: malformed escape in a name names the parameter",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "%G0=1",
+    "error": "percent escape \"%G0\" in the name of parameter 1 at byte offset 0 must use two hexadecimal digits"
+  },
+  {
+    "name": "parse: truncated escape in the second value",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "a=1&b=%4",
+    "error": "percent escape \"%4\" in the value of parameter 2 at byte offset 6 is truncated"
+  },
+  {
+    "name": "parse: offsets count from the start of the input, not the query",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "?x=1&y=%zz",
+    "error": "percent escape \"%zz\" in the value of parameter 2 at byte offset 7 must use two hexadecimal digits"
+  },
+  {
+    "name": "parse: offsets include trimmed leading whitespace",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "  a=%FF",
+    "error": "byte 0xFF produced at input byte offset 4"
+  },
+  {
+    "name": "parse: offsets include the absolute URL prefix",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "https://h/p?a=%E2",
+    "error": "in the value of parameter 1 are not valid UTF-8: byte 0xE2 produced at input byte offset 14"
+  },
+  {
+    "name": "parse: absolute URL with a space in the host",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "https://exa mple.test/?a=1",
+    "error": "input looks like an absolute URL but is malformed"
+  },
+  {
+    "name": "parse: absolute URL with an empty host",
+    "operationId": "url.parse-query",
+    "options": {},
+    "input": "http://",
+    "error": "input looks like an absolute URL but is malformed"
+  },
+  {
+    "name": "encode: input bytes are not UTF-8",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "encode",
+      "encoding": "rfc3986"
+    },
+    "inputHex": "fffe",
+    "error": "input is not valid UTF-8 text: byte 0xFF at byte offset 0 does not begin a well-formed sequence"
+  },
+  {
+    "name": "decode: input bytes are not UTF-8",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "form"
+    },
+    "inputHex": "6162c3",
+    "error": "input is not valid UTF-8 text: byte 0xC3 at byte offset 2"
+  },
+  {
+    "name": "parse: input bytes are not UTF-8",
+    "operationId": "url.parse-query",
+    "options": {},
+    "inputHex": "613dc328",
+    "error": "input is not valid UTF-8 text: byte 0xC3 at byte offset 2"
+  },
+  {
+    "name": "options: unknown mode",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "shout"
+    },
+    "input": "a",
+    "error": "mode must be encode or decode"
+  },
+  {
+    "name": "options: unknown encoding",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "encode",
+      "encoding": "latin1"
+    },
+    "input": "a",
+    "error": "encoding must be rfc3986 or form"
+  },
+  {
+    "name": "options: indent above maximum",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": 9
+    },
+    "input": "a=1",
+    "error": "indent must be an integer from 0 to 8"
+  },
+  {
+    "name": "options: negative indent",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": -1
+    },
+    "input": "a=1",
+    "error": "indent must be an integer from 0 to 8"
+  },
+  {
+    "name": "options: fractional indent string",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": "2.5"
+    },
+    "input": "a=1",
+    "error": "indent must be an integer from 0 to 8"
+  },
+  {
+    "name": "options: empty indent string",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": ""
+    },
+    "input": "a=1",
+    "error": "indent must be an integer from 0 to 8"
+  },
+  {
+    "name": "options: boolean indent",
+    "operationId": "url.parse-query",
+    "options": {
+      "indent": true
+    },
+    "input": "a=1",
+    "error": "indent must be an integer from 0 to 8"
+  },
+  {
+    "name": "request: unknown operation",
+    "operationId": "url.nope",
+    "options": {},
+    "input": "a",
+    "error": "unsupported operation url.nope"
+  },
+  {
+    "name": "malformed percent escape does not cut a utf-8 sequence",
+    "operationId": "url.transform",
+    "options": {
+      "mode": "decode",
+      "encoding": "rfc3986"
+    },
+    "input": "%€x",
+    "error": "percent escape \"%€\" at byte offset 0 must use two hexadecimal digits"
+  }
+]

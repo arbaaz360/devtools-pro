@@ -25,6 +25,24 @@ const hex = (byte) => `0x${HEX[byte >> 4]}${HEX[byte & 15]}`;
 const token = (bytes, start, end) => JSON.stringify(decoder.decode(bytes.subarray(start, end)));
 function indexOf(bytes, byte, start, end) { for (let i = start; i < end; i += 1) if (bytes[i] === byte) return i; return -1; }
 
+function characterEnd(bytes, index, end) {
+  if (index >= end) return end;
+  const lead = bytes[index];
+  if (lead < 0x80) return index + 1;
+  let need = 0;
+  if (lead >= 0xC2 && lead <= 0xDF) need = 1;
+  else if (lead >= 0xE0 && lead <= 0xEF) need = 2;
+  else if (lead >= 0xF0 && lead <= 0xF4) need = 3;
+  if (need > 0 && index + need < end) {
+    let valid = true;
+    for (let k = 1; k <= need; k += 1) {
+      if ((bytes[index + k] & 0xC0) !== 0x80) { valid = false; break; }
+    }
+    if (valid) return index + need + 1;
+  }
+  return index + 1;
+}
+
 /** Offset of the first byte that does not begin a well-formed UTF-8 sequence (RFC 3629), or -1. */
 export function utf8InvalidOffset(bytes) {
   const length = bytes.length;
@@ -119,10 +137,18 @@ function decodePercent(bytes, start, end, form, context, where = "") {
     if ((i - start) % CHECK_EVERY === 0) check(context);
     const byte = bytes[i];
     if (byte === 0x25) {
-      if (i + 2 >= end) throw new Error(`percent escape ${token(bytes, i, end)}${where} at byte offset ${i} is truncated; expected two hexadecimal digits`);
+      if (i + 2 >= end) {
+        let tokenEnd = i + 1;
+        while (tokenEnd < end && tokenEnd < i + 3) tokenEnd = characterEnd(bytes, tokenEnd, end);
+        throw new Error(`percent escape ${token(bytes, i, tokenEnd)}${where} at byte offset ${i} is truncated; expected two hexadecimal digits`);
+      }
       const high = hexValue(bytes[i + 1]);
       const low = hexValue(bytes[i + 2]);
-      if (high < 0 || low < 0) throw new Error(`percent escape ${token(bytes, i, i + 3)}${where} at byte offset ${i} must use two hexadecimal digits`);
+      if (high < 0 || low < 0) {
+        let tokenEnd = i + 1;
+        while (tokenEnd < end && tokenEnd < i + 3) tokenEnd = characterEnd(bytes, tokenEnd, end);
+        throw new Error(`percent escape ${token(bytes, i, tokenEnd)}${where} at byte offset ${i} must use two hexadecimal digits`);
+      }
       out[o++] = high * 16 + low;
       i += 3;
       continue;
