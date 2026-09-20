@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorCancelled, ProcessorContext, SeededRandom } from "../../packages/plugin-sdk/src/context.ts";
 import { execute } from "./processor.mjs";
+import { md5 } from "./md5.mjs";
 
 const fixture = async name => JSON.parse(await readFile(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 const manifest = JSON.parse(await readFile(new URL("./manifest.json", import.meta.url), "utf8"));
@@ -217,4 +218,16 @@ await rejects({ version: "v4", count: 10 }, { cancellation: midBatch, randomness
 class CancelAfterChecks { constructor(after) { this.after = after; this.checks = 0; } isCancelled() { return ++this.checks > this.after; } }
 await rejects({ version: "v5", name: "example.com", count: 100 }, { cancellation: new CancelAfterChecks(3) }, ProcessorCancelled);
 await rejects({ version: "v1", count: 100 }, { cancellation: new CancelAfterChecks(50) }, ProcessorCancelled);
+
+// RFC 1321 MD5 test vectors
+const md5Hex = bytes => Array.from(md5(bytes), b => b.toString(16).padStart(2, "0")).join("");
+const encoder = new TextEncoder();
+assert.equal(md5Hex(encoder.encode("")), "d41d8cd98f00b204e9800998ecf8427e", "RFC 1321 md5 empty");
+assert.equal(md5Hex(encoder.encode("a")), "0cc175b9c0f1b6a831c399e269772661", "RFC 1321 md5 a");
+assert.equal(md5Hex(encoder.encode("abc")), "900150983cd24fb0d6963f7d28e17f72", "RFC 1321 md5 abc");
+assert.equal(md5Hex(encoder.encode("message digest")), "f96b697d7cb7938d525a2f31aaf161d0", "RFC 1321 md5 message digest");
+assert.equal(md5Hex(encoder.encode("abcdefghijklmnopqrstuvwxyz")), "c3fcd3d76192e4007dfb496cca67e13b", "RFC 1321 md5 alphabet");
+assert.equal(md5Hex(encoder.encode("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")), "d174ab98d277d9f5a5611c2c9f419d9f", "RFC 1321 md5 alphanum");
+assert.equal(md5Hex(encoder.encode("12345678901234567890123456789012345678901234567890123456789012345678901234567890")), "57edf4a22be3c955ac49da2e2107b67a", "RFC 1321 md5 80 chars");
+
 console.log("uuid package tests passed");
