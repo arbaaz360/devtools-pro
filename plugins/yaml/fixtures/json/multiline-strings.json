@@ -1,0 +1,1 @@
+{"none":"single line","trailing_one":"line one\nline two\n","trailing_none":"line one\nline two","trailing_many":"line one\nline two\n\n\n","leading_space":"  indented first\nsecond"}

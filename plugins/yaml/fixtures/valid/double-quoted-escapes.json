@@ -1,0 +1,11 @@
+{
+  "a": "line1\nline2",
+  "b": "tab\there",
+  "c": "quote\"here",
+  "d": "back\\slash",
+  "e": "slash/here",
+  "f": "null\u0000byte",
+  "g": "hexA",
+  "h": "unicodeé",
+  "i": "wide😀"
+}

@@ -1,0 +1,4 @@
+# The packet fixtures are compared byte-for-byte against the processor's
+# LF-only output; force LF on checkout so a Windows runner's git doesn't
+# rewrite them to CRLF and break that comparison.
+* text=auto eol=lf
