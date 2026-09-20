@@ -6,7 +6,7 @@ Source root: `F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/d
 
 Status legend: **partial** means a related implementation exists, not parity; **planned** means no corresponding complete workbench tool is established by this audit. No entry below is marked parity-complete. Each entry's Required, UX, and Acceptance paragraphs are separate acceptance obligations. Cross-cutting UX requirements are in [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md#shared-workspace-vocabulary-and-ux-contract).
 
-## Status, verified 2026-09-20
+## Status, verified 2026-09-21
 
 Kept current by the integrator when a packet merges. "Usable" means the tool
 runs in the desktop app; it is not a parity sign-off against the card below.
@@ -18,34 +18,35 @@ the webview worker engine (see
 |---|---|---|---|---|
 | DU-01 | Unix timestamp converter | `time.unix` | js | usable |
 | DU-02 | JSON formatter/validator | `structured.json` | rust | usable |
-| DU-03 | RegExp tester | `text.regex` | — | planned, needs shell work |
+| DU-03 | RegExp tester | `text.regex` | js | packet ready (AG-116, #61); shell annotations landed in #60 |
 | DU-04 | JWT decode/verify | `security.jwt` | js | usable |
 | DU-05 | URL encode/decode | `text.url` | rust | usable |
 | DU-06 | Base64 text | `encoding.base64-text` | js | usable |
 | DU-07 | URL / query parser | `web.url-parser` | js | usable |
 | DU-08 | HTML entities | `text.html` | rust | usable |
 | DU-09 | Backslash escaping | `text.backslash` | js | usable |
-| DU-10 | UUID generate/decode | `identity.uuid` | js | in review (AG-106, PR #56) makes it browser-safe |
-| DU-11 | HTML preview | — | — | planned, needs shell work |
+| DU-10 | UUID generate/decode | `identity.uuid` | js | usable |
+| DU-11 | HTML preview | `preview.html` | js | packet ready (AG-117, #62); shell preview frame landed in #60 |
 | DU-12 | Text diff | `text.compare` | rust | usable |
 | DU-13 | HTML beautify/minify | `format.html` | js | usable |
-| DU-14 | CSS beautify/minify | `format.css` | js | packet ready (AG-113) |
-| DU-15 | JavaScript beautify/minify | `format.js` | js | packet ready (AG-115); beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`), minify is comment and whitespace removal |
-| DU-16 | XML beautify/minify | `format.xml` | js | packet ready (AG-112) |
+| DU-14 | CSS beautify/minify | `format.css` | js | usable |
+| DU-15 | JavaScript beautify/minify | `format.js` | js | in review (AG-115, PR #69); beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`), minify is comment and whitespace removal |
+| DU-16 | XML beautify/minify | `format.xml` | js | usable |
 | DU-17 | YAML to JSON | `convert.yaml-json` | js | usable |
 | DU-18 | JSON to YAML | `convert.json-yaml` | js | usable |
 | DU-19 | Number base converter | `number.base` | js | usable |
 | DU-20 | Example string generator | `generate.examples` | js | usable |
-| DU-21 | QR code | — | — | planned, needs shell work |
+| DU-21 | QR code | `media.qr` | js | packet ready (AG-119, #64); shell SVG results landed in #60 |
 | DU-22 | String inspector | `text.inspect` | rust | usable, parity gaps unaudited |
 | DU-23 | Hash generator | `encoding.hash` | rust | usable (SHA-256/512; MD5, SHA-1, SHA-224, SHA-384 only in the package) |
-| DU-24 | HTML/SVG to JSX | — | — | planned, needs shell work |
-| DU-25 | Markdown preview | — | — | planned, needs shell work |
-| DU-26 | SQL formatter | `format.sql` | js | packet ready (AG-111) |
+| DU-24 | HTML/SVG to JSX | `convert.jsx` | js | packet ready (AG-118, #63) |
+| DU-25 | Markdown preview | `preview.markdown` | js | packet ready (AG-117, #62); vendored `marked` 18.0.13 |
+| DU-26 | SQL formatter | `format.sql` | js | usable |
 | DU-27 | String case converter | `text.case` | js | usable |
 
-Usable: 16 of 27. In review: 1. Packets ready: 4. Needs shell
-work: 5. Beyond these 27, the wider catalogue is in
+Usable: 21 of 27 (DU-22 with unaudited parity gaps). In review: 1. Packets
+ready: 4, covering the 5 remaining cards; no shell work is outstanding for
+them. Beyond these 27, the wider catalogue is in
 [PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
 
 ## DU-01 — Unix Timestamp Converter

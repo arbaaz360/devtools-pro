@@ -21,25 +21,25 @@ parses **Allowed files** from the fenced block under that heading:
 
 | ID | Title | Vendor | State |
 |---|---|---|---|
-| AG-101 | Plugin package tests in the quality gate | antigravity | ready |
-| AG-102 | String case converter package (DU-27) | antigravity | ready |
-| AG-103 | Unix timestamp converter package (DU-01) | antigravity | ready |
-| AG-104 | Number base converter package (DU-19) | antigravity | ready |
-| AG-105 | Example string generator package (DU-20) | antigravity | ready |
-| AG-106 | UUID package follow-ups | antigravity | ready |
-| AG-107 | Escaping package follow-ups | antigravity | ready |
-| AG-108 | URL package follow-ups | antigravity | ready |
-| AG-109 | JWT decoder and verifier package (DU-04) | claude | ready |
-| AG-110 | YAML ↔ JSON package (DU-17, DU-18) | claude | ready |
-| AG-111 | SQL formatter package (DU-26) | antigravity | ready |
-| AG-112 | XML beautifier and minifier package (DU-16) | claude | ready |
-| AG-113 | CSS beautifier and minifier package (DU-14) | claude | ready |
-| AG-114 | HTML beautifier and minifier package (DU-13) | claude | ready |
-| AG-115 | JavaScript beautifier and minifier package (DU-15) | antigravity | ready |
-| AG-116 | Regular expression tester package (DU-03) | claude | ready |
-| AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | ready |
-| AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | ready |
-| AG-119 | QR code generator package (DU-21) | antigravity | ready |
+| AG-101 | Plugin package tests in the quality gate | antigravity | merged (#25) |
+| AG-102 | String case converter package (DU-27) | antigravity | merged (#32) |
+| AG-103 | Unix timestamp converter package (DU-01) | antigravity | merged (#36) |
+| AG-104 | Number base converter package (DU-19) | antigravity | merged (#52) |
+| AG-105 | Example string generator package (DU-20) | antigravity | merged (#55) |
+| AG-106 | UUID package follow-ups | antigravity | merged (#56) |
+| AG-107 | Escaping package follow-ups | antigravity | merged (#65) |
+| AG-108 | URL package follow-ups | antigravity | merged (#66) |
+| AG-109 | JWT decoder and verifier package (DU-04) | claude | merged (#48) |
+| AG-110 | YAML ↔ JSON package (DU-17, DU-18) | claude | merged (#53) |
+| AG-111 | SQL formatter package (DU-26) | antigravity | merged (#68) |
+| AG-112 | XML beautifier and minifier package (DU-16) | claude | merged (#67) |
+| AG-113 | CSS beautifier and minifier package (DU-14) | claude | merged (#70) |
+| AG-114 | HTML beautifier and minifier package (DU-13) | claude | merged (#54) |
+| AG-115 | JavaScript beautifier and minifier package (DU-15) | antigravity | in review (PR #69) |
+| AG-116 | Regular expression tester package (DU-03) | claude | ready (#61) |
+| AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | ready (#62) |
+| AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | ready (#63) |
+| AG-119 | QR code generator package (DU-21) | antigravity | ready (#64) |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).
