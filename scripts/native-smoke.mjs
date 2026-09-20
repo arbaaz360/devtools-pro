@@ -104,8 +104,13 @@ if (!browser) {
 const errors = [];
 
 try {
-  const page = browser.contexts()[0]?.pages()[0];
-  if (!page) fail("no page in the WebView2 context");
+  // The connection can land before the webview has attached its page; wait for it.
+  let page = null;
+  for (let waited = 0; waited < 30_000 && !page; waited += 500) {
+    page = browser.contexts().flatMap((context) => context.pages()).find((candidate) => !candidate.url().startsWith("devtools://")) ?? null;
+    if (!page) await sleep(500);
+  }
+  if (!page) fail(`no page in the WebView2 context after 30 s (contexts: ${browser.contexts().length}, pages: ${browser.contexts().map((context) => context.pages().map((candidate) => candidate.url()).join(",")).join(" | ") || "none"})`);
   page.on("pageerror", (error) => errors.push(`pageerror: ${error.message}`));
   page.on("console", (message) => { if (message.type() === "error" && !/favicon\.ico|404|Blocked script execution in 'about:srcdoc'/.test(message.text())) errors.push(`console: ${message.text()}`); });
   // The shell declares no favicon; the webview asks for one anyway and the
