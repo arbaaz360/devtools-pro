@@ -25,5 +25,24 @@ jobs:
         run: pnpm --dir apps/desktop install --frozen-lockfile
       - name: Install browser for rendered UI tests
         run: pnpm --dir apps/desktop exec playwright install chromium
+      - name: Ensure the WebView2 runtime for the native smoke
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          if (Test-Path $key) { Write-Host "WebView2 runtime present: $((Get-ItemProperty $key).pv)"; exit 0 }
+          Write-Host 'WebView2 runtime missing; installing the Evergreen runtime'
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:TEMP\MicrosoftEdgeWebview2Setup.exe"
+          Start-Process -FilePath "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" -ArgumentList '/silent','/install' -Wait
+          if (Test-Path $key) { Write-Host "WebView2 runtime installed: $((Get-ItemProperty $key).pv)" } else { Write-Warning 'WebView2 runtime still not registered' }
       - name: Run repository quality gate
         run: node scripts/quality-gate.mjs
+      - name: Keep native smoke evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-smoke
+          path: |
+            apps/desktop/test-results/desktop-smoke.png
+            apps/desktop/test-results/desktop-smoke.log
+            apps/desktop/test-results/webview2-smoke.log
+          if-no-files-found: ignore

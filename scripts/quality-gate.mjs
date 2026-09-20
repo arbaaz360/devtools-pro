@@ -34,6 +34,10 @@ run('pnpm', ['--dir', 'apps/desktop', 'test:ui']);
 run('node', ['scripts/check-desktop-bundle.mjs']);
 run('cargo', ['build', '-p', 'devtools-cli']);
 run('node', ['scripts/smoke-shell.mjs']);
+// The real window: Tauri host, WebView2 CSP and the worker bundle together. Reuses the
+// host compile from `cargo test`; the script skips itself off Windows.
+run('cargo', ['build', '-p', 'devtools-desktop']);
+run('node', ['scripts/native-smoke.mjs']);
 run('git', ['diff', '--check']);
 
 const rustfmt = process.platform === 'win32' ? 'rustfmt.exe' : 'rustfmt';
@@ -49,4 +53,4 @@ if (!existsSync(distIndex)) {
   process.stderr.write('quality gate failed: desktop smoke output is missing after build\n');
   process.exit(1);
 }
-process.stdout.write('\nQuality gate passed: Rust tests, desktop build, shell tests, built-shell smoke, and whitespace validation.\n');
+process.stdout.write('\nQuality gate passed: Rust tests, desktop build, shell tests, built-shell smoke, native smoke, and whitespace validation.\n');

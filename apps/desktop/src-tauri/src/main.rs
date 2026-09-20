@@ -970,9 +970,31 @@ fn list_plugin_catalog(state: tauri::State<'_, Arc<HostState>>) -> Vec<EmbeddedP
     state.plugin_catalog.clone()
 }
 
+/// The main window, built in code rather than declared in tauri.conf.json so the
+/// native smoke can reach the webview. In a debug build, DEVTOOLS_SMOKE_BROWSER_ARGS
+/// is appended to the WebView2 browser arguments (the smoke sets a remote debugging
+/// port there); a release build never reads it. wry's own default flags are kept.
+fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
+    use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
+    let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
+        .title("The DevTools Pro · Native preview")
+        .inner_size(1280.0, 840.0)
+        .min_inner_size(800.0, 560.0)
+        .background_color(Color(0x11, 0x14, 0x19, 0xff));
+    #[cfg(all(debug_assertions, windows))]
+    if let Ok(extra) = std::env::var("DEVTOOLS_SMOKE_BROWSER_ARGS") {
+        if !extra.trim().is_empty() {
+            builder = builder.additional_browser_args(&format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection {}", extra.trim()));
+        }
+    }
+    builder.build()?;
+    Ok(())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .setup(|app| build_main_window(app).map_err(Into::into))
         .manage(Arc::new(HostState::default()))
         .invoke_handler(tauri::generate_handler![
             open_document, create_text_document, read_preview, read_binary_preview, close_document, start_operation, run_tool, run_compare, cancel_operation, job_status, save_result, save_document, list_tools, list_plugin_catalog
