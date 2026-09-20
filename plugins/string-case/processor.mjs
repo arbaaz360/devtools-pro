@@ -138,7 +138,7 @@ export async function execute(request, context) {
     const trailing = trailingMatch[0];
 
     if (leading.length === token.length) {
-      outLines.push(token);
+      outParts.push(token);
       continue;
     }
 

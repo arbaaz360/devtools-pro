@@ -10,6 +10,7 @@ Converts identifier-style text between cases, line by line, with configurable ac
 - When acronym preservation is disabled, acronyms are treated as ordinary words (`userId`).
 - Converts line by line independently, preserving leading and trailing whitespace exactly.
 - Preserves line endings (`\n` and `\r\n`) and blank lines byte-for-byte.
+- Output properties: `lines` counts line segments the way an editor numbers them (a trailing line ending starts an empty last line), `converted` is whether the text changed, `acronymsApplied` is how many words were kept as acronyms.
 
 ## Word Splitting Rules
 

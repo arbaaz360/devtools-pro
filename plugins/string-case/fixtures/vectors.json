@@ -331,5 +331,31 @@
       "converted": true,
       "acronymsApplied": 1
     }
+  },
+  {
+    "name": "whitespace-only line passes through",
+    "options": {
+      "target": "snake"
+    },
+    "input": "user ID\n   \n\tapi key",
+    "output": "user_id\n   \n\tapi_key",
+    "expectedProperties": {
+      "lines": 3,
+      "converted": true,
+      "acronymsApplied": 2
+    }
+  },
+  {
+    "name": "trailing line ending starts an empty last line",
+    "options": {
+      "target": "kebab"
+    },
+    "input": "HTTPServer\r\nuser ID\r\n",
+    "output": "http-server\r\nuser-id\r\n",
+    "expectedProperties": {
+      "lines": 3,
+      "converted": true,
+      "acronymsApplied": 2
+    }
   }
 ]
