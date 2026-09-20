@@ -1,0 +1,111 @@
+[
+  {
+    "name": "basic whitespace stripped",
+    "options": {},
+    "input": ".a { color : red ; margin : 0 ; }",
+    "output": ".a{color:red;margin:0}",
+    "diagnostics": []
+  },
+  {
+    "name": "regular comment dropped",
+    "options": {},
+    "input": ".a { color: red; /* drop me */ }",
+    "output": ".a{color:red}",
+    "diagnostics": []
+  },
+  {
+    "name": "license comment kept",
+    "options": {
+      "preserve-comments": true
+    },
+    "input": "/*! keep */ .a { color: red; }",
+    "output": "/*! keep */.a{color:red}",
+    "diagnostics": []
+  },
+  {
+    "name": "license comment dropped when preserve-comments is false",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "/*! keep */ .a { color: red; }",
+    "output": ".a{color:red}",
+    "diagnostics": []
+  },
+  {
+    "name": "last semicolon in a block is dropped",
+    "options": {},
+    "input": ".a { color: red; margin: 0; }",
+    "output": ".a{color:red;margin:0}",
+    "diagnostics": []
+  },
+  {
+    "name": "merge prevention: two identifiers",
+    "options": {},
+    "input": ".a { x: and screen; }",
+    "output": ".a{x:and screen}",
+    "diagnostics": []
+  },
+  {
+    "name": "merge prevention: dimension then identifier",
+    "options": {},
+    "input": ".a { margin: 1px solid; }",
+    "output": ".a{margin:1px solid}",
+    "diagnostics": []
+  },
+  {
+    "name": "merge prevention: identifier then function paren (media feature)",
+    "options": {},
+    "input": "@media screen and (min-width: 1px) { .a { color: red; } }",
+    "output": "@media screen and (min-width:1px){.a{color:red}}",
+    "diagnostics": []
+  },
+  {
+    "name": "merge prevention: calc plus operator both sides",
+    "options": {},
+    "input": ".a { width: calc(1px + 2px); }",
+    "output": ".a{width:calc(1px + 2px)}",
+    "diagnostics": []
+  },
+  {
+    "name": "comma tightened inside function arguments",
+    "options": {},
+    "input": ".a { color: rgba(0, 0, 0, .5); }",
+    "output": ".a{color:rgba(0,0,0,.5)}",
+    "diagnostics": []
+  },
+  {
+    "name": "selector list comma has no space",
+    "options": {},
+    "input": "h1, h2, h3 { margin: 0; }",
+    "output": "h1,h2,h3{margin:0}",
+    "diagnostics": []
+  },
+  {
+    "name": "empty rule collapses to tight braces",
+    "options": {},
+    "input": ".empty {  }",
+    "output": ".empty{}",
+    "diagnostics": []
+  },
+  {
+    "name": "nested @media minified",
+    "options": {},
+    "input": "@media (min-width: 1px) { .a { color: red; } .b { color: blue; } }",
+    "output": "@media (min-width:1px){.a{color:red}.b{color:blue}}",
+    "diagnostics": []
+  },
+  {
+    "name": "url() forms preserved",
+    "options": {},
+    "input": ".a { background: url( a.png ); background: url(\"b.png\"); }",
+    "output": ".a{background:url( a.png );background:url(\"b.png\")}",
+    "diagnostics": []
+  },
+  {
+    "name": "combinator spacing is stripped (not a merge risk)",
+    "options": {},
+    "input": ".a > .b ~ .c + .d { color: red; }",
+    "output": ".a>.b~.c + .d{color:red}",
+    "diagnostics": []
+  }
+]
