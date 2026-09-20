@@ -1,0 +1,65 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "format.html",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "HTML Beautifier/Minifier",
+  "description": "Beautifies or minifies HTML with a tokenizer that knows void elements, raw-text elements, optional end tags and inline elements. Incomplete markup formats without failing.",
+  "tools": [{
+    "id": "format.html",
+    "title": "HTML Beautify/Minify",
+    "category": "converter",
+    "description": "Beautify or minify HTML, including incomplete markup, with embedded script, style, pre and textarea content preserved byte for byte.",
+    "searchAliases": ["html", "beautify", "minify", "format", "pretty print"],
+    "operationIds": ["beautify", "minify"],
+    "workspaceId": "html"
+  }],
+  "operations": [
+    {
+      "id": "beautify",
+      "title": "Beautify",
+      "executor": { "kind": "javascriptWorker", "id": "format.html.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "HTML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/html"], "languages": ["html"] }],
+      "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save", "useAsInput"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indentation", "default": "spaces-2", "choices": [{ "id": "spaces-2", "label": "2 spaces" }, { "id": "spaces-4", "label": "4 spaces" }, { "id": "tab", "label": "One tab" }], "persistence": "instance", "sensitive": false },
+        { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "wrap-attributes", "type": "enum", "label": "Wrap attributes", "default": "auto", "choices": [{ "id": "auto", "label": "Keep on the tag line" }, { "id": "force", "label": "One per line" }], "persistence": "instance", "sensitive": false },
+        { "id": "indent-inner-html", "type": "boolean", "label": "Indent <head> and <body>", "default": false, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
+    },
+    {
+      "id": "minify",
+      "title": "Minify",
+      "executor": { "kind": "javascriptWorker", "id": "format.html.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "HTML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/html"], "languages": ["html"] }],
+      "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save", "useAsInput"] }],
+      "options": [
+        { "id": "indent", "type": "enum", "label": "Indentation", "default": "spaces-2", "choices": [{ "id": "spaces-2", "label": "2 spaces" }, { "id": "spaces-4", "label": "4 spaces" }, { "id": "tab", "label": "One tab" }], "persistence": "instance", "sensitive": false },
+        { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "wrap-attributes", "type": "enum", "label": "Wrap attributes", "default": "auto", "choices": [{ "id": "auto", "label": "Keep on the tag line" }, { "id": "force", "label": "One per line" }], "persistence": "instance", "sensitive": false },
+        { "id": "indent-inner-html", "type": "boolean", "label": "Indent <head> and <body>", "default": false, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{
+    "id": "html",
+    "kind": "transform",
+    "bindings": [
+      { "id": "source", "component": "editor", "inputPort": "input" },
+      { "id": "settings", "component": "form", "optionIds": ["indent", "preserve-comments", "wrap-attributes", "indent-inner-html"] },
+      { "id": "result", "component": "output", "outputPort": "output" },
+      { "id": "annotations", "component": "diagnostics", "outputPort": "output" }
+    ],
+    "commands": [],
+    "presentationSettings": []
+  }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-13"], "fixtures": ["beautify", "minify", "large-list", "invalid"], "uiScenarios": ["beautify", "minify"] }
+}

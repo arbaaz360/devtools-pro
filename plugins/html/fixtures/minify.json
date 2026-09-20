@@ -1,0 +1,118 @@
+[
+  {
+    "name": "minify-simple-document",
+    "options": {},
+    "input": "<!DOCTYPE html>\n<html>\n<head>\n  <title>x</title>\n</head>\n<body>\n  <p>hello</p>\n</body>\n</html>",
+    "output": "<!DOCTYPE html><html><head><title>x</title></head><body><p>hello</p></body></html>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-whitespace-between-blocks",
+    "options": {},
+    "input": "<div>\n\n  <p>a</p>\n\n  <p>b</p>\n\n</div>",
+    "output": "<div><p>a</p><p>b</p></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-collapse-text-runs",
+    "options": {},
+    "input": "<p>one    two\n\nthree</p>",
+    "output": "<p>one two three</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-comments-preserved-by-default",
+    "options": {},
+    "input": "<div><!-- keep --><p>a</p></div>",
+    "output": "<div><!-- keep --><p>a</p></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-comments-removed-when-disabled",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "<div><!-- drop --><p>a</p></div>",
+    "output": "<div><p>a</p></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-conditional-comment-kept-when-comments-off",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "<head><!--[if IE]><p>ie</p><![endif]--><!-- drop --></head>",
+    "output": "<head><!--[if IE]><p>ie</p><![endif]--></head>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-pre-untouched",
+    "options": {},
+    "input": "<div>\n  <pre>  keep\n   this</pre>\n</div>",
+    "output": "<div><pre>  keep\n   this</pre></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-script-untouched",
+    "options": {},
+    "input": "<body>\n  <script>\n    if (a < b) { f(\"</p>\"); }\n  </script>\n</body>",
+    "output": "<body><script>\n    if (a < b) { f(\"</p>\"); }\n  </script></body>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-textarea-untouched",
+    "options": {},
+    "input": "<form>\n  <textarea>line one\n  line two</textarea>\n</form>",
+    "output": "<form><textarea>line one\n  line two</textarea></form>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-attribute-quoting-preserved",
+    "options": {},
+    "input": "<a href=\"/a\" title='b' rel=next hidden>x</a>",
+    "output": "<a href=\"/a\" title='b' rel=next hidden>x</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-inline-spacing-kept",
+    "options": {},
+    "input": "<p>a <b>b</b> <i>c</i> d</p>",
+    "output": "<p>a <b>b</b> <i>c</i> d</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-headless-sample",
+    "options": {},
+    "input": "<div>\n  <p>  hello   <em>there</em>  </p>\n  <!-- gone -->\n</div>",
+    "output": "<div><p>hello <em>there</em></p><!-- gone --></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-void-elements",
+    "options": {},
+    "input": "<div>\n  <img src=\"a.png\">\n  <br />\n  <hr>\n</div>",
+    "output": "<div><img src=\"a.png\"><br/><hr></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-optional-end-tags-kept-as-written",
+    "options": {},
+    "input": "<ul>\n  <li>one\n  <li>two\n</ul>",
+    "output": "<ul><li>one<li>two</ul>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-comment-between-text-keeps-space",
+    "options": {},
+    "input": "<p>before <!-- note --> after</p>",
+    "output": "<p>before <!-- note --> after</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify-du13-sample",
+    "options": {},
+    "input": "<!DOCTYPE html><html><head><title>x</title></head><body><ul><li>one<li>two <b>bold</b> text</ul><pre>  keep\n   this</pre><br><img src=a.png></body></html>",
+    "output": "<!DOCTYPE html><html><head><title>x</title></head><body><ul><li>one<li>two <b>bold</b> text</ul><pre>  keep\n   this</pre><br><img src=a.png></body></html>",
+    "diagnostics": []
+  }
+]

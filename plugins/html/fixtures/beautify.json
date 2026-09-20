@@ -1,0 +1,632 @@
+[
+  {
+    "name": "du13-screenshot-sample",
+    "options": {},
+    "input": "<!DOCTYPE html><html><head><title>x</title></head><body><ul><li>one<li>two <b>bold</b> text</ul><pre>  keep\n   this</pre><br><img src=a.png></body></html>",
+    "output": "<!DOCTYPE html>\n<html>\n<head>\n  <title>x</title>\n</head>\n<body>\n  <ul>\n    <li>one\n    <li>two <b>bold</b> text\n  </ul>\n  <pre>  keep\n   this</pre>\n  <br>\n  <img src=a.png>\n</body>\n</html>",
+    "diagnostics": []
+  },
+  {
+    "name": "full-document-head-body",
+    "options": {},
+    "input": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n<meta charset=\"utf-8\">\n<title>Report</title>\n<link rel=\"stylesheet\" href=\"app.css\">\n</head>\n<body>\n<header><h1>Report</h1></header>\n<main><p>Body text.</p></main>\n<footer><small>&copy; 2026</small></footer>\n</body>\n</html>",
+    "output": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <title>Report</title>\n  <link rel=\"stylesheet\" href=\"app.css\">\n</head>\n<body>\n  <header>\n    <h1>Report</h1>\n  </header>\n  <main>\n    <p>Body text.</p>\n  </main>\n  <footer><small>&copy; 2026</small></footer>\n</body>\n</html>",
+    "diagnostics": []
+  },
+  {
+    "name": "nested-lists",
+    "options": {},
+    "input": "<ul><li>one<ul><li>one.a</li><li>one.b</li></ul></li><li>two</li></ul>",
+    "output": "<ul>\n  <li>\n    one\n    <ul>\n      <li>one.a</li>\n      <li>one.b</li>\n    </ul>\n  </li>\n  <li>two</li>\n</ul>",
+    "diagnostics": []
+  },
+  {
+    "name": "table-thead-tbody",
+    "options": {},
+    "input": "<table><thead><tr><th>Name</th><th>Value</th></tr></thead><tbody><tr><td>a</td><td>1</td></tr><tr><td>b</td><td>2</td></tr></tbody></table>",
+    "output": "<table>\n  <thead>\n    <tr>\n      <th>Name</th>\n      <th>Value</th>\n    </tr>\n  </thead>\n  <tbody>\n    <tr>\n      <td>a</td>\n      <td>1</td>\n    </tr>\n    <tr>\n      <td>b</td>\n      <td>2</td>\n    </tr>\n  </tbody>\n</table>",
+    "diagnostics": []
+  },
+  {
+    "name": "paragraph-inline-mixed",
+    "options": {},
+    "input": "<p>See <a href=\"/docs\">the docs</a>, the <b>bold</b> part and <code>format()</code> before you file a bug.</p>",
+    "output": "<p>See <a href=\"/docs\">the docs</a>, the <b>bold</b> part and <code>format()</code> before you file a bug.</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "void-elements-without-slash",
+    "options": {},
+    "input": "<div><img src=\"a.png\" alt=\"a\"><br><hr><input type=\"text\" name=\"q\"><wbr></div>",
+    "output": "<div>\n  <img src=\"a.png\" alt=\"a\">\n  <br>\n  <hr>\n  <input type=\"text\" name=\"q\"><wbr>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "void-elements-with-slash",
+    "options": {},
+    "input": "<div><img src=\"a.png\" alt=\"a\" /><br /><hr /><input type=\"text\" name=\"q\" /><wbr /></div>",
+    "output": "<div>\n  <img src=\"a.png\" alt=\"a\"/>\n  <br/>\n  <hr/>\n  <input type=\"text\" name=\"q\"/><wbr/>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "pre-with-indentation",
+    "options": {},
+    "input": "<div><pre>\n  first\n    second\n      third\n</pre></div>",
+    "output": "<div>\n  <pre>\n  first\n    second\n      third\n</pre>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "script-with-lt-and-close",
+    "options": {},
+    "input": "<body><script>\n  if (a < b && b </* not a tag */ c) { report(\"</p>\"); }\n</script></body>",
+    "output": "<body>\n  <script>\n  if (a < b && b </* not a tag */ c) { report(\"</p>\"); }\n</script>\n</body>",
+    "diagnostics": []
+  },
+  {
+    "name": "style-with-braces",
+    "options": {},
+    "input": "<head><style>\n  body { margin: 0; padding: 0 }\n  a:hover { color: red }\n</style></head>",
+    "output": "<head>\n  <style>\n  body { margin: 0; padding: 0 }\n  a:hover { color: red }\n</style>\n</head>",
+    "diagnostics": []
+  },
+  {
+    "name": "textarea-with-newlines",
+    "options": {},
+    "input": "<form><textarea name=\"note\">line one\n  line two\n\nline four</textarea></form>",
+    "output": "<form><textarea name=\"note\">line one\n  line two\n\nline four</textarea></form>",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute-double-quoted",
+    "options": {},
+    "input": "<a href=\"/a b\" title=\"x\">t</a>",
+    "output": "<a href=\"/a b\" title=\"x\">t</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute-single-quoted",
+    "options": {},
+    "input": "<a href='/a b' title='x'>t</a>",
+    "output": "<a href='/a b' title='x'>t</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute-unquoted",
+    "options": {},
+    "input": "<a href=/ab title=x>t</a>",
+    "output": "<a href=/ab title=x>t</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute-valueless",
+    "options": {},
+    "input": "<input type=\"checkbox\" checked>",
+    "output": "<input type=\"checkbox\" checked>",
+    "diagnostics": []
+  },
+  {
+    "name": "boolean-attributes",
+    "options": {},
+    "input": "<form><input type=\"checkbox\" checked disabled><select multiple required><option selected>a</option></select></form>",
+    "output": "<form><input type=\"checkbox\" checked disabled><select multiple required><option selected>a</option></select></form>",
+    "diagnostics": []
+  },
+  {
+    "name": "conditional-comment",
+    "options": {},
+    "input": "<head><!--[if lt IE 9]><script src=\"shim.js\"></script><![endif]--><title>t</title></head>",
+    "output": "<head>\n  <!--[if lt IE 9]><script src=\"shim.js\"></script><![endif]-->\n  <title>t</title>\n</head>",
+    "diagnostics": []
+  },
+  {
+    "name": "conditional-comment-kept-when-comments-off",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "<head><!--[if lt IE 9]><script src=\"shim.js\"></script><![endif]--><!-- dropped --><title>t</title></head>",
+    "output": "<head>\n  <!--[if lt IE 9]><script src=\"shim.js\"></script><![endif]-->\n  <title>t</title>\n</head>",
+    "diagnostics": []
+  },
+  {
+    "name": "unclosed-li-sequence",
+    "options": {},
+    "input": "<ul><li>one<li>two<li>three</ul>",
+    "output": "<ul>\n  <li>one\n  <li>two\n  <li>three\n</ul>",
+    "diagnostics": []
+  },
+  {
+    "name": "unclosed-p-sequence",
+    "options": {},
+    "input": "<div><p>one<p>two<p>three</div>",
+    "output": "<div>\n  <p>one\n  <p>two\n  <p>three\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "mismatched-end-tag",
+    "options": {},
+    "input": "<div><span>text</div>",
+    "output": "<div><span>text</div>",
+    "diagnostics": [
+      {
+        "code": "html.mismatched-end-tag",
+        "severity": "warning",
+        "message": "</div> closes <span>, which was still open",
+        "data": {
+          "tag": "div",
+          "closed": "span"
+        },
+        "offset": 15,
+        "line": 1,
+        "column": 16,
+        "end": 21
+      }
+    ]
+  },
+  {
+    "name": "stray-end-br",
+    "options": {},
+    "input": "<p>one</br>two</p>",
+    "output": "<p>onetwo</p>",
+    "diagnostics": [
+      {
+        "code": "html.void-end-tag",
+        "severity": "warning",
+        "message": "<br> is a void element and never has an end tag; </br> is dropped",
+        "data": {
+          "tag": "br"
+        },
+        "offset": 6,
+        "line": 1,
+        "column": 7,
+        "end": 11
+      }
+    ]
+  },
+  {
+    "name": "wrap-attributes-force",
+    "options": {
+      "wrap-attributes": "force"
+    },
+    "input": "<div class=\"card wide\" id=\"main\" data-role=\"panel\"><p class=\"only\">text</p><span id=\"s\">one</span></div>",
+    "output": "<div\n  class=\"card wide\"\n  id=\"main\"\n  data-role=\"panel\">\n  <p class=\"only\">text</p>\n  <span id=\"s\">one</span>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "wrap-attributes-force-single-attribute-stays",
+    "options": {
+      "wrap-attributes": "force"
+    },
+    "input": "<div class=\"card\"><p>text</p></div>",
+    "output": "<div class=\"card\">\n  <p>text</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "indent-inner-html-true",
+    "options": {
+      "indent-inner-html": true
+    },
+    "input": "<html><head><title>x</title></head><body><div>y</div></body></html>",
+    "output": "<html>\n  <head>\n    <title>x</title>\n  </head>\n  <body>\n    <div>y</div>\n  </body>\n</html>",
+    "diagnostics": []
+  },
+  {
+    "name": "indent-inner-html-default-false",
+    "options": {},
+    "input": "<html><head><title>x</title></head><body><div>y</div></body></html>",
+    "output": "<html>\n<head>\n  <title>x</title>\n</head>\n<body>\n  <div>y</div>\n</body>\n</html>",
+    "diagnostics": []
+  },
+  {
+    "name": "indent-4-spaces",
+    "options": {
+      "indent": "4"
+    },
+    "input": "<div><ul><li>one</li><li>two</li></ul></div>",
+    "output": "<div>\n    <ul>\n        <li>one</li>\n        <li>two</li>\n    </ul>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "indent-tab",
+    "options": {
+      "indent": "tab"
+    },
+    "input": "<div><ul><li>one</li><li>two</li></ul></div>",
+    "output": "<div>\n\t<ul>\n\t\t<li>one</li>\n\t\t<li>two</li>\n\t</ul>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "indent-2-spaces-default",
+    "options": {},
+    "input": "<div><ul><li>one</li><li>two</li></ul></div>",
+    "output": "<div>\n  <ul>\n    <li>one</li>\n    <li>two</li>\n  </ul>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "comments-preserved-by-default",
+    "options": {},
+    "input": "<div><!-- keep me --><p>text</p></div>",
+    "output": "<div>\n  <!-- keep me -->\n  <p>text</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "comments-removed-when-disabled",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "<div><!-- drop me --><p>text</p></div>",
+    "output": "<div>\n  <p>text</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "comment-inside-paragraph-keeps-spacing",
+    "options": {},
+    "input": "<p>before <!-- note --> after</p>",
+    "output": "<p>before <!-- note --> after</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "doctype-first-line",
+    "options": {},
+    "input": "<!doctype html>\n<html><body><p>x</p></body></html>",
+    "output": "<!doctype html>\n<html>\n<body>\n  <p>x</p>\n</body>\n</html>",
+    "diagnostics": []
+  },
+  {
+    "name": "whitespace-only-between-blocks-dropped",
+    "options": {},
+    "input": "<div>\n\n   <p>a</p>\n\n   <p>b</p>\n\n</div>",
+    "output": "<div>\n  <p>a</p>\n  <p>b</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "text-whitespace-collapsed",
+    "options": {},
+    "input": "<p>one    two\n\nthree\t\tfour</p>",
+    "output": "<p>one two three four</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "inline-elements-not-reflowed",
+    "options": {},
+    "input": "<p>a <em>b</em> c <strong>d</strong> e <span>f</span> g</p>",
+    "output": "<p>a <em>b</em> c <strong>d</strong> e <span>f</span> g</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "empty-block-element",
+    "options": {},
+    "input": "<div></div>",
+    "output": "<div></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "empty-block-element-with-whitespace",
+    "options": {},
+    "input": "<div>\n   \n</div>",
+    "output": "<div></div>",
+    "diagnostics": []
+  },
+  {
+    "name": "self-closing-non-void-element",
+    "options": {},
+    "input": "<div><custom-widget/><p>after</p></div>",
+    "output": "<div>\n  <custom-widget/>\n  <p>after</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "unknown-element-is-block",
+    "options": {},
+    "input": "<my-panel><my-item>one</my-item><my-item>two</my-item></my-panel>",
+    "output": "<my-panel>\n  <my-item>one</my-item>\n  <my-item>two</my-item>\n</my-panel>",
+    "diagnostics": []
+  },
+  {
+    "name": "tag-names-case-insensitive-emitted-as-written",
+    "options": {},
+    "input": "<DIV><P>one</P><BR><IMG SRC=\"a.png\"></DIV>",
+    "output": "<DIV>\n  <P>one</P>\n  <BR>\n  <IMG SRC=\"a.png\">\n</DIV>",
+    "diagnostics": []
+  },
+  {
+    "name": "attribute-names-case-insensitive-emitted-as-written",
+    "options": {},
+    "input": "<input TYPE=\"text\" DataRole=\"x\" readonly>",
+    "output": "<input TYPE=\"text\" DataRole=\"x\" readonly>",
+    "diagnostics": []
+  },
+  {
+    "name": "character-references-untouched",
+    "options": {},
+    "input": "<p>&amp; &lt; &#169; &nbsp; &notanentity;</p>",
+    "output": "<p>&amp; &lt; &#169; &nbsp; &notanentity;</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "unclosed-div-diagnostic",
+    "options": {},
+    "input": "<div><p>text</p>",
+    "output": "<div>\n  <p>text</p>",
+    "diagnostics": [
+      {
+        "code": "html.unclosed-element",
+        "severity": "warning",
+        "message": "<div> was never closed; it is closed here",
+        "data": {
+          "tag": "div"
+        },
+        "offset": 0,
+        "line": 1,
+        "column": 1,
+        "end": 5
+      }
+    ]
+  },
+  {
+    "name": "stray-end-tag-dropped",
+    "options": {},
+    "input": "<div>text</div></section>",
+    "output": "<div>text</div>",
+    "diagnostics": [
+      {
+        "code": "html.stray-end-tag",
+        "severity": "warning",
+        "message": "</section> has no open <section>; it is dropped",
+        "data": {
+          "tag": "section"
+        },
+        "offset": 15,
+        "line": 1,
+        "column": 16,
+        "end": 25
+      }
+    ]
+  },
+  {
+    "name": "content-after-html",
+    "options": {},
+    "input": "<html><body><p>x</p></body></html><p>after</p>",
+    "output": "<html>\n<body>\n  <p>x</p>\n</body>\n</html>\n<p>after</p>",
+    "diagnostics": [
+      {
+        "code": "html.content-after-html",
+        "severity": "warning",
+        "message": "content after </html> is not part of the document the HTML parser builds",
+        "data": {
+          "tag": "html"
+        },
+        "offset": 34,
+        "line": 1,
+        "column": 35,
+        "end": 37
+      }
+    ]
+  },
+  {
+    "name": "unquoted-attribute-with-quote",
+    "options": {},
+    "input": "<a href=x\"y>text</a>",
+    "output": "<a href=x\"y>text</a>",
+    "diagnostics": [
+      {
+        "code": "html.unquoted-attribute",
+        "severity": "warning",
+        "message": "unquoted value for attribute \"href\" on <a> contains \"\\\"\"; an unquoted value ends at the first whitespace or \">\", so quotes and \">\" cannot appear inside it",
+        "data": {
+          "tag": "a",
+          "attribute": "href",
+          "value": "x\"y"
+        },
+        "offset": 8,
+        "line": 1,
+        "column": 9,
+        "end": 11
+      }
+    ]
+  },
+  {
+    "name": "nested-inline-in-paragraph",
+    "options": {},
+    "input": "<p>The <b>quick <i>brown <u>fox</u></i></b> jumps.</p>",
+    "output": "<p>The <b>quick <i>brown <u>fox</u></i></b> jumps.</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "definition-list-optional-end-tags",
+    "options": {},
+    "input": "<dl><dt>term one<dd>definition one<dt>term two<dd>definition two</dl>",
+    "output": "<dl>\n  <dt>term one\n  <dd>definition one\n  <dt>term two\n  <dd>definition two\n</dl>",
+    "diagnostics": []
+  },
+  {
+    "name": "table-optional-end-tags",
+    "options": {},
+    "input": "<table><tr><td>a<td>b<tr><td>c<td>d</table>",
+    "output": "<table>\n  <tr>\n    <td>a\n    <td>b\n  <tr>\n    <td>c\n    <td>d\n</table>",
+    "diagnostics": []
+  },
+  {
+    "name": "select-option-optional-end-tags",
+    "options": {},
+    "input": "<select name=\"s\"><option>one<option>two<option>three</select>",
+    "output": "<select name=\"s\"><option>one<option>two<option>three</select>",
+    "diagnostics": []
+  },
+  {
+    "name": "deeply-nested-five-levels",
+    "options": {},
+    "input": "<section><article><div><ul><li>deep</li></ul></div></article></section>",
+    "output": "<section>\n  <article>\n    <div>\n      <ul>\n        <li>deep</li>\n      </ul>\n    </div>\n  </article>\n</section>",
+    "diagnostics": []
+  },
+  {
+    "name": "script-json-content",
+    "options": {},
+    "input": "<head><script type=\"application/json\">{\"a\": [1, 2], \"b\": \"<c>\"}</script></head>",
+    "output": "<head>\n  <script type=\"application/json\">{\"a\": [1, 2], \"b\": \"<c>\"}</script>\n</head>",
+    "diagnostics": []
+  },
+  {
+    "name": "bogus-comment-and-processing-instruction",
+    "options": {},
+    "input": "<div><?php echo 1; ?><![CDATA[x]]><p>after</p></div>",
+    "output": "<div>\n  <?php echo 1; ?><![CDATA[x]]>\n  <p>after</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "pre-content-never-altered",
+    "options": {},
+    "input": "<div>   <pre>a   b\n\tc</pre>   </div>",
+    "output": "<div>\n  <pre>a   b\n\tc</pre>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "mixed-block-and-text-children",
+    "options": {},
+    "input": "<div>lead text<p>block</p>trail text</div>",
+    "output": "<div>\n  lead text\n  <p>block</p>\n  trail text\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "heading-levels",
+    "options": {},
+    "input": "<article><h1>One</h1><h2>Two</h2><h3>Three</h3><h4>Four</h4><h5>Five</h5><h6>Six</h6></article>",
+    "output": "<article>\n  <h1>One</h1>\n  <h2>Two</h2>\n  <h3>Three</h3>\n  <h4>Four</h4>\n  <h5>Five</h5>\n  <h6>Six</h6>\n</article>",
+    "diagnostics": []
+  },
+  {
+    "name": "figure-details-summary",
+    "options": {},
+    "input": "<figure><img src=\"a.png\" alt=\"a\"><figcaption>Caption <em>text</em></figcaption></figure><details><summary>More</summary><p>Hidden</p></details>",
+    "output": "<figure>\n  <img src=\"a.png\" alt=\"a\">\n  <figcaption>Caption <em>text</em></figcaption>\n</figure>\n<details>\n  <summary>More</summary>\n  <p>Hidden</p>\n</details>",
+    "diagnostics": []
+  },
+  {
+    "name": "form-fieldset-label-button",
+    "options": {},
+    "input": "<form action=\"/x\"><fieldset><label for=\"q\">Query</label><input id=\"q\" name=\"q\"><button type=\"submit\">Go</button></fieldset></form>",
+    "output": "<form action=\"/x\">\n  <fieldset><label for=\"q\">Query</label><input id=\"q\" name=\"q\"><button type=\"submit\">Go</button></fieldset>\n</form>",
+    "diagnostics": []
+  },
+  {
+    "name": "blockquote-and-nav",
+    "options": {},
+    "input": "<nav><a href=\"/\">Home</a> <a href=\"/a\">A</a></nav><blockquote cite=\"/s\"><p>Quoted.</p></blockquote>",
+    "output": "<nav><a href=\"/\">Home</a> <a href=\"/a\">A</a></nav>\n<blockquote cite=\"/s\">\n  <p>Quoted.</p>\n</blockquote>",
+    "diagnostics": []
+  },
+  {
+    "name": "inline-wrapper-around-block",
+    "options": {},
+    "input": "<span>before<div>inner</div>after</span>",
+    "output": "<span>before<div>inner</div>after</span>",
+    "diagnostics": []
+  },
+  {
+    "name": "empty-attribute-value",
+    "options": {},
+    "input": "<a href=\"\" title=''>x</a>",
+    "output": "<a href=\"\" title=''>x</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "nbsp-is-not-collapsed",
+    "options": {},
+    "input": "<p>a  b   c</p>",
+    "output": "<p>a  b c</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "attributes-single-spaced",
+    "options": {},
+    "input": "<a    href = \"x\"\n   title='y'     rel=next   >t</a>",
+    "output": "<a href=\"x\" title='y' rel=next>t</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "wrap-attributes-auto-keeps-them-on-the-tag-line",
+    "options": {},
+    "input": "<div class=\"a\" id=\"b\" data-x=\"c\"><p>t</p></div>",
+    "output": "<div class=\"a\" id=\"b\" data-x=\"c\">\n  <p>t</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "crlf-source-is-normalized-like-any-whitespace",
+    "options": {},
+    "input": "<div>\r\n  <p>a\r\n  b</p>\r\n</div>",
+    "output": "<div>\n  <p>a b</p>\n</div>",
+    "diagnostics": []
+  },
+  {
+    "name": "unterminated-comment-runs-to-end-of-input",
+    "options": {},
+    "input": "<div><p>a</p><!-- open",
+    "output": "<div>\n  <p>a</p>\n  <!-- open",
+    "diagnostics": [
+      {
+        "code": "html.unclosed-element",
+        "severity": "warning",
+        "message": "<div> was never closed; it is closed here",
+        "data": {
+          "tag": "div"
+        },
+        "offset": 0,
+        "line": 1,
+        "column": 1,
+        "end": 5
+      }
+    ]
+  },
+  {
+    "name": "unterminated-start-tag-at-end-of-input",
+    "options": {},
+    "input": "<div><p>a</p><span class=\"x\"",
+    "output": "<div>\n  <p>a</p>\n  <span class=\"x\">",
+    "diagnostics": [
+      {
+        "code": "html.unclosed-element",
+        "severity": "warning",
+        "message": "<div> was never closed; it is closed here",
+        "data": {
+          "tag": "div"
+        },
+        "offset": 0,
+        "line": 1,
+        "column": 1,
+        "end": 5
+      },
+      {
+        "code": "html.unclosed-element",
+        "severity": "warning",
+        "message": "<span> was never closed; it is closed here",
+        "data": {
+          "tag": "span"
+        },
+        "offset": 13,
+        "line": 1,
+        "column": 14,
+        "end": 28
+      }
+    ]
+  },
+  {
+    "name": "paragraph-with-br-is-not-closed",
+    "options": {},
+    "input": "<p>line one<br>line two</p>",
+    "output": "<p>\n  line one\n  <br>\n  line two\n</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "paragraph-not-closed-by-unknown-element",
+    "options": {},
+    "input": "<p>text <custom-tag>x</custom-tag> more</p>",
+    "output": "<p>\n  text\n  <custom-tag>x</custom-tag>\n  more\n</p>",
+    "diagnostics": []
+  },
+  {
+    "name": "paragraph-closed-by-hr",
+    "options": {},
+    "input": "<div><p>before<hr><p>after</p></div>",
+    "output": "<div>\n  <p>before\n  <hr>\n  <p>after</p>\n</div>",
+    "diagnostics": []
+  }
+]
