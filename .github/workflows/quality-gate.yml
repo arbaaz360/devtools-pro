@@ -36,3 +36,13 @@ jobs:
           if (Test-Path $key) { Write-Host "WebView2 runtime installed: $((Get-ItemProperty $key).pv)" } else { Write-Warning 'WebView2 runtime still not registered' }
       - name: Run repository quality gate
         run: node scripts/quality-gate.mjs
+      - name: Keep native smoke evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-smoke
+          path: |
+            apps/desktop/test-results/desktop-smoke.png
+            apps/desktop/test-results/desktop-smoke.log
+            apps/desktop/test-results/webview2-smoke.log
+          if-no-files-found: ignore

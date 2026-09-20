@@ -13,7 +13,7 @@
 // `vite preview` for the duration of the check.
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { createRequire } from "node:module";
@@ -65,7 +65,10 @@ if (!served) fail(`vite preview did not answer on ${previewPort}`);
 const browserLog = resolve(desktop, "test-results", "webview2-smoke.log");
 mkdirSync(resolve(desktop, "test-results"), { recursive: true });
 const ciArguments = process.env.CI ? ` --disable-gpu --disable-gpu-compositing --no-sandbox --enable-logging --v=0 --log-file=${browserLog}` : "";
-const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}${ciArguments}` }, stdio: "ignore" });
+// The executable's own output is kept: Tauri reports a failed webview creation there.
+const appLog = resolve(desktop, "test-results", "desktop-smoke.log");
+const appOut = openSync(appLog, "w");
+const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}${ciArguments}` }, stdio: ["ignore", appOut, appOut] });
 children.push(app);
 let browser = null;
 // A cold WebView2 start on a CI runner can take well over the local few seconds.
@@ -84,8 +87,13 @@ if (!browser) {
   console.error("processes:", probe('tasklist /fi "IMAGENAME eq devtools-desktop.exe" /fo csv /nh'), probe('tasklist /fi "IMAGENAME eq msedgewebview2.exe" /fo csv /nh'));
   console.error("listening on the port:", probe(`netstat -ano | findstr :${port}`) || "(nothing)");
   try { console.error("/json/version:", (await (await fetch(`http://127.0.0.1:${port}/json/version`)).text()).slice(0, 300)); } catch (error) { console.error("/json/version:", String(error.cause ?? error.message).slice(0, 200)); }
-  if (existsSync(browserLog)) { const { readFileSync } = await import("node:fs"); console.error("webview2 log tail:", readFileSync(browserLog, "utf8").split("\n").slice(-40).join("\n")); }
+  if (existsSync(browserLog)) console.error("webview2 log tail:", readFileSync(browserLog, "utf8").split("\n").slice(-40).join("\n"));
   else console.error("webview2 log: none written at", browserLog);
+  console.error("executable output:", (existsSync(appLog) ? readFileSync(appLog, "utf8").trim() : "") || "(empty)");
+  // A picture of the runner's desktop: a dialog or an unpainted window says more than any log.
+  const shot = resolve(desktop, "test-results", "desktop-smoke.png");
+  const script = `Add-Type -AssemblyName System.Windows.Forms,System.Drawing; $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds; $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height; $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); $bmp.Save('${shot.replace(/'/g, "''")}'); Write-Output ("screen " + $b.Width + "x" + $b.Height)`;
+  console.error("desktop screenshot:", probe(`powershell -NoProfile -Command "${script.replace(/"/g, '\\"')}"`), existsSync(shot) ? shot : "(not written)");
   fail(`could not connect to WebView2 over CDP within ${Math.round(connectBudgetMs / 1000)} s (executable ${app.exitCode === null ? "still running" : `exited ${app.exitCode}`})`);
 }
 
