@@ -127,6 +127,10 @@ async function readDataUrl(file: File): Promise<string> {
 
 export const IMAGE_IMPORT_LIMIT = 25 * 1024 * 1024;
 
+/** Raster results are read as bytes; an SVG or HTML document is text the shell renders itself. */
+export const isBinaryResult = (event: JobFinished) =>
+  event.renderer === "binary" || (!!event.resultMime?.startsWith("image/") && event.renderer !== "svg");
+
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
 export class WorkbenchController {
   private api: WorkbenchApi;
@@ -267,7 +271,7 @@ export class WorkbenchController {
       !event.resultDocumentId
     )
       throw new Error("That result is no longer current.");
-    if (event.renderer === "binary" || event.resultMime?.startsWith("image/"))
+    if (isBinaryResult(event))
       throw new Error("Binary results cannot be opened as text.");
     const token = tokenFor(tab);
     const resultId = event.resultDocumentId;
@@ -914,10 +918,7 @@ export class WorkbenchController {
     const view: ResultView = { event, text: "", truncated: false };
     try {
       if (this.current(task.token) && event.ok && event.resultDocumentId) {
-        if (
-          event.renderer === "binary" ||
-          event.resultMime?.startsWith("image/")
-        )
+        if (isBinaryResult(event))
           view.image = await this.api.readBinaryPreview(event.resultDocumentId);
         else {
           const preview = await this.api.readPreview(event.resultDocumentId);

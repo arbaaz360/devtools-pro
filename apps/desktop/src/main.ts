@@ -37,6 +37,7 @@ import {
   type ToolDefinition,
 } from "./workbench/tools";
 import { WorkerEngine } from "./plugins/engine";
+import { annotationMarkup } from "./ui/annotations";
 import type { OptionSpec } from "../../../packages/plugin-contract/ts/generated.ts";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
@@ -297,6 +298,34 @@ function renderTools() {
     nav.append(section);
   }
 }
+/* ------------------------------------------------------- Editor annotations */
+let renderedAnnotationsKey = "";
+// Highlights belong to the text they were computed for: a stale result (the text
+// changed since) hides them until the next result lands, so nothing drifts.
+function renderEditorAnnotations(tab: TabState, input: HTMLTextAreaElement, text: string) {
+  const layer = $("#editor-highlight");
+  const annotations = tab.result && !tab.resultStale && tab.result.event.ok ? (tab.result.event.annotations ?? []) : [];
+  const show = annotations.length > 0 && tab.text !== null;
+  const key = show ? `${tab.id}:${tab.result?.event.jobId}:${text.length}` : "";
+  if (key === renderedAnnotationsKey && show === !layer.hidden) return;
+  renderedAnnotationsKey = key;
+  layer.hidden = !show;
+  input.classList.toggle("annotated", show);
+  if (!show) { layer.replaceChildren(); return; }
+  // A trailing newline needs a visible line so the two scroll heights match.
+  layer.innerHTML = annotationMarkup(text, annotations) + (text.endsWith("\n") ? " " : "");
+  layer.scrollTop = input.scrollTop;
+  layer.scrollLeft = input.scrollLeft;
+}
+function syncOverlay(source: HTMLElement, layer: HTMLElement) {
+  source.addEventListener("scroll", () => {
+    if (layer.hidden) return;
+    layer.scrollTop = source.scrollTop;
+    layer.scrollLeft = source.scrollLeft;
+  }, { passive: true });
+}
+syncOverlay($("#preview"), $("#editor-highlight"));
+syncOverlay($("#result-output"), $("#result-highlight"));
 function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".format-control");
   const optionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${JSON.stringify(tab.options)}:${tool?.id === "text.find-replace" ? tab.revision : ""}`;
@@ -733,6 +762,7 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
   } else if (!tool?.compare) {
     const text = tab.text ?? tab.source?.preview ?? "";
     if (input.value !== text) input.value = text;
+    renderEditorAnnotations(tab, input, text);
     input.readOnly = tab.text === null || tab.phase === "importing";
     input.disabled = false;
     input.oninput = () => controller.edit(tab.id, input.value);
@@ -952,7 +982,9 @@ function renderResult(tab: TabState) {
   const output = $("#result-output") as HTMLTextAreaElement;
   const highlight = $("#result-highlight");
   const statusMessage = $("#result-status-message");
-  const binary = !!result.image;
+  const framed = event.ok && event.renderer === "preview";
+  const vector = event.ok && event.renderer === "svg";
+  const binary = !!result.image || framed || vector;
   let diff = false;
   if (!binary && event.renderer === "diff" && event.ok) {
     // A truncated preview never parses; it falls back to the bounded raw text
@@ -979,11 +1011,29 @@ function renderResult(tab: TabState) {
   structured.hidden = !diff;
   media.hidden = !binary;
   $(".result-preview-block").classList.toggle("binary-output", binary);
+  media.classList.toggle("preview-stage", framed);
   if (result.image) {
     const image = document.createElement("img");
     image.className = "binary-preview";
     image.src = result.image.data;
     image.alt = `${result.image.mime} result preview`;
+    media.append(image);
+  } else if (framed) {
+    // The document is shown in a frame with every sandbox permission withheld: no
+    // scripts, forms, navigation or same-origin access, and no network beyond the
+    // shell's own CSP. The text stays behind Copy and Save unchanged.
+    const frame = document.createElement("iframe");
+    frame.className = "preview-frame";
+    frame.setAttribute("sandbox", "");
+    frame.setAttribute("referrerpolicy", "no-referrer");
+    frame.title = "Rendered preview";
+    frame.srcdoc = result.text;
+    media.append(frame);
+  } else if (vector) {
+    const image = document.createElement("img");
+    image.className = "binary-preview";
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(result.text)}`;
+    image.alt = "SVG result preview";
     media.append(image);
   }
   output.hidden = binary || diff;
@@ -1030,10 +1080,10 @@ function renderResult(tab: TabState) {
         ? "Complete result"
         : "No result");
   $("#copy-result").hidden =
-    tab.resultStale || !event.ok || binary || !result.text;
+    tab.resultStale || !event.ok || !!result.image || !result.text;
   $("#copy-result").textContent = "Copy complete result";
   $("#open-result").hidden =
-    tab.resultStale || !event.ok || binary || !event.resultDocumentId;
+    tab.resultStale || !event.ok || !!result.image || !event.resultDocumentId;
   $("#save-result").hidden =
     tab.resultStale || !event.ok || !event.resultDocumentId;
 }

@@ -168,6 +168,17 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 .editor-host:focus-within { box-shadow: inset 0 0 0 1px var(--accent-strong); }
 #preview, .compare-source textarea, #result-output, #result-highlight, #result-summary { width: 100%; min-height: 0; border: 0; outline: 0; resize: none; background: var(--well); color: #d4d8dd; caret-color: var(--accent); font: 12px/1.55 var(--mono); tab-size: 2; }
 #preview { flex: 1; padding: 10px 12px; }
+/* Annotation layer: same box, font and padding as the editor so highlights sit under their
+   characters; the textarea goes transparent above it and keeps the caret and selection. */
+#editor-highlight { position: absolute; inset: 0; padding: 10px 12px; overflow: auto; white-space: pre; z-index: 0; pointer-events: none; color: transparent; }
+#editor-highlight mark { color: transparent; background: rgba(159, 190, 223, 0.22); border-radius: 0; }
+#editor-highlight mark.ann-group { background: rgba(159, 190, 223, 0.12); box-shadow: inset 0 -1px 0 var(--accent-strong); }
+#editor-highlight mark.ann-warning { background: rgba(239, 159, 39, 0.22); }
+#editor-highlight mark.ann-error { background: rgba(226, 75, 74, 0.25); }
+#editor-highlight mark.ann-info { background: rgba(93, 202, 165, 0.18); }
+#preview.annotated { position: relative; z-index: 1; background: transparent; }
+.preview-frame { width: 100%; height: 100%; border: 0; background: #fff; }
+.result-media.preview-stage { display: block; padding: 0; }
 #preview:read-only { color: #a9b0b8; }
 .editor-host.drag-over { outline: 1px dashed var(--accent); outline-offset: -3px; background: #16181b; }
 .empty-state, .result-empty, .input-message { display: flex; align-items: center; justify-content: center; flex-direction: column; width: 100%; padding: 28px; color: var(--muted); text-align: center; }

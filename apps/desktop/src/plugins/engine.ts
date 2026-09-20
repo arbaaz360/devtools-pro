@@ -1,7 +1,7 @@
 import type { ExecutionIdentity, FileDocument, JobFinished, JobProgress, ToolManifest } from "../bridge";
 import type { WorkbenchApi } from "../workbench/controller.ts";
 import { packageTools } from "./catalog.ts";
-import { prepareOptions, primaryInput, primaryOutput, type EngineTool } from "./describe.ts";
+import { prepareOptions, primaryInput, primaryOutput, rendererFor, splitAnnotations, type EngineTool } from "./describe.ts";
 import type { RunOutcome, RunRequest } from "./protocol.ts";
 
 /**
@@ -154,11 +154,13 @@ export class WorkerEngine {
       }
       const port = primaryOutput(operation);
       const portId = port?.id ?? Object.keys(outcome.outputs)[0] ?? "output";
-      const value = outcome.values[portId];
+      const { properties: value, annotations } = splitAnnotations(outcome.values[portId]);
       const produced = outcome.outputs[portId];
-      const json = !!port?.mime?.includes("application/json") || (!produced && value !== undefined);
+      const renderer = rendererFor(port, !!produced, value);
+      const json = renderer === "json";
       const resultText = produced ? new TextDecoder().decode(produced) : value === undefined ? "" : JSON.stringify(value, null, 2);
-      const result = await this.host.createTextDocument(resultText, `${job.tool.manifest.label}.${json ? "json" : "txt"}`, json ? "json" : "text");
+      const extension = renderer === "preview" ? "html" : renderer === "svg" ? "svg" : json ? "json" : "txt";
+      const result = await this.host.createTextDocument(resultText, `${job.tool.manifest.label}.${extension}`, json ? "json" : "text");
       if (job.finished) {
         void this.host.closeDocument(result.id).catch(() => undefined);
         return;
@@ -175,10 +177,11 @@ export class WorkerEngine {
         outputBytes: result.size,
         resultDocumentId: result.id,
         resultPath: result.path,
-        renderer: json ? "json" : "text",
+        renderer,
         resultKind: json ? "json" : "text",
-        resultMime: json ? "application/json" : (port?.mime?.[0] ?? "text/plain"),
+        resultMime: renderer === "preview" ? "text/html" : renderer === "svg" ? "image/svg+xml" : json ? "application/json" : (port?.mime?.[0] ?? "text/plain"),
         diagnostics: [],
+        annotations,
         sourceDocumentId: job.documentId,
         operationId: job.operationId,
       });
