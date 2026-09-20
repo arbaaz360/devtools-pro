@@ -13,7 +13,7 @@
 // `vite preview` for the duration of the check.
 
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import process from "node:process";
 import { createRequire } from "node:module";
@@ -63,6 +63,7 @@ if (!served) fail(`vite preview did not answer on ${previewPort}`);
 // process then stalls at start-up unless told to skip the GPU and sandbox. The log
 // file is printed if the port never answers.
 const browserLog = resolve(desktop, "test-results", "webview2-smoke.log");
+mkdirSync(resolve(desktop, "test-results"), { recursive: true });
 const ciArguments = process.env.CI ? ` --disable-gpu --disable-gpu-compositing --no-sandbox --enable-logging --v=0 --log-file=${browserLog}` : "";
 const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}${ciArguments}` }, stdio: "ignore" });
 children.push(app);
@@ -81,6 +82,8 @@ if (!browser) {
   console.error("WebView2 runtime (HKLM):", probe(String.raw`reg query "HKLM\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
   console.error("WebView2 runtime (HKCU):", probe(String.raw`reg query "HKCU\Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}" /v pv`));
   console.error("processes:", probe('tasklist /fi "IMAGENAME eq devtools-desktop.exe" /fo csv /nh'), probe('tasklist /fi "IMAGENAME eq msedgewebview2.exe" /fo csv /nh'));
+  console.error("listening on the port:", probe(`netstat -ano | findstr :${port}`) || "(nothing)");
+  try { console.error("/json/version:", (await (await fetch(`http://127.0.0.1:${port}/json/version`)).text()).slice(0, 300)); } catch (error) { console.error("/json/version:", String(error.cause ?? error.message).slice(0, 200)); }
   if (existsSync(browserLog)) { const { readFileSync } = await import("node:fs"); console.error("webview2 log tail:", readFileSync(browserLog, "utf8").split("\n").slice(-40).join("\n")); }
   else console.error("webview2 log: none written at", browserLog);
   fail(`could not connect to WebView2 over CDP within ${Math.round(connectBudgetMs / 1000)} s (executable ${app.exitCode === null ? "still running" : `exited ${app.exitCode}`})`);
