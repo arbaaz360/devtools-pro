@@ -1,0 +1,219 @@
+[
+  {
+    "name": "unbalanced opening parenthesis",
+    "input": "abc",
+    "options": {
+      "pattern": "(abc"
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Unterminated group"
+  },
+  {
+    "name": "unbalanced closing parenthesis",
+    "input": "abc",
+    "options": {
+      "pattern": "abc)"
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Unmatched"
+  },
+  {
+    "name": "invalid quantifier: nothing to repeat",
+    "input": "abc",
+    "options": {
+      "pattern": "a**"
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Nothing to repeat"
+  },
+  {
+    "name": "invalid unicode property name is only invalid under the unicode flag",
+    "input": "abc",
+    "options": {
+      "pattern": "\\p{Bogus}",
+      "unicode": true
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Invalid property name"
+  },
+  {
+    "name": "duplicate named group in the same pattern",
+    "input": "ab",
+    "options": {
+      "pattern": "(?<x>a)(?<x>b)"
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Duplicate capture group name"
+  },
+  {
+    "name": "backreference to a name the pattern's named groups do not declare",
+    "input": "abc",
+    "options": {
+      "pattern": "(?<a>x)\\k<missing>"
+    },
+    "code": "regex.invalid-pattern",
+    "message": "Invalid named capture referenced"
+  },
+  {
+    "name": "oversize pattern",
+    "input": "abc",
+    "options": {
+      "pattern": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "code": "regex.invalid-option",
+    "message": "pattern is limited to 4096 bytes"
+  },
+  {
+    "name": "unknown option is rejected",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "regex": true
+    },
+    "code": "regex.invalid-option",
+    "message": "unknown option regex"
+  },
+  {
+    "name": "mode outside the enum",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "mode": "search"
+    },
+    "code": "regex.invalid-option",
+    "message": "mode must be one of match, replace"
+  },
+  {
+    "name": "mode of the wrong type",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "mode": 1
+    },
+    "code": "regex.invalid-option",
+    "message": "mode must be one of"
+  },
+  {
+    "name": "pattern of the wrong type",
+    "input": "abc",
+    "options": {
+      "pattern": 123
+    },
+    "code": "regex.invalid-option",
+    "message": "pattern must be a string"
+  },
+  {
+    "name": "null pattern is not a default",
+    "input": "abc",
+    "options": {
+      "pattern": null
+    },
+    "code": "regex.invalid-option",
+    "message": "pattern must be a string"
+  },
+  {
+    "name": "replacement of the wrong type",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "replacement": {}
+    },
+    "code": "regex.invalid-option",
+    "message": "replacement must be a string"
+  },
+  {
+    "name": "global must be a boolean",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "global": "yes"
+    },
+    "code": "regex.invalid-option",
+    "message": "global must be a boolean"
+  },
+  {
+    "name": "ignore-case must be a boolean",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "ignore-case": 1
+    },
+    "code": "regex.invalid-option",
+    "message": "ignore-case must be a boolean"
+  },
+  {
+    "name": "conflicting spellings of one option are rejected",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "ignore-case": true,
+      "ignoreCase": false
+    },
+    "code": "regex.invalid-option",
+    "message": "ignore-case and ignoreCase disagree"
+  },
+  {
+    "name": "pattern with a lone high surrogate",
+    "input": "abc",
+    "options": {
+      "pattern": "\ud800"
+    },
+    "code": "regex.invalid-option",
+    "message": "pattern must be well-formed Unicode"
+  },
+  {
+    "name": "replacement with a lone low surrogate",
+    "input": "abc",
+    "options": {
+      "pattern": "a",
+      "replacement": "\udc00"
+    },
+    "code": "regex.invalid-option",
+    "message": "replacement must be well-formed Unicode"
+  },
+  {
+    "name": "options must be an object",
+    "input": "abc",
+    "options": [],
+    "code": "regex.invalid-option",
+    "message": "options must be an object"
+  },
+  {
+    "name": "input is not UTF-8",
+    "inputBytes": [
+      255,
+      254,
+      253
+    ],
+    "options": {
+      "pattern": "a"
+    },
+    "code": "regex.invalid-utf8",
+    "message": "not valid UTF-8"
+  },
+  {
+    "name": "overlong UTF-8 encoding is rejected",
+    "inputBytes": [
+      192,
+      128
+    ],
+    "options": {
+      "pattern": "a"
+    },
+    "code": "regex.invalid-utf8",
+    "message": "not valid UTF-8"
+  },
+  {
+    "name": "UTF-8 encoded surrogate is rejected",
+    "inputBytes": [
+      237,
+      160,
+      128
+    ],
+    "options": {
+      "pattern": "a"
+    },
+    "code": "regex.invalid-utf8",
+    "message": "not valid UTF-8"
+  }
+]

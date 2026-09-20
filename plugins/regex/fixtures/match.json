@@ -1,0 +1,1511 @@
+[
+  {
+    "name": "digits: multiple numeric runs",
+    "input": "a12 b345 c6",
+    "options": {
+      "pattern": "\\d+"
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 1,
+          "end": 3,
+          "text": "12",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 5,
+          "end": 8,
+          "text": "345",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 10,
+          "end": 11,
+          "text": "6",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [1-3] 12\n#2 [5-8] 345\n#3 [10-11] 6\n"
+    }
+  },
+  {
+    "name": "DU-03 screenshot: email addresses",
+    "input": "contact: a.b+c@example.co, other@x.io",
+    "options": {
+      "pattern": "[\\w.+-]+@[\\w-]+\\.[\\w.-]+"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 9,
+          "end": 25,
+          "text": "a.b+c@example.co",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 27,
+          "end": 37,
+          "text": "other@x.io",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [9-25] a.b+c@example.co\n#2 [27-37] other@x.io\n"
+    }
+  },
+  {
+    "name": "DU-03 screenshot: phone numbers",
+    "input": "call 555-123-4567 or 555-987-6543",
+    "options": {
+      "pattern": "\\d{3}-\\d{3}-\\d{4}"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 5,
+          "end": 17,
+          "text": "555-123-4567",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 21,
+          "end": 33,
+          "text": "555-987-6543",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [5-17] 555-123-4567\n#2 [21-33] 555-987-6543\n"
+    }
+  },
+  {
+    "name": "global flag alone: every occurrence",
+    "input": "the cat sat on the mat",
+    "options": {
+      "pattern": "at",
+      "global": true
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 5,
+          "end": 7,
+          "text": "at",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 9,
+          "end": 11,
+          "text": "at",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 20,
+          "end": 22,
+          "text": "at",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [5-7] at\n#2 [9-11] at\n#3 [20-22] at\n"
+    }
+  },
+  {
+    "name": "global false: only first occurrence",
+    "input": "the cat sat on the mat",
+    "options": {
+      "pattern": "at",
+      "global": false
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "",
+      "matches": [
+        {
+          "index": 5,
+          "end": 7,
+          "text": "at",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [5-7] at\n"
+    }
+  },
+  {
+    "name": "ignore-case flag alone",
+    "input": "Hello HELLO hello",
+    "options": {
+      "pattern": "hello",
+      "ignore-case": true
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "gi",
+      "matches": [
+        {
+          "index": 0,
+          "end": 5,
+          "text": "Hello",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 6,
+          "end": 11,
+          "text": "HELLO",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 12,
+          "end": 17,
+          "text": "hello",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-5] Hello\n#2 [6-11] HELLO\n#3 [12-17] hello\n"
+    }
+  },
+  {
+    "name": "ignore-case off is case-sensitive",
+    "input": "Hello HELLO hello",
+    "options": {
+      "pattern": "hello",
+      "ignoreCase": false
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 12,
+          "end": 17,
+          "text": "hello",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [12-17] hello\n"
+    }
+  },
+  {
+    "name": "multiline flag alone: caret matches line starts",
+    "input": "one\ntwo\nthree",
+    "options": {
+      "pattern": "^\\w+",
+      "multiline": true
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "gm",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "one",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 4,
+          "end": 7,
+          "text": "two",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 8,
+          "end": 13,
+          "text": "three",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] one\n#2 [4-7] two\n#3 [8-13] three\n"
+    }
+  },
+  {
+    "name": "multiline off: caret matches only document start",
+    "input": "one\ntwo\nthree",
+    "options": {
+      "pattern": "^\\w+",
+      "multiline": false
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "one",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] one\n"
+    }
+  },
+  {
+    "name": "dot-all flag alone: dot matches newline",
+    "input": "a\nb",
+    "options": {
+      "pattern": "a.b",
+      "dot-all": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gs",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "a\nb",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] a\nb\n"
+    }
+  },
+  {
+    "name": "dot-all off: dot excludes newline",
+    "input": "a\nb",
+    "options": {
+      "pattern": "a.b",
+      "dotAll": false
+    },
+    "expect": {
+      "count": 0,
+      "truncated": false,
+      "flags": "g",
+      "matches": [],
+      "text": ""
+    }
+  },
+  {
+    "name": "unicode flag alone: property escape matches letters",
+    "input": "café 42",
+    "options": {
+      "pattern": "\\p{L}+",
+      "unicode": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gu",
+      "matches": [
+        {
+          "index": 0,
+          "end": 4,
+          "text": "café",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-4] café\n"
+    }
+  },
+  {
+    "name": "unicode off: property escape is literal text",
+    "input": "p{L} p{L}",
+    "options": {
+      "pattern": "\\p{L}+",
+      "unicode": false
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 4,
+          "text": "p{L}",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 5,
+          "end": 9,
+          "text": "p{L}",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-4] p{L}\n#2 [5-9] p{L}\n"
+    }
+  },
+  {
+    "name": "sticky flag alone: anchored scan stops at a gap",
+    "input": "123abc456",
+    "options": {
+      "pattern": "\\d+",
+      "sticky": true,
+      "global": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gy",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "123",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] 123\n"
+    }
+  },
+  {
+    "name": "sticky false: scans the whole document",
+    "input": "123abc456",
+    "options": {
+      "pattern": "\\d+",
+      "sticky": false,
+      "global": true
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "123",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 6,
+          "end": 9,
+          "text": "456",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] 123\n#2 [6-9] 456\n"
+    }
+  },
+  {
+    "name": "combined ignore-case and multiline",
+    "input": "HELLO\nhello",
+    "options": {
+      "pattern": "^hello",
+      "ignoreCase": true,
+      "multiline": true
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "gim",
+      "matches": [
+        {
+          "index": 0,
+          "end": 5,
+          "text": "HELLO",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 6,
+          "end": 11,
+          "text": "hello",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-5] HELLO\n#2 [6-11] hello\n"
+    }
+  },
+  {
+    "name": "combined dot-all and unicode over an astral character",
+    "input": "a😀b",
+    "options": {
+      "pattern": "a.b",
+      "dotAll": true,
+      "unicode": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gsu",
+      "matches": [
+        {
+          "index": 0,
+          "end": 4,
+          "text": "a😀b",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-4] a😀b\n"
+    }
+  },
+  {
+    "name": "combined global, sticky and ignore-case",
+    "input": "abc ABC abc",
+    "options": {
+      "pattern": "[a-z]+",
+      "ignoreCase": true,
+      "sticky": true,
+      "global": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "giy",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "abc",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] abc\n"
+    }
+  },
+  {
+    "name": "combined multiline and dot-all",
+    "input": "x\na\nb\ny",
+    "options": {
+      "pattern": "^a.b$",
+      "multiline": true,
+      "dotAll": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gms",
+      "matches": [
+        {
+          "index": 2,
+          "end": 5,
+          "text": "a\nb",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [2-5] a\nb\n"
+    }
+  },
+  {
+    "name": "named groups: date parts",
+    "input": "2024-02-29 and 1999-12-31",
+    "options": {
+      "pattern": "(?<y>\\d{4})-(?<m>\\d{2})-(?<d>\\d{2})"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 10,
+          "text": "2024-02-29",
+          "groups": [
+            {
+              "number": 1,
+              "name": "y",
+              "index": 0,
+              "end": 4,
+              "text": "2024"
+            },
+            {
+              "number": 2,
+              "name": "m",
+              "index": 5,
+              "end": 7,
+              "text": "02"
+            },
+            {
+              "number": 3,
+              "name": "d",
+              "index": 8,
+              "end": 10,
+              "text": "29"
+            }
+          ],
+          "named": {
+            "y": {
+              "number": 1,
+              "name": "y",
+              "index": 0,
+              "end": 4,
+              "text": "2024"
+            },
+            "m": {
+              "number": 2,
+              "name": "m",
+              "index": 5,
+              "end": 7,
+              "text": "02"
+            },
+            "d": {
+              "number": 3,
+              "name": "d",
+              "index": 8,
+              "end": 10,
+              "text": "29"
+            }
+          }
+        },
+        {
+          "index": 15,
+          "end": 25,
+          "text": "1999-12-31",
+          "groups": [
+            {
+              "number": 1,
+              "name": "y",
+              "index": 15,
+              "end": 19,
+              "text": "1999"
+            },
+            {
+              "number": 2,
+              "name": "m",
+              "index": 20,
+              "end": 22,
+              "text": "12"
+            },
+            {
+              "number": 3,
+              "name": "d",
+              "index": 23,
+              "end": 25,
+              "text": "31"
+            }
+          ],
+          "named": {
+            "y": {
+              "number": 1,
+              "name": "y",
+              "index": 15,
+              "end": 19,
+              "text": "1999"
+            },
+            "m": {
+              "number": 2,
+              "name": "m",
+              "index": 20,
+              "end": 22,
+              "text": "12"
+            },
+            "d": {
+              "number": 3,
+              "name": "d",
+              "index": 23,
+              "end": 25,
+              "text": "31"
+            }
+          }
+        }
+      ],
+      "text": "#1 [0-10] 2024-02-29\n  y: 2024\n  m: 02\n  d: 29\n#2 [15-25] 1999-12-31\n  y: 1999\n  m: 12\n  d: 31\n"
+    }
+  },
+  {
+    "name": "numbered groups only",
+    "input": "12-34 56-78",
+    "options": {
+      "pattern": "(\\d+)-(\\d+)"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 5,
+          "text": "12-34",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 0,
+              "end": 2,
+              "text": "12"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 3,
+              "end": 5,
+              "text": "34"
+            }
+          ],
+          "named": {}
+        },
+        {
+          "index": 6,
+          "end": 11,
+          "text": "56-78",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 6,
+              "end": 8,
+              "text": "56"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 9,
+              "end": 11,
+              "text": "78"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-5] 12-34\n  1: 12\n  2: 34\n#2 [6-11] 56-78\n  1: 56\n  2: 78\n"
+    }
+  },
+  {
+    "name": "mixed named and numbered groups",
+    "input": "abc123 def456",
+    "options": {
+      "pattern": "(?<word>[a-z]+)(\\d+)"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 6,
+          "text": "abc123",
+          "groups": [
+            {
+              "number": 1,
+              "name": "word",
+              "index": 0,
+              "end": 3,
+              "text": "abc"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 3,
+              "end": 6,
+              "text": "123"
+            }
+          ],
+          "named": {
+            "word": {
+              "number": 1,
+              "name": "word",
+              "index": 0,
+              "end": 3,
+              "text": "abc"
+            }
+          }
+        },
+        {
+          "index": 7,
+          "end": 13,
+          "text": "def456",
+          "groups": [
+            {
+              "number": 1,
+              "name": "word",
+              "index": 7,
+              "end": 10,
+              "text": "def"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 10,
+              "end": 13,
+              "text": "456"
+            }
+          ],
+          "named": {
+            "word": {
+              "number": 1,
+              "name": "word",
+              "index": 7,
+              "end": 10,
+              "text": "def"
+            }
+          }
+        }
+      ],
+      "text": "#1 [0-6] abc123\n  word: abc\n  2: 123\n#2 [7-13] def456\n  word: def\n  2: 456\n"
+    }
+  },
+  {
+    "name": "non-participating group via alternation",
+    "input": "a b a",
+    "options": {
+      "pattern": "(a)|(b)"
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 1,
+          "text": "a",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 0,
+              "end": 1,
+              "text": "a"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": null,
+              "end": null,
+              "text": null
+            }
+          ],
+          "named": {}
+        },
+        {
+          "index": 2,
+          "end": 3,
+          "text": "b",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": null,
+              "end": null,
+              "text": null
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 2,
+              "end": 3,
+              "text": "b"
+            }
+          ],
+          "named": {}
+        },
+        {
+          "index": 4,
+          "end": 5,
+          "text": "a",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 4,
+              "end": 5,
+              "text": "a"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": null,
+              "end": null,
+              "text": null
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-1] a\n  1: a\n  2: \n#2 [2-3] b\n  1: \n  2: b\n#3 [4-5] a\n  1: a\n  2: \n"
+    }
+  },
+  {
+    "name": "nested groups",
+    "input": "ab",
+    "options": {
+      "pattern": "((a)(b))"
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 2,
+          "text": "ab",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 0,
+              "end": 2,
+              "text": "ab"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 0,
+              "end": 1,
+              "text": "a"
+            },
+            {
+              "number": 3,
+              "name": null,
+              "index": 1,
+              "end": 2,
+              "text": "b"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-2] ab\n  1: ab\n  2: a\n  3: b\n"
+    }
+  },
+  {
+    "name": "non-capturing group excluded from numbering",
+    "input": "abc1 abc2",
+    "options": {
+      "pattern": "(?:abc)(\\d)"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 4,
+          "text": "abc1",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 3,
+              "end": 4,
+              "text": "1"
+            }
+          ],
+          "named": {}
+        },
+        {
+          "index": 5,
+          "end": 9,
+          "text": "abc2",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 8,
+              "end": 9,
+              "text": "2"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-4] abc1\n  1: 1\n#2 [5-9] abc2\n  1: 2\n"
+    }
+  },
+  {
+    "name": "lookahead does not capture",
+    "input": "ab ac ab",
+    "options": {
+      "pattern": "a(?=b)"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 1,
+          "text": "a",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 6,
+          "end": 7,
+          "text": "a",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-1] a\n#2 [6-7] a\n"
+    }
+  },
+  {
+    "name": "lookbehind does not capture",
+    "input": "ab cb ab",
+    "options": {
+      "pattern": "(?<=a)b"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 1,
+          "end": 2,
+          "text": "b",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 7,
+          "end": 8,
+          "text": "b",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [1-2] b\n#2 [7-8] b\n"
+    }
+  },
+  {
+    "name": "backreference to a named group",
+    "input": "hello hello world world",
+    "options": {
+      "pattern": "(?<w>\\w+) \\k<w>"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 11,
+          "text": "hello hello",
+          "groups": [
+            {
+              "number": 1,
+              "name": "w",
+              "index": 0,
+              "end": 5,
+              "text": "hello"
+            }
+          ],
+          "named": {
+            "w": {
+              "number": 1,
+              "name": "w",
+              "index": 0,
+              "end": 5,
+              "text": "hello"
+            }
+          }
+        },
+        {
+          "index": 12,
+          "end": 23,
+          "text": "world world",
+          "groups": [
+            {
+              "number": 1,
+              "name": "w",
+              "index": 12,
+              "end": 17,
+              "text": "world"
+            }
+          ],
+          "named": {
+            "w": {
+              "number": 1,
+              "name": "w",
+              "index": 12,
+              "end": 17,
+              "text": "world"
+            }
+          }
+        }
+      ],
+      "text": "#1 [0-11] hello hello\n  w: hello\n#2 [12-23] world world\n  w: world\n"
+    }
+  },
+  {
+    "name": "zero-length matches at start, middle and end",
+    "input": "ab",
+    "options": {
+      "pattern": "(?:)"
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 0,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 1,
+          "end": 1,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 2,
+          "end": 2,
+          "text": "",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-0] \n#2 [1-1] \n#3 [2-2] \n"
+    }
+  },
+  {
+    "name": "zero-length matches advance one code point with unicode over an astral pair",
+    "input": "😀b",
+    "options": {
+      "pattern": "(?:)",
+      "unicode": true
+    },
+    "expect": {
+      "count": 3,
+      "truncated": false,
+      "flags": "gu",
+      "matches": [
+        {
+          "index": 0,
+          "end": 0,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 2,
+          "end": 2,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 3,
+          "end": 3,
+          "text": "",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-0] \n#2 [2-2] \n#3 [3-3] \n"
+    }
+  },
+  {
+    "name": "zero-length matches advance one code unit without unicode, splitting an astral pair",
+    "input": "😀b",
+    "options": {
+      "pattern": "(?:)",
+      "unicode": false
+    },
+    "expect": {
+      "count": 4,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 0,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 1,
+          "end": 1,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 2,
+          "end": 2,
+          "text": "",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 3,
+          "end": 3,
+          "text": "",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-0] \n#2 [1-1] \n#3 [2-2] \n#4 [3-3] \n"
+    }
+  },
+  {
+    "name": "sticky from index 0 with a named group",
+    "input": "abc def",
+    "options": {
+      "pattern": "(?<tok>[a-z]+)",
+      "sticky": true,
+      "global": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gy",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "abc",
+          "groups": [
+            {
+              "number": 1,
+              "name": "tok",
+              "index": 0,
+              "end": 3,
+              "text": "abc"
+            }
+          ],
+          "named": {
+            "tok": {
+              "number": 1,
+              "name": "tok",
+              "index": 0,
+              "end": 3,
+              "text": "abc"
+            }
+          }
+        }
+      ],
+      "text": "#1 [0-3] abc\n  tok: abc\n"
+    }
+  },
+  {
+    "name": "whitespace class across a mix of spaces, tabs and newlines",
+    "input": "a   b\n\tc",
+    "options": {
+      "pattern": "\\s+"
+    },
+    "expect": {
+      "count": 2,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 1,
+          "end": 4,
+          "text": "   ",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 5,
+          "end": 7,
+          "text": "\n\t",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [1-4]    \n#2 [5-7] \n\t\n"
+    }
+  },
+  {
+    "name": "anchors without multiline match only document edges",
+    "input": "abc",
+    "options": {
+      "pattern": "^abc$"
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "abc",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] abc\n"
+    }
+  },
+  {
+    "name": "anchors without multiline fail across lines",
+    "input": "xxx\nabc\nyyy",
+    "options": {
+      "pattern": "^abc$",
+      "multiline": false
+    },
+    "expect": {
+      "count": 0,
+      "truncated": false,
+      "flags": "g",
+      "matches": [],
+      "text": ""
+    }
+  },
+  {
+    "name": "anchors with multiline succeed mid-document",
+    "input": "xxx\nabc\nyyy",
+    "options": {
+      "pattern": "^abc$",
+      "multiline": true
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "gm",
+      "matches": [
+        {
+          "index": 4,
+          "end": 7,
+          "text": "abc",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [4-7] abc\n"
+    }
+  },
+  {
+    "name": "global false still reports groups for the single match",
+    "input": "1-2 3-4",
+    "options": {
+      "pattern": "(\\d+)-(\\d+)",
+      "global": false
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "1-2",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 0,
+              "end": 1,
+              "text": "1"
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": 2,
+              "end": 3,
+              "text": "2"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] 1-2\n  1: 1\n  2: 2\n"
+    }
+  },
+  {
+    "name": "lone quantifier brace is literal without unicode",
+    "input": "a{ b",
+    "options": {
+      "pattern": "a{",
+      "unicode": false
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 2,
+          "text": "a{",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-2] a{\n"
+    }
+  },
+  {
+    "name": "repeated capturing group keeps only the last iteration's span",
+    "input": "123 x",
+    "options": {
+      "pattern": "(\\d)+"
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "123",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": 2,
+              "end": 3,
+              "text": "3"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] 123\n  1: 3\n"
+    }
+  },
+  {
+    "name": "alternation with only the matching branch's group participating",
+    "input": "c",
+    "options": {
+      "pattern": "(a)|(b)|(c)"
+    },
+    "expect": {
+      "count": 1,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 1,
+          "text": "c",
+          "groups": [
+            {
+              "number": 1,
+              "name": null,
+              "index": null,
+              "end": null,
+              "text": null
+            },
+            {
+              "number": 2,
+              "name": null,
+              "index": null,
+              "end": null,
+              "text": null
+            },
+            {
+              "number": 3,
+              "name": null,
+              "index": 0,
+              "end": 1,
+              "text": "c"
+            }
+          ],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-1] c\n  1: \n  2: \n  3: c\n"
+    }
+  },
+  {
+    "name": "non-word runs separated by whitespace",
+    "input": "one two three four five",
+    "options": {
+      "pattern": "\\S+"
+    },
+    "expect": {
+      "count": 5,
+      "truncated": false,
+      "flags": "g",
+      "matches": [
+        {
+          "index": 0,
+          "end": 3,
+          "text": "one",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 4,
+          "end": 7,
+          "text": "two",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 8,
+          "end": 13,
+          "text": "three",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 14,
+          "end": 18,
+          "text": "four",
+          "groups": [],
+          "named": {}
+        },
+        {
+          "index": 19,
+          "end": 23,
+          "text": "five",
+          "groups": [],
+          "named": {}
+        }
+      ],
+      "text": "#1 [0-3] one\n#2 [4-7] two\n#3 [8-13] three\n#4 [14-18] four\n#5 [19-23] five\n"
+    }
+  },
+  {
+    "name": "empty pattern reports zero matches",
+    "input": "hello",
+    "options": {
+      "pattern": ""
+    },
+    "expect": {
+      "count": 0,
+      "truncated": false,
+      "flags": "g",
+      "matches": [],
+      "text": ""
+    }
+  }
+]
