@@ -1,0 +1,119 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "number.base",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Number Base Converter",
+  "description": "Convert an exact integer between bases 2 to 36 with arbitrary precision.",
+  "tools": [
+    {
+      "id": "number.base",
+      "title": "Number Base Converter",
+      "category": "converter",
+      "operationIds": ["number.base"],
+      "workspaceId": "converter"
+    }
+  ],
+  "operations": [
+    {
+      "id": "number.base",
+      "title": "Convert Number Base",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "number.base.processor",
+        "version": "0.1.0",
+        "engine": "node",
+        "engineVersion": "20",
+        "syntax": "javascript",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "label": "Input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": ["text"],
+          "maxBytes": "65536"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "label": "Result",
+          "kind": "value",
+          "multiplicity": "one",
+          "mime": ["text/plain"],
+          "representations": ["text", "properties"],
+          "sensitive": false,
+          "exports": ["copyText", "save"]
+        }
+      ],
+      "limits": {
+        "maxInputBytes": "65536",
+        "maxOutputBytes": "1048576",
+        "maxChunkBytes": "1048576",
+        "deadlineMs": "1000"
+      },
+      "options": [
+        {
+          "id": "from-base",
+          "type": "integer",
+          "label": "From Base",
+          "default": "10",
+          "minimum": "2",
+          "maximum": "36",
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "to-base",
+          "type": "integer",
+          "label": "To Base",
+          "default": "16",
+          "minimum": "2",
+          "maximum": "36",
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "digits",
+          "type": "enum",
+          "label": "Digits",
+          "default": "lower",
+          "choices": [
+            { "id": "lower", "label": "Lower" },
+            { "id": "upper", "label": "Upper" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        }
+      ],
+      "trigger": {
+        "modes": ["explicit", "inputChange"],
+        "debounceMs": "100"
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "converter",
+      "kind": "transform",
+      "bindings": [
+        { "id": "input", "component": "editor", "inputPort": "input" },
+        { "id": "result", "component": "output", "outputPort": "output" }
+      ],
+      "commands": [],
+      "presentationSettings": []
+    }
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {
+    "requirementIds": ["DU-19"],
+    "fixtures": [],
+    "uiScenarios": []
+  }
+}
