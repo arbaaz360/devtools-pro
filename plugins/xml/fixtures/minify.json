@@ -1,0 +1,110 @@
+[
+  {
+    "name": "minify drops all insignificant whitespace",
+    "options": {},
+    "input": "<a>\n  <b/>\n  <c/>\n</a>",
+    "output": "<a><b/><c/></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify trims leading and trailing text whitespace",
+    "options": {},
+    "input": "<a>  hello  </a>",
+    "output": "<a>hello</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify keeps mixed content byte for byte",
+    "options": {},
+    "input": "<item><b>two</b> and text</item>",
+    "output": "<item><b>two</b> and text</item>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify keeps CDATA byte for byte",
+    "options": {},
+    "input": "<a>  <![CDATA[  raw  ]]>  </a>",
+    "output": "<a><![CDATA[  raw  ]]></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify removes comments unless preserve-comments",
+    "options": {
+      "preserve-comments": false
+    },
+    "input": "<a><!-- gone --><b/></a>",
+    "output": "<a><b/></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify keeps comments when preserve-comments is set",
+    "options": {
+      "preserve-comments": true
+    },
+    "input": "<a><!-- kept --><b/></a>",
+    "output": "<a><!-- kept --><b/></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify keeps newlines inside xml:space preserve content",
+    "options": {},
+    "input": "<a xml:space=\"preserve\">\n  x\n  <b>\n    y\n  </b>\n</a>",
+    "output": "<a xml:space=\"preserve\">\n  x\n  <b>\n    y\n  </b>\n</a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify collapses empty elements by default",
+    "options": {},
+    "input": "<a><b></b><c/></a>",
+    "output": "<a><b/><c/></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify keeps declaration and doctype verbatim",
+    "options": {},
+    "input": "<?xml version=\"1.0\"?><!DOCTYPE root><root><a/></root>",
+    "output": "<?xml version=\"1.0\"?><!DOCTYPE root><root><a/></root>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify of an already-minified document is the identity",
+    "options": {},
+    "input": "<a><b>1</b><c>2</c></a>",
+    "output": "<a><b>1</b><c>2</c></a>",
+    "diagnostics": []
+  },
+  {
+    "name": "minify tolerates an unquoted attribute",
+    "options": {},
+    "input": "<a b=1/>",
+    "output": "<a b=1/>",
+    "diagnostics": [
+      {
+        "code": "xml.unquoted-attribute",
+        "severity": "warning",
+        "message": "attribute \"b\" on \"<a>\" is not quoted",
+        "offset": 5,
+        "end": 6,
+        "line": 1,
+        "column": 6
+      }
+    ]
+  },
+  {
+    "name": "minify tolerates trailing content after the root",
+    "options": {},
+    "input": "<root/>extra",
+    "output": "<root/>",
+    "diagnostics": [
+      {
+        "code": "xml.trailing-content",
+        "severity": "warning",
+        "message": "content after the root element \"<root>\" is ignored",
+        "offset": 7,
+        "end": 8,
+        "line": 1,
+        "column": 8
+      }
+    ]
+  }
+]
