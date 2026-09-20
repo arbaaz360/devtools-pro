@@ -68,7 +68,11 @@ const ciArguments = process.env.CI ? ` --disable-gpu --disable-gpu-compositing -
 // The executable's own output is kept: Tauri reports a failed webview creation there.
 const appLog = resolve(desktop, "test-results", "desktop-smoke.log");
 const appOut = openSync(appLog, "w");
-const app = spawn(exe, [], { env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${port}${ciArguments}` }, stdio: ["ignore", appOut, appOut] });
+const browserArguments = `--remote-debugging-port=${port}${ciArguments}`;
+// DEVTOOLS_SMOKE_BROWSER_ARGS is read by a debug build of the host and passed to the
+// webview builder; WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is the runtime's own hook,
+// honoured on some machines and ignored on the CI runner.
+const app = spawn(exe, [], { env: { ...process.env, DEVTOOLS_SMOKE_BROWSER_ARGS: browserArguments, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArguments }, stdio: ["ignore", appOut, appOut] });
 children.push(app);
 let browser = null;
 // A cold WebView2 start on a CI runner can take well over the local few seconds.
