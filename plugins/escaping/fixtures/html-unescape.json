@@ -92,7 +92,7 @@
       "strict": false
     },
     "input": "esc&#27;del&#127;",
-    "output": "esc\u001bdel\u007f",
+    "output": "esc\u001bdel",
     "value": {
       "sequences": 2
     }
@@ -154,7 +154,7 @@
       "strict": false
     },
     "input": "&#x80;&#150;&#x9F;&#x81;",
-    "output": "€–Ÿ\u0081",
+    "output": "€–Ÿ",
     "value": {
       "remapped": 3
     }
@@ -167,7 +167,7 @@
       "strict": false
     },
     "input": "&#0;&#xD800;&#x110000;&#99999999999;",
-    "output": "\ufffd\ufffd\ufffd\ufffd",
+    "output": "����",
     "value": {
       "replaced": 4
     }
@@ -180,7 +180,7 @@
       "strict": false
     },
     "input": "&#1;&#xFFFE;&#13;",
-    "output": "\u0001\ufffe\r"
+    "output": "\u0001￾\r"
   },
   {
     "name": "permissive numeric without digits is text",
@@ -215,6 +215,91 @@
     "output": "AA",
     "value": {
       "sequences": 2,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "legacy attribute name next char equals",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false,
+      "context": "attribute"
+    },
+    "input": "?a=1&copy=2",
+    "output": "?a=1&copy=2",
+    "value": {
+      "sequences": 0,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "legacy attribute name next char alnum",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false,
+      "context": "attribute"
+    },
+    "input": "&copy2",
+    "output": "&copy2",
+    "value": {
+      "sequences": 0,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "legacy attribute name decoded if next char is not equals or alnum",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false,
+      "context": "attribute"
+    },
+    "input": "&copy-",
+    "output": "©-",
+    "value": {
+      "sequences": 1,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "legacy attribute name decoded in text context",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": false,
+      "context": "text"
+    },
+    "input": "?a=1&copy=2",
+    "output": "?a=1©=2",
+    "value": {
+      "sequences": 1,
+      "preserved": 0,
+      "replaced": 0,
+      "remapped": 0
+    }
+  },
+  {
+    "name": "legacy attribute name next char equals strict mode",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": true,
+      "context": "attribute"
+    },
+    "input": "?a=1&copy=2",
+    "output": "?a=1&copy=2",
+    "value": {
+      "sequences": 0,
       "preserved": 0,
       "replaced": 0,
       "remapped": 0

@@ -17,7 +17,7 @@
     "options": {
       "mode": "escape"
     },
-    "input": "\u0001\u001b\u007f",
+    "input": "\u0001\u001b",
     "output": "\\x01\\x1b\\x7f"
   },
   {
@@ -93,7 +93,7 @@
       "mode": "escape",
       "non-ascii": "unicode"
     },
-    "input": "café 😀 \uffff",
+    "input": "café 😀 ￿",
     "output": "caf\\u00e9 \\u{1f600} \\uffff",
     "value": {
       "sequences": 3
@@ -118,7 +118,7 @@
     "options": {
       "mode": "escape"
     },
-    "input": "a\u0085b\u009f",
+    "input": "ab",
     "output": "a\\u0085b\\u009f"
   },
   {
@@ -140,6 +140,19 @@
     "output": "",
     "value": {
       "sequences": 0
+    }
+  },
+  {
+    "name": "combining marks code point handling",
+    "operationId": "text.backslash",
+    "options": {
+      "mode": "escape",
+      "non-ascii": "unicode"
+    },
+    "input": "e\u0301 \uD83D\uDE00\u20E3",
+    "output": "e\\u0301 \\u{1f600}\\u20e3",
+    "value": {
+      "sequences": 3
     }
   }
 ]

@@ -213,6 +213,36 @@
               }
             }
           ]
+        },
+        {
+          "id": "context",
+          "type": "enum",
+          "label": "Context",
+          "default": "text",
+          "choices": [
+            {
+              "id": "text",
+              "label": "Text"
+            },
+            {
+              "id": "attribute",
+              "label": "Attribute"
+            }
+          ],
+          "persistence": "instance",
+          "sensitive": false,
+          "group": "Unescape",
+          "rules": [
+            {
+              "effect": "visible",
+              "when": {
+                "kind": "predicate",
+                "optionId": "mode",
+                "operator": "equals",
+                "value": "unescape"
+              }
+            }
+          ]
         }
       ],
       "trigger": {

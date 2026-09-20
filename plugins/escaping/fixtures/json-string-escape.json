@@ -17,8 +17,8 @@
     "options": {
       "mode": "escape"
     },
-    "input": "a/b\u007f",
-    "output": "\"a/b\u007f\"",
+    "input": "a/b",
+    "output": "\"a/b\"",
     "value": {
       "sequences": 0
     }
@@ -29,8 +29,8 @@
     "options": {
       "mode": "escape"
     },
-    "input": "café 😀 \u2028",
-    "output": "\"café 😀 \u2028\"",
+    "input": "café 😀  ",
+    "output": "\"café 😀  \"",
     "value": {
       "sequences": 0
     }
@@ -42,7 +42,7 @@
       "mode": "escape",
       "ascii-only": true
     },
-    "input": "café 😀 \u2028",
+    "input": "café 😀  ",
     "output": "\"caf\\u00e9 \\ud83d\\ude00 \\u2028\"",
     "value": {
       "sequences": 4
@@ -55,7 +55,7 @@
       "mode": "escape",
       "ascii-only": true
     },
-    "input": "\u007f",
+    "input": "",
     "output": "\"\\u007f\""
   },
   {
@@ -98,5 +98,18 @@
     },
     "input": "",
     "output": ""
+  },
+  {
+    "name": "combining marks code point handling",
+    "operationId": "text.json-string",
+    "options": {
+      "mode": "escape",
+      "ascii-only": true
+    },
+    "input": "é 😀⃣",
+    "output": "\"e\\u0301 \\ud83d\\ude00\\u20e3\"",
+    "value": {
+      "sequences": 4
+    }
   }
 ]

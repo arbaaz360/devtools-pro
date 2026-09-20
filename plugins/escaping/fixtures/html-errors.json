@@ -330,5 +330,21 @@
       "code": "option.invalid",
       "match": "strict"
     }
+  },
+  {
+    "name": "legacy attribute name decoded if next char is not equals or alnum strict mode throws",
+    "operationId": "text.html",
+    "options": {
+      "mode": "unescape",
+      "strict": true,
+      "context": "attribute"
+    },
+    "input": "&copy-",
+    "error": {
+      "code": "html.reference-missing-semicolon",
+      "byteOffset": 0,
+      "line": 1,
+      "column": 1
+    }
   }
 ]

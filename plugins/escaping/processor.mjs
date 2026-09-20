@@ -222,6 +222,14 @@ function htmlUnescape(text, options, context) {
         if (candidate !== undefined) { legacy = candidate; legacyEnd = index + length; break; }
       }
       if (legacy !== undefined) {
+        if (options.context === "attribute" && legacyEnd < text.length) {
+          const nextCode = text.charCodeAt(legacyEnd);
+          if (nextCode === 0x3d || isAlnum(nextCode)) {
+            legacy = undefined;
+          }
+        }
+      }
+      if (legacy !== undefined) {
         if (strict) throw missingSemicolon(amp, text.slice(amp, legacyEnd));
         output += legacy;
         index = legacyEnd;
@@ -492,6 +500,7 @@ const OPERATIONS = {
       "encode-everything": booleanOption(raw, "encode-everything", false),
       "allow-unsafe-symbols": booleanOption(raw, "allow-unsafe-symbols", false),
       strict: booleanOption(raw, "strict", true),
+      context: enumOption(raw, "context", ["text", "attribute"], "text"),
     }),
     escape: htmlEscape,
     unescape: htmlUnescape,
