@@ -130,9 +130,16 @@ if (-not $ConversationId) {
 }
 Write-Host "dispatching to conversation $ConversationId"
 
+# A state file written by an older loop may lack newer fields; a PSCustomObject from
+# ConvertFrom-Json refuses to set a field it does not have, so every field is ensured here.
 function Read-State {
-  if (Test-Path $statePath) { return Get-Content $statePath -Raw | ConvertFrom-Json }
-  return [pscustomobject]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @() }
+  $state = if (Test-Path $statePath) { Get-Content $statePath -Raw | ConvertFrom-Json } else { [pscustomobject]@{} }
+  $defaults = [ordered]@{ issue = $null; packet = $null; conversation = $null; startedAt = $null; forwarded = @(); nudgedAt = $null }
+  foreach ($name in $defaults.Keys) {
+    if (-not ($state.PSObject.Properties.Name -contains $name)) { $state | Add-Member -NotePropertyName $name -NotePropertyValue $defaults[$name] }
+  }
+  if ($null -eq $state.forwarded) { $state.forwarded = @() }
+  return $state
 }
 function Set-Tracked($state, $issue, $packet) {
   $startedAt = if ($issue) { (Get-Date).ToString('o') } else { $null }
@@ -275,8 +282,9 @@ function Start-Packet($issue) {
 }
 
 Write-Host "Antigravity worker loop: polling $repo every $IntervalMinutes min; Ctrl+C to stop."
-while ($true) {
-  Update-Self
+# One tick. A failure inside a tick is reported and the loop carries on; only Ctrl+C
+# or a failed self-restart ends it.
+function Invoke-Tick {
   $state = Read-State
   if (Test-InFlight $state) {
     Write-Host ("{0}  packet #{1} in flight" -f (Get-Date -Format 'HH:mm'), $state.issue)
@@ -292,13 +300,23 @@ while ($true) {
         $conversation = Start-Packet $issue
         if ($conversation) {
           Set-Tracked $state $issue.number $issue.packet
-          if ($Once) { break }
+          if ($Once) { return $false }
         }
       } else {
         if ($state.issue) { Set-Tracked $state $null $null }
         Write-Host ("{0}  no ready packets" -f (Get-Date -Format 'HH:mm'))
       }
     }
+  }
+  return $true
+}
+
+while ($true) {
+  Update-Self
+  try {
+    if (-not (Invoke-Tick)) { break }
+  } catch {
+    Write-Warning ("{0}  tick failed, will retry: {1}" -f (Get-Date -Format 'HH:mm'), $_.Exception.Message)
   }
   Start-Sleep -Seconds ($IntervalMinutes * 60)
 }
