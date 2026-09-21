@@ -10,10 +10,28 @@
   },
   "diagnostics": [
     {
-      "code": "jsx.unclosed-element"
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<a> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "a"
+      },
+      "offset": 0,
+      "line": 1,
+      "column": 1,
+      "end": 3
     },
     {
-      "code": "jsx.stray-end-tag"
+      "code": "jsx.stray-end-tag",
+      "severity": "warning",
+      "message": "</c> has no open <c>; it is dropped",
+      "data": {
+        "tag": "c"
+      },
+      "offset": 10,
+      "line": 1,
+      "column": 11,
+      "end": 14
     }
   ]
 }

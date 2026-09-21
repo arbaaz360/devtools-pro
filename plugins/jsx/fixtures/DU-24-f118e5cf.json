@@ -10,7 +10,13 @@
   },
   "diagnostics": [
     {
-      "code": "jsx.raw-element-warning"
+      "code": "jsx.raw-element-warning",
+      "severity": "warning",
+      "message": "<style> block found, emitting as template literal",
+      "offset": 7,
+      "line": 1,
+      "column": 8,
+      "end": 25
     }
   ]
 }

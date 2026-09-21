@@ -10,7 +10,17 @@
   },
   "diagnostics": [
     {
-      "code": "jsx.unclosed-element"
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<span> was never closed; it is closed by </div>",
+      "data": {
+        "tag": "span",
+        "closedBy": "div"
+      },
+      "offset": 5,
+      "line": 1,
+      "column": 6,
+      "end": 11
     }
   ]
 }
