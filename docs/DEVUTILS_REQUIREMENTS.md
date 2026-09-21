@@ -36,7 +36,7 @@ the webview worker engine (see
 | DU-18 | JSON to YAML | `convert.json-yaml` | js | usable |
 | DU-19 | Number base converter | `number.base` | js | usable |
 | DU-20 | Example string generator | `generate.examples` | js | usable |
-| DU-21 | QR code | `media.qr` | js | in progress (AG-119, #64, Antigravity) |
+| DU-21 | QR code | `media.qr` | js | usable; vendored `qrcode-generator` 2.0.4, byte mode only |
 | DU-22 | String inspector | `text.inspect` | rust | usable, parity gaps unaudited |
 | DU-23 | Hash generator | `encoding.hash` | rust | usable (SHA-256/512; MD5, SHA-1, SHA-224, SHA-384 only in the package) |
 | DU-24 | HTML/SVG to JSX | `convert.jsx` | js | usable |
@@ -44,8 +44,9 @@ the webview worker engine (see
 | DU-26 | SQL formatter | `format.sql` | js | usable |
 | DU-27 | String case converter | `text.case` | js | usable |
 
-Usable: 26 of 27 (DU-22 with unaudited parity gaps). In progress: 1 (DU-21,
-the last packet). Beyond these 27, the wider catalogue is in
+Usable: 27 of 27 (DU-22 with unaudited parity gaps). Every card on this list
+runs in the desktop app; parity sign-off against each card below is the next
+pass. Beyond these 27, the wider catalogue is in
 [PARITY_AND_BUILDING_BLOCKS.md](PARITY_AND_BUILDING_BLOCKS.md).
 
 ## DU-01 — Unix Timestamp Converter
