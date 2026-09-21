@@ -39,7 +39,7 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-116 | Regular expression tester package (DU-03) | claude | merged (#73) |
 | AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | merged (#74) |
 | AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | merged (#75) |
-| AG-119 | QR code generator package (DU-21) | antigravity | in progress (#64) |
+| AG-119 | QR code generator package (DU-21) | antigravity | merged (#77) |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).
