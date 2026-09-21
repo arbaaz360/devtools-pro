@@ -1,0 +1,9 @@
+{
+  "id": "DU-21-6f170831",
+  "operationId": "media.qr",
+  "options": {},
+  "input": {
+    "input": ""
+  },
+  "error": "qr.empty"
+}

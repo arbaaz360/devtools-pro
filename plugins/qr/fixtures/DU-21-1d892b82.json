@@ -1,0 +1,11 @@
+{
+  "id": "DU-21-1d892b82",
+  "operationId": "media.qr",
+  "options": {
+    "version": 1
+  },
+  "input": {
+    "input": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  },
+  "error": "qr.capacity"
+}

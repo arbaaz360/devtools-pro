@@ -1,0 +1,88 @@
+{
+  "manifestVersion": 1,
+  "id": "media.qr",
+  "category": "generator",
+  "name": "QR Code Generator",
+  "title": "QR Code",
+  "description": "Encodes text as a QR code SVG.",
+  "tests": {
+    "requirementIds": [
+      "DU-21"
+    ]
+  },
+  "workspaces": [
+    {
+      "kind": "generator",
+      "operationId": "media.qr"
+    }
+  ],
+  "operations": [
+    {
+      "id": "media.qr",
+      "name": "Generate QR Code",
+      "options": [
+        {
+          "id": "error-correction",
+          "aliases": [
+            "errorCorrection"
+          ],
+          "type": "string",
+          "enum": [
+            "L",
+            "M",
+            "Q",
+            "H"
+          ],
+          "default": "M",
+          "title": "Error Correction"
+        },
+        {
+          "id": "cell-size",
+          "aliases": [
+            "cellSize"
+          ],
+          "type": "number",
+          "default": 8,
+          "title": "Cell Size"
+        },
+        {
+          "id": "margin",
+          "type": "number",
+          "default": 4,
+          "title": "Margin"
+        },
+        {
+          "id": "version",
+          "type": "number",
+          "default": 0,
+          "title": "Version"
+        }
+      ],
+      "inputPorts": [
+        {
+          "id": "input",
+          "name": "Input text",
+          "type": [
+            "document",
+            "text"
+          ],
+          "required": true,
+          "maxBytes": 2953
+        }
+      ],
+      "outputPorts": [
+        {
+          "id": "output",
+          "name": "SVG",
+          "type": "artifact",
+          "mimeType": "image/svg+xml",
+          "representations": [
+            "image",
+            "code",
+            "properties"
+          ]
+        }
+      ]
+    }
+  ]
+}

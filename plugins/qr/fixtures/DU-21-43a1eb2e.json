@@ -1,0 +1,11 @@
+{
+  "id": "DU-21-43a1eb2e",
+  "operationId": "media.qr",
+  "options": {
+    "cell-size": 0
+  },
+  "input": {
+    "input": "test"
+  },
+  "error": "qr.invalid-option"
+}
