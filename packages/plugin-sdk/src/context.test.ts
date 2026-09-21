@@ -28,3 +28,14 @@ test("named input reads reject unsupplied ports explicitly", async () => {
   const ctx = new ProcessorContext(reader, new MemoryOutputSink(), new CancellationToken(), new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
   await assert.rejects(() => ctx.read("missing"), /named input missing was not supplied/);
 });
+
+test("memory output sink accumulates chunks written to one port", async () => {
+  const sink = new MemoryOutputSink();
+  const limits = { ...defaultLimits(), maxChunkBytes: 4, maxOutputBytes: 7 };
+  await sink.write("output", new TextEncoder().encode("abcd"), limits);
+  const artifact = await sink.write("output", new TextEncoder().encode("efg"), limits);
+  assert.equal(new TextDecoder().decode(sink.bytes.get("output")), "abcdefg");
+  assert.equal(artifact.byteLength, 7);
+  await assert.rejects(() => sink.write("output", new TextEncoder().encode("h"), limits), /output exceeds limit/);
+  await assert.rejects(() => sink.write("other", new TextEncoder().encode("abcde"), limits), /output chunk exceeds limit/);
+});
