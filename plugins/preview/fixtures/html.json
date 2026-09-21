@@ -1,0 +1,133 @@
+[
+  {
+    "name": "fragment-wrapped",
+    "input": "<p>hello <b>there</b></p>",
+    "expectedOutput": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark\">\n<style>\n:root { color-scheme: dark; }\n* { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  font-size: 15px;\n  line-height: 1.6;\n  background: #1e1e1e;\n  color: #e6e6e6;\n  padding: 24px;\n}\ncode, pre, kbd, samp {\n  font-family: ui-monospace, SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, monospace;\n}\npre {\n  background: #2a2a2a;\n  padding: 12px;\n  border-radius: 4px;\n  overflow: auto;\n}\ncode {\n  background: #2a2a2a;\n  padding: 0.15em 0.3em;\n  border-radius: 3px;\n}\npre code {\n  background: none;\n  padding: 0;\n}\ntable {\n  border-collapse: collapse;\n  width: 100%;\n}\nth, td {\n  border: 1px solid #3c3c3c;\n  padding: 6px 10px;\n  text-align: left;\n}\nimg { max-width: 100%; height: auto; }\na { color: #8ab4f8; }\nblockquote {\n  margin: 0;\n  padding: 0 1em;\n  border-left: 4px solid #3c3c3c;\n  color: #9aa0a6;\n}\nhr {\n  border: none;\n  border-top: 1px solid #3c3c3c;\n}\n</style>\n</head>\n<body>\n<p>hello <b>there</b></p>\n</body>\n</html>\n",
+    "expectedProperties": {
+      "bytes": 1154,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": true
+    }
+  },
+  {
+    "name": "full-document-doctype-passthrough",
+    "input": "<!DOCTYPE html>\n<html><head><title>Doc</title></head><body><p>hi</p></body></html>",
+    "expectedOutput": "<!DOCTYPE html>\n<html><head><title>Doc</title></head><body><p>hi</p></body></html>",
+    "expectedProperties": {
+      "bytes": 82,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": false
+    }
+  },
+  {
+    "name": "full-document-html-tag-passthrough",
+    "input": "<html><body><p>no doctype</p></body></html>",
+    "expectedOutput": "<html><body><p>no doctype</p></body></html>",
+    "expectedProperties": {
+      "bytes": 43,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": false
+    }
+  },
+  {
+    "name": "leading-comment-passthrough",
+    "input": "<!-- generated -->\n<!DOCTYPE html>\n<html><body><p>after comment</p></body></html>",
+    "expectedOutput": "<!-- generated -->\n<!DOCTYPE html>\n<html><body><p>after comment</p></body></html>",
+    "expectedProperties": {
+      "bytes": 81,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": false
+    }
+  },
+  {
+    "name": "leading-whitespace-passthrough",
+    "input": "\n\n   <!DOCTYPE html>\n<html><body><p>indented</p></body></html>",
+    "expectedOutput": "\n\n   <!DOCTYPE html>\n<html><body><p>indented</p></body></html>",
+    "expectedProperties": {
+      "bytes": 62,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": false
+    }
+  },
+  {
+    "name": "script-counted-in-fragment",
+    "input": "<p>hi</p><script>alert(1)</script>",
+    "expectedOutput": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark\">\n<style>\n:root { color-scheme: dark; }\n* { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  font-size: 15px;\n  line-height: 1.6;\n  background: #1e1e1e;\n  color: #e6e6e6;\n  padding: 24px;\n}\ncode, pre, kbd, samp {\n  font-family: ui-monospace, SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, monospace;\n}\npre {\n  background: #2a2a2a;\n  padding: 12px;\n  border-radius: 4px;\n  overflow: auto;\n}\ncode {\n  background: #2a2a2a;\n  padding: 0.15em 0.3em;\n  border-radius: 3px;\n}\npre code {\n  background: none;\n  padding: 0;\n}\ntable {\n  border-collapse: collapse;\n  width: 100%;\n}\nth, td {\n  border: 1px solid #3c3c3c;\n  padding: 6px 10px;\n  text-align: left;\n}\nimg { max-width: 100%; height: auto; }\na { color: #8ab4f8; }\nblockquote {\n  margin: 0;\n  padding: 0 1em;\n  border-left: 4px solid #3c3c3c;\n  color: #9aa0a6;\n}\nhr {\n  border: none;\n  border-top: 1px solid #3c3c3c;\n}\n</style>\n</head>\n<body>\n<p>hi</p><script>alert(1)</script>\n</body>\n</html>\n",
+    "expectedProperties": {
+      "bytes": 1163,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 1,
+      "wrapped": true
+    }
+  },
+  {
+    "name": "script-counted-in-full-document",
+    "input": "<!DOCTYPE html>\n<html><head><script>alert(1)</script></head><body></body></html>",
+    "expectedOutput": "<!DOCTYPE html>\n<html><head><script>alert(1)</script></head><body></body></html>",
+    "expectedProperties": {
+      "bytes": 80,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 1,
+      "wrapped": false
+    }
+  },
+  {
+    "name": "images-and-links-fragment",
+    "input": "<p><a href=\"https://example.com\">link</a></p><img src=\"a.png\"><img src=\"b.png\">",
+    "expectedOutput": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark\">\n<style>\n:root { color-scheme: dark; }\n* { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  font-size: 15px;\n  line-height: 1.6;\n  background: #1e1e1e;\n  color: #e6e6e6;\n  padding: 24px;\n}\ncode, pre, kbd, samp {\n  font-family: ui-monospace, SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, monospace;\n}\npre {\n  background: #2a2a2a;\n  padding: 12px;\n  border-radius: 4px;\n  overflow: auto;\n}\ncode {\n  background: #2a2a2a;\n  padding: 0.15em 0.3em;\n  border-radius: 3px;\n}\npre code {\n  background: none;\n  padding: 0;\n}\ntable {\n  border-collapse: collapse;\n  width: 100%;\n}\nth, td {\n  border: 1px solid #3c3c3c;\n  padding: 6px 10px;\n  text-align: left;\n}\nimg { max-width: 100%; height: auto; }\na { color: #8ab4f8; }\nblockquote {\n  margin: 0;\n  padding: 0 1em;\n  border-left: 4px solid #3c3c3c;\n  color: #9aa0a6;\n}\nhr {\n  border: none;\n  border-top: 1px solid #3c3c3c;\n}\n</style>\n</head>\n<body>\n<p><a href=\"https://example.com\">link</a></p><img src=\"a.png\"><img src=\"b.png\">\n</body>\n</html>\n",
+    "expectedProperties": {
+      "bytes": 1208,
+      "headings": 0,
+      "links": 1,
+      "images": 2,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": true
+    }
+  },
+  {
+    "name": "table-fragment",
+    "input": "<table><tr><td>a</td><td>b</td></tr></table>",
+    "expectedOutput": "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"color-scheme\" content=\"dark\">\n<style>\n:root { color-scheme: dark; }\n* { box-sizing: border-box; }\nhtml, body { margin: 0; padding: 0; }\nbody {\n  font-family: -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif;\n  font-size: 15px;\n  line-height: 1.6;\n  background: #1e1e1e;\n  color: #e6e6e6;\n  padding: 24px;\n}\ncode, pre, kbd, samp {\n  font-family: ui-monospace, SFMono-Regular, Consolas, \"Liberation Mono\", Menlo, monospace;\n}\npre {\n  background: #2a2a2a;\n  padding: 12px;\n  border-radius: 4px;\n  overflow: auto;\n}\ncode {\n  background: #2a2a2a;\n  padding: 0.15em 0.3em;\n  border-radius: 3px;\n}\npre code {\n  background: none;\n  padding: 0;\n}\ntable {\n  border-collapse: collapse;\n  width: 100%;\n}\nth, td {\n  border: 1px solid #3c3c3c;\n  padding: 6px 10px;\n  text-align: left;\n}\nimg { max-width: 100%; height: auto; }\na { color: #8ab4f8; }\nblockquote {\n  margin: 0;\n  padding: 0 1em;\n  border-left: 4px solid #3c3c3c;\n  color: #9aa0a6;\n}\nhr {\n  border: none;\n  border-top: 1px solid #3c3c3c;\n}\n</style>\n</head>\n<body>\n<table><tr><td>a</td><td>b</td></tr></table>\n</body>\n</html>\n",
+    "expectedProperties": {
+      "bytes": 1173,
+      "headings": 0,
+      "links": 0,
+      "images": 0,
+      "codeBlocks": 0,
+      "scripts": 0,
+      "wrapped": true
+    }
+  },
+  {
+    "name": "empty-input-rejected",
+    "input": "",
+    "errorCode": "preview.empty"
+  }
+]
