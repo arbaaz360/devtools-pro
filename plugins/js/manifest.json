@@ -1,0 +1,217 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "format.js",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "JavaScript Formatter",
+  "description": "Beautify or minify JavaScript.",
+  "tools": [
+    {
+      "id": "format.js",
+      "title": "JavaScript Formatter",
+      "category": "converter",
+      "operationIds": ["beautify", "minify"],
+      "workspaceId": "js-formatter",
+      "searchAliases": ["js beautifier", "js minifier", "javascript beautifier"]
+    }
+  ],
+  "operations": [
+    {
+      "id": "beautify",
+      "title": "Beautify JavaScript",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "format.js.processor",
+        "version": "0.1.0",
+        "engine": "ecmascript",
+        "engineVersion": "2024",
+        "syntax": "javascript",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": ["text"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "kind": "artifact",
+          "multiplicity": "one",
+          "representations": ["code", "properties", "annotations"],
+          "mime": ["text/javascript"],
+          "sensitive": false,
+          "exports": ["copyText", "save", "useAsInput"]
+        }
+      ],
+      "options": [
+        {
+          "id": "indent",
+          "type": "enum",
+          "label": "Indentation",
+          "default": "space-2",
+          "choices": [
+            { "id": "space-2", "label": "2 spaces" },
+            { "id": "space-4", "label": "4 spaces" },
+            { "id": "tab", "label": "Tabs" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "brace-style",
+          "type": "enum",
+          "label": "Brace style",
+          "default": "collapse",
+          "choices": [
+            { "id": "collapse", "label": "Collapse" },
+            { "id": "expand", "label": "Expand" },
+            { "id": "end-expand", "label": "End expand" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "preserve-newlines",
+          "type": "boolean",
+          "label": "Preserve newlines",
+          "default": true,
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "max-preserve-newlines",
+          "type": "integer",
+          "label": "Max preserve newlines",
+          "default": "2",
+          "minimum": "0",
+          "maximum": "10",
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "space-in-parens",
+          "type": "boolean",
+          "label": "Space in parens",
+          "default": false,
+          "persistence": "instance",
+          "sensitive": false
+        },
+        {
+          "id": "end-with-newline",
+          "type": "boolean",
+          "label": "End with newline",
+          "default": true,
+          "persistence": "instance",
+          "sensitive": false
+        }
+      ],
+      "trigger": {
+        "modes": ["explicit", "inputChange"],
+        "debounceMs": "100",
+        "changedPorts": ["input"]
+      },
+      "limits": {
+        "maxInputBytes": "8388608",
+        "maxOutputBytes": "16777216",
+        "maxChunkBytes": "8388608",
+        "deadlineMs": "5000"
+      }
+    },
+    {
+      "id": "minify",
+      "title": "Minify JavaScript",
+      "executor": {
+        "kind": "javascriptWorker",
+        "id": "format.js.processor",
+        "version": "0.1.0",
+        "engine": "ecmascript",
+        "engineVersion": "2024",
+        "syntax": "javascript",
+        "cancellation": "cooperative"
+      },
+      "inputs": [
+        {
+          "id": "input",
+          "kind": "document",
+          "required": true,
+          "multiplicity": "one",
+          "contentKinds": ["text"]
+        }
+      ],
+      "outputs": [
+        {
+          "id": "output",
+          "kind": "artifact",
+          "multiplicity": "one",
+          "representations": ["code", "properties", "annotations"],
+          "mime": ["text/javascript"],
+          "sensitive": false,
+          "exports": ["copyText", "save", "useAsInput"]
+        }
+      ],
+      "options": [
+        {
+          "id": "preserve-comments",
+          "type": "enum",
+          "label": "Preserve comments",
+          "default": "license",
+          "choices": [
+            { "id": "none", "label": "None" },
+            { "id": "license", "label": "License" }
+          ],
+          "persistence": "instance",
+          "sensitive": false
+        }
+      ],
+      "trigger": {
+        "modes": ["explicit", "inputChange"],
+        "debounceMs": "100",
+        "changedPorts": ["input"]
+      },
+      "limits": {
+        "maxInputBytes": "8388608",
+        "maxOutputBytes": "16777216",
+        "maxChunkBytes": "8388608",
+        "deadlineMs": "5000"
+      }
+    }
+  ],
+  "workspaces": [
+    {
+      "id": "js-formatter",
+      "kind": "transform",
+      "bindings": [
+        { "id": "source", "component": "editor", "inputPort": "input" },
+        {
+          "id": "options",
+          "component": "form",
+          "optionIds": [
+            "indent",
+            "brace-style",
+            "preserve-newlines",
+            "max-preserve-newlines",
+            "space-in-parens",
+            "end-with-newline",
+            "preserve-comments"
+          ]
+        },
+        { "id": "result", "component": "output", "outputPort": "output" }
+      ],
+      "commands": [],
+      "presentationSettings": []
+    }
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {
+    "requirementIds": ["DU-15"],
+    "fixtures": ["beautify", "minify"],
+    "uiScenarios": []
+  }
+}

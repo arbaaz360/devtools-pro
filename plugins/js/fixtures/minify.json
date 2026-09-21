@@ -1,0 +1,194 @@
+[
+  {
+    "name": "basic division",
+    "options": {},
+    "input": "a = b / c / d;",
+    "output": "a=b/c/d;"
+  },
+  {
+    "name": "regex vs division",
+    "options": {},
+    "input": "a = /b/g;",
+    "output": "a=/b/g;"
+  },
+  {
+    "name": "regex with division inside",
+    "options": {},
+    "input": "a = /b\\/c/g;",
+    "output": "a=/b\\/c/g;"
+  },
+  {
+    "name": "regex with character class containing //",
+    "options": {},
+    "input": "a = /[//]/g;",
+    "output": "a=/[//]/g;"
+  },
+  {
+    "name": "nested templates",
+    "options": {},
+    "input": "const a = `b ${c + `d ${e} f`} g`;",
+    "output": "const a=`b ${c+`d ${e} f`} g`;"
+  },
+  {
+    "name": "string containing block comment",
+    "options": {},
+    "input": "const a = \"/* this is not a comment */\";",
+    "output": "const a=\"/* this is not a comment */\";"
+  },
+  {
+    "name": "string containing line comment",
+    "options": {},
+    "input": "const a = \"// this is not a comment\";",
+    "output": "const a=\"// this is not a comment\";"
+  },
+  {
+    "name": "block comment removed",
+    "options": {},
+    "input": "/* comment */ const a = 1;",
+    "output": "const a=1;"
+  },
+  {
+    "name": "line comment removed",
+    "options": {},
+    "input": "// comment\nconst a = 1;",
+    "output": "const a=1;"
+  },
+  {
+    "name": "license block comment preserved",
+    "options": {
+      "preserve-comments": "license"
+    },
+    "input": "/*! license */ const a = 1;",
+    "output": "/*! license */const a=1;"
+  },
+  {
+    "name": "license block comment removed",
+    "options": {
+      "preserve-comments": "none"
+    },
+    "input": "/*! license */ const a = 1;",
+    "output": "const a=1;"
+  },
+  {
+    "name": "license line comment not preserved",
+    "options": {
+      "preserve-comments": "license"
+    },
+    "input": "//! license\nconst a = 1;",
+    "output": "const a=1;"
+  },
+  {
+    "name": "ASI newline after return",
+    "options": {},
+    "input": "function a() {\n  return\n  value;\n}",
+    "output": "function a(){return\nvalue;}"
+  },
+  {
+    "name": "ASI newline after throw",
+    "options": {},
+    "input": "function a() {\n  throw\n  new Error();\n}",
+    "output": "function a(){throw\nnew Error();}"
+  },
+  {
+    "name": "ASI newline before ++",
+    "options": {},
+    "input": "let y = 1;\n++y;",
+    "output": "let y=1;++y;"
+  },
+  {
+    "name": "ASI newline with +",
+    "options": {},
+    "input": "let a = 1\n+ 2;",
+    "output": "let a=1\n+2;"
+  },
+  {
+    "name": "ASI newline with array",
+    "options": {},
+    "input": "let a = b\n[1, 2, 3].forEach();",
+    "output": "let a=b\n[1,2,3].forEach();"
+  },
+  {
+    "name": "ASI newline with parens",
+    "options": {},
+    "input": "let a = b\n(c).d();",
+    "output": "let a=b\n(c).d();"
+  },
+  {
+    "name": "ASI newline with template",
+    "options": {},
+    "input": "let a = b\n`c`;",
+    "output": "let a=b`c`;"
+  },
+  {
+    "name": "ASI newline with regex",
+    "options": {},
+    "input": "let a = b\n/c/g.test(d);",
+    "output": "let a=b\n/c/g.test(d);"
+  },
+  {
+    "name": "unterminated string",
+    "options": {},
+    "input": "const a = \"b",
+    "output": "const a=\"b"
+  },
+  {
+    "name": "unterminated string single",
+    "options": {},
+    "input": "const a = 'b",
+    "output": "const a='b"
+  },
+  {
+    "name": "unterminated template",
+    "options": {},
+    "input": "const a = `b",
+    "output": "const a=`b"
+  },
+  {
+    "name": "unterminated template expression",
+    "options": {},
+    "input": "const a = `b ${c",
+    "output": "const a=`b ${c"
+  },
+  {
+    "name": "unterminated block comment",
+    "options": {},
+    "input": "/* comment",
+    "output": ""
+  },
+  {
+    "name": "unterminated regex",
+    "options": {},
+    "input": "const a = /b",
+    "output": "const a=/b"
+  },
+  {
+    "name": "unterminated regex char class",
+    "options": {},
+    "input": "const a = /[b",
+    "output": "const a=/[b"
+  },
+  {
+    "name": "keyword spacing",
+    "options": {},
+    "input": "if(a)return b;else throw c;",
+    "output": "if(a)return b;else throw c;"
+  },
+  {
+    "name": "identifier spacing",
+    "options": {},
+    "input": "let a b c;",
+    "output": "let a b c;"
+  },
+  {
+    "name": "multiple whitespace removed",
+    "options": {},
+    "input": "const   a   =   1   ;  ",
+    "output": "const a=1;"
+  },
+  {
+    "name": "newlines removed if not ASI",
+    "options": {},
+    "input": "const\n  a\n  =\n  1\n  ;",
+    "output": "const\na=1;"
+  }
+]
