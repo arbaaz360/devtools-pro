@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div style={{ color: \"red\", marginTop: \"10px\" }} />\n</>"
-  }
+  },
+  "diagnostics": []
 }

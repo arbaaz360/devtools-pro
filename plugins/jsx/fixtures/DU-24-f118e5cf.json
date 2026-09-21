@@ -7,5 +7,10 @@
   },
   "output": {
     "output": "<>\n  <style>\n    {`.a { color: red; }`}\n  </style>\n</>"
-  }
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.raw-element-warning"
+    }
+  ]
 }

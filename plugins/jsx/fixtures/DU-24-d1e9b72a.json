@@ -7,5 +7,13 @@
   },
   "output": {
     "output": "<>\n  <a>\n    <b />\n  </a>\n</>"
-  }
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.unclosed-element"
+    },
+    {
+      "code": "jsx.stray-end-tag"
+    }
+  ]
 }

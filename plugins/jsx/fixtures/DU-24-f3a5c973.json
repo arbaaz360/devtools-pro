@@ -7,5 +7,19 @@
   },
   "output": {
     "output": "<>\n  <div>\n    <ul>\n      <li>\n        <p>\n          abc\n        </p>\n      </li>\n    </ul>\n  </div>\n</>"
-  }
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.unclosed-element"
+    },
+    {
+      "code": "jsx.unclosed-element"
+    },
+    {
+      "code": "jsx.unclosed-element"
+    },
+    {
+      "code": "jsx.unclosed-element"
+    }
+  ]
 }

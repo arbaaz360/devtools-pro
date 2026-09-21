@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div>\n    <svg>\n      <path d=\"M0\" />\n    </svg>\n  </div>\n</>"
-  }
+  },
+  "diagnostics": []
 }

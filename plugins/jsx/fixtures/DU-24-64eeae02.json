@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div style={{ msUserSelect: \"none\", WebkitTransform: \"scale(1)\", MozBoxSizing: \"border-box\", OTransition: \"all\" }} />\n</>"
-  }
+  },
+  "diagnostics": []
 }

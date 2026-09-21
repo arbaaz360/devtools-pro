@@ -452,7 +452,7 @@ function renderElement(node, depth, options, metrics, sink, inSvgContext) {
     lines.push(startTag);
     return lines;
   }
-  
+
   startTag += ">";
   lines.push(startTag);
 
@@ -466,7 +466,7 @@ function renderElement(node, depth, options, metrics, sink, inSvgContext) {
         const textLines = text.split("\n");
         for (let i = 0; i < textLines.length; i++) {
           if (i === 0) lines.push(options.indentText.repeat(depth + 1) + textLines[i]);
-          else lines.push(textLines[i]); 
+          else lines.push(textLines[i]);
         }
       }
     } else if (child.type === "comment") {
@@ -492,29 +492,29 @@ function renderElement(node, depth, options, metrics, sink, inSvgContext) {
 export function format(text, rawOptions, check = () => {}) {
   const options = normalizeOptions(rawOptions);
   if (!text.trim()) throw new JsxError("jsx.empty", "the document is empty; there is nothing to format", { bytes: encoder.encode(text).byteLength });
-  
+
   const diagnostics = [];
   const sink = { check, count: 0, diagnostic: (d) => diagnostics.push(d) };
-  
+
   const { tokens, counts } = tokenize(text, sink);
   const root = buildTree(tokens, sink);
-  
+
   const metrics = {
     elements: counts.elements,
     attributesRenamed: 0,
     stylesConverted: 0,
     comments: counts.comments
   };
-  
+
   let outputLines = [];
-  
+
   if (options.wrap === "component") {
     outputLines.push(`export default function ${options.componentName}() {`);
     outputLines.push(options.indentText + "return (");
   }
-  
+
   const innerDepth = options.wrap === "component" ? 3 : (options.wrap === "fragment" ? 1 : 0);
-  
+
   if (options.wrap === "fragment" || options.wrap === "component") {
     const wrapDepth = options.wrap === "component" ? 2 : 0;
     outputLines.push(options.indentText.repeat(wrapDepth) + "<>");
@@ -553,7 +553,7 @@ export function format(text, rawOptions, check = () => {}) {
   const output = outputLines.join("\n");
   diagnostics.sort((a, b) => a.charOffset - b.charOffset || a.charEnd - b.charEnd);
   resolvePositions(text, diagnostics);
-  
+
   return { output, diagnostics, metrics, options };
 }
 
@@ -562,10 +562,10 @@ export async function execute(request, context) {
     throw new JsxError("jsx.unsupported-operation", `unsupported operation ${request.operationId}`, { operationId: request.operationId, supported: [OPERATION_ID] });
   }
   if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
-  
+
   const { text, inputBytes } = await readText(context);
   const check = () => { if (context.cancellation.isCancelled()) throw new ProcessorCancelled(); };
-  
+
   const result = format(text, request?.options, check);
   const bytes = encoder.encode(result.output);
   const cap = Math.min(context.limits.maxOutputBytes, context.limits.maxChunkBytes);

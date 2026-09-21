@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <span>\n      hello  \n  </span>\n</>"
-  }
+  },
+  "diagnostics": []
 }

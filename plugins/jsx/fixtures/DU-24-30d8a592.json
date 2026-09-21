@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <area />\n  <base />\n  <br />\n  <col />\n  <embed />\n  <hr />\n  <img />\n  <input />\n  <link />\n  <meta />\n  <source />\n  <track />\n  <wbr />\n</>"
-  }
+  },
+  "diagnostics": []
 }

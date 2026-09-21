@@ -44,15 +44,26 @@ async function rejects(operation, options, input, code, extra = {}) {
   return caught;
 }
 
+function assertDiagnostics(actual, expected, name) {
+  assert.equal(actual.length, expected.length, `${name}: expected ${expected.length} diagnostics, got ${JSON.stringify(actual)}`);
+  for (let index = 0; index < expected.length; index += 1) {
+    for (const [key, value] of Object.entries(expected[index])) {
+      assert.deepEqual(actual[index][key], value, `${name}: diagnostic ${index} field ${key}`);
+    }
+  }
+}
+
 test("fixtures produce the expected output or error", async () => {
   assert.ok(allFixtures.length >= 40, `expected at least 40 fixtures, found ${allFixtures.length}`);
   for (const item of allFixtures) {
     if (item.error) {
-      const caught = await rejects(item.operationId, item.options, item.input.input, "jsx.empty");
+      const caught = await rejects(item.operationId, item.options, item.input.input, item.error);
       assert.ok(caught, `fixture ${item.id} should fail`);
     } else {
       const result = await run(item.operationId, item.options, item.input.input);
       assert.equal(result.text, item.output.output, `fixture ${item.id} output`);
+      assertDiagnostics(result.value.annotations, item.diagnostics, item.id);
+      assert.equal(result.value.diagnostics, item.diagnostics.length, `${item.id}: diagnostics count`);
     }
   }
 });

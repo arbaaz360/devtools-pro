@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div data-foo=\"bar\" aria-label=\"baz\" />\n</>"
-  }
+  },
+  "diagnostics": []
 }

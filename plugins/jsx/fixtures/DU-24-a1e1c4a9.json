@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div className='a' id=\"b\" data-x='c\"d' />\n</>"
-  }
+  },
+  "diagnostics": []
 }

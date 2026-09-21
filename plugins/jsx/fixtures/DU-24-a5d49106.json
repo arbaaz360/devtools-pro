@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  {/* hello world */}\n  <div>\n    {/* nested comment */}\n  </div>\n</>"
-  }
+  },
+  "diagnostics": []
 }

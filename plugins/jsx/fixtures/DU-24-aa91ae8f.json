@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <input disabled checked selected hidden required readOnly multiple autoFocus autoplay controls loop muted open defer async noValidate />\n</>"
-  }
+  },
+  "diagnostics": []
 }

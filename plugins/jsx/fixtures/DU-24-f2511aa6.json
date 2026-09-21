@@ -7,5 +7,10 @@
   },
   "output": {
     "output": "<>\n  <script>\n    {`const a = \\`{\\${b}}\\`;`}\n  </script>\n</>"
-  }
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.raw-element-warning"
+    }
+  ]
 }

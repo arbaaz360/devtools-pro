@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div data-y={\"c\\\"d\"} />\n</>"
-  }
+  },
+  "diagnostics": []
 }

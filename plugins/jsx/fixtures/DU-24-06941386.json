@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <div style={{ width: \"100\", zIndex: \"5\" }} />\n</>"
-  }
+  },
+  "diagnostics": []
 }

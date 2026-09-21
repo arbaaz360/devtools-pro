@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <form acceptCharset=\"utf8\" noValidate>\n    <input formNoValidate=\"true\" inputMode=\"text\" minLength=\"1\" />\n  </form>\n</>"
-  }
+  },
+  "diagnostics": []
 }

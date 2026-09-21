@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <input readOnly maxLength=\"5\" colSpan=\"2\" rowSpan=\"3\" autoComplete=\"off\" autoFocus encType=\"abc\" />\n</>"
-  }
+  },
+  "diagnostics": []
 }

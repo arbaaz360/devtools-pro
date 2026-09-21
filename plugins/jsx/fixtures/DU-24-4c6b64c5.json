@@ -10,5 +10,6 @@
   },
   "output": {
     "output": "export default function MyComp() {\n  return (\n    <>\n      <div>\n        a\n      </div>\n    </>\n  );\n}"
-  }
+  },
+  "diagnostics": []
 }

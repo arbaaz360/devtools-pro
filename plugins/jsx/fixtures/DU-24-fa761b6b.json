@@ -9,5 +9,6 @@
   },
   "output": {
     "output": "<>\n    <div>\n        <span>\n            a\n        </span>\n    </div>\n</>"
-  }
+  },
+  "diagnostics": []
 }

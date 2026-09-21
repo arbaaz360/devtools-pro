@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <button onClick=\"a()\" onMouseover=\"b()\" onKeydown=\"c()\">\n    A\n  </button>\n</>"
-  }
+  },
+  "diagnostics": []
 }

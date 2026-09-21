@@ -7,5 +7,6 @@
   },
   "output": {
     "output": "<>\n  <meta httpEquiv=\"refresh\" crossOrigin=\"anonymous\" />\n  <img srcSet=\"a.png\" useMap=\"#a\" />\n</>"
-  }
+  },
+  "diagnostics": []
 }
