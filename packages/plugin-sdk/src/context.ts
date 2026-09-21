@@ -72,7 +72,10 @@ export class MemoryReader implements NamedReader {
 }
 export class MemoryOutputSink implements OutputSink {
   readonly artifacts = new Map<string, OutputArtifact>(); readonly bytes = new Map<string, Uint8Array>(); readonly values = new Map<string, unknown>();
-  async write(port: string, bytes: Uint8Array, limits: Limits): Promise<OutputArtifact> { if (bytes.byteLength > limits.maxChunkBytes) throw new Error("output chunk exceeds limit"); if (bytes.byteLength > limits.maxOutputBytes) throw new Error("output exceeds limit"); const contentHash = await sha256Hex(bytes); const artifact = { handle: `memory:${port}`, byteLength: bytes.byteLength, contentHash }; this.bytes.set(port, bytes.slice()); this.artifacts.set(port, artifact); return artifact; }
+  // Writes to one port accumulate, as they do in the desktop engine: `bytes` holds the whole
+  // output and the artifact describes it, so a processor that streams chunks is tested on
+  // the document it produced rather than on its last chunk.
+  async write(port: string, bytes: Uint8Array, limits: Limits): Promise<OutputArtifact> { if (bytes.byteLength > limits.maxChunkBytes) throw new Error("output chunk exceeds limit"); const previous = this.bytes.get(port); const total = new Uint8Array((previous?.byteLength ?? 0) + bytes.byteLength); if (previous) total.set(previous, 0); total.set(bytes, previous?.byteLength ?? 0); if (total.byteLength > limits.maxOutputBytes) throw new Error("output exceeds limit"); const contentHash = await sha256Hex(total); const artifact = { handle: `memory:${port}`, byteLength: total.byteLength, contentHash }; this.bytes.set(port, total); this.artifacts.set(port, artifact); return artifact; }
   value(port: string, value: unknown): void { this.values.set(port, value); }
 }
 export class FixedClock implements Clock { readonly value: string; constructor(value: string) { this.value = value; } now(): string { return this.value; } }
