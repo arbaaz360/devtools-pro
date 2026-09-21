@@ -1,88 +1,49 @@
 {
-  "manifestVersion": 1,
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
   "id": "media.qr",
-  "category": "generator",
-  "name": "QR Code Generator",
+  "version": "0.1.0",
+  "stateVersion": 1,
   "title": "QR Code",
   "description": "Encodes text as a QR code SVG.",
-  "tests": {
-    "requirementIds": [
-      "DU-21"
-    ]
-  },
-  "workspaces": [
-    {
-      "kind": "generator",
-      "operationId": "media.qr"
-    }
-  ],
+  "tools": [{
+    "id": "media.qr",
+    "title": "QR Code",
+    "category": "generator",
+    "description": "Encodes text as a QR code SVG.",
+    "searchAliases": ["qr", "qrcode", "generator", "barcode"],
+    "operationIds": ["media.qr"],
+    "workspaceId": "qr"
+  }],
   "operations": [
     {
       "id": "media.qr",
-      "name": "Generate QR Code",
+      "title": "Generate QR Code",
+      "executor": { "kind": "javascriptWorker", "id": "media.qr.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "Text", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "maxBytes": "2953" }],
+      "outputs": [{ "id": "output", "label": "SVG", "kind": "artifact", "multiplicity": "one", "mime": ["image/svg+xml"], "representations": ["image", "code", "properties"], "sensitive": false, "exports": ["copyText", "save"] }],
       "options": [
-        {
-          "id": "error-correction",
-          "aliases": [
-            "errorCorrection"
-          ],
-          "type": "string",
-          "enum": [
-            "L",
-            "M",
-            "Q",
-            "H"
-          ],
-          "default": "M",
-          "title": "Error Correction"
-        },
-        {
-          "id": "cell-size",
-          "aliases": [
-            "cellSize"
-          ],
-          "type": "number",
-          "default": 8,
-          "title": "Cell Size"
-        },
-        {
-          "id": "margin",
-          "type": "number",
-          "default": 4,
-          "title": "Margin"
-        },
-        {
-          "id": "version",
-          "type": "number",
-          "default": 0,
-          "title": "Version"
-        }
+        { "id": "error-correction", "type": "enum", "label": "Error Correction", "default": "M", "choices": [{ "id": "L", "label": "L (7%)" }, { "id": "M", "label": "M (15%)" }, { "id": "Q", "label": "Q (25%)" }, { "id": "H", "label": "H (30%)" }], "persistence": "instance", "sensitive": false },
+        { "id": "cell-size", "type": "integer", "label": "Cell Size", "default": "8", "minimum": "1", "maximum": "40", "persistence": "instance", "sensitive": false },
+        { "id": "margin", "type": "integer", "label": "Margin", "default": "4", "minimum": "0", "maximum": "16", "persistence": "instance", "sensitive": false },
+        { "id": "version", "type": "integer", "label": "Version", "default": "0", "minimum": "0", "maximum": "40", "persistence": "instance", "sensitive": false }
       ],
-      "inputPorts": [
-        {
-          "id": "input",
-          "name": "Input text",
-          "type": [
-            "document",
-            "text"
-          ],
-          "required": true,
-          "maxBytes": 2953
-        }
-      ],
-      "outputPorts": [
-        {
-          "id": "output",
-          "name": "SVG",
-          "type": "artifact",
-          "mimeType": "image/svg+xml",
-          "representations": [
-            "image",
-            "code",
-            "properties"
-          ]
-        }
-      ]
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "4096", "maxOutputBytes": "4194304", "maxChunkBytes": "4194304", "deadlineMs": "5000" }
     }
-  ]
+  ],
+  "workspaces": [{
+    "id": "qr",
+    "kind": "generator",
+    "bindings": [
+      { "id": "source", "component": "editor", "inputPort": "input" },
+      { "id": "settings", "component": "form", "optionIds": ["error-correction", "cell-size", "margin", "version"] },
+      { "id": "result", "component": "output", "outputPort": "output" }
+    ],
+    "commands": [],
+    "presentationSettings": []
+  }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-21"], "fixtures": [], "uiScenarios": [] }
 }

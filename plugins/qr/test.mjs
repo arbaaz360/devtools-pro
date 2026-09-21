@@ -81,3 +81,29 @@ test("cooperative cancellation", async () => {
     }
   }
 });
+
+test("options validation", async () => {
+  // outside ranges
+  await rejects(OPERATION_ID, { "error-correction": "Z" }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { "cell-size": 0 }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { "cell-size": 41 }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { margin: -1 }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { margin: 17 }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { version: -1 }, "hello", "qr.invalid-option");
+  await rejects(OPERATION_ID, { version: 41 }, "hello", "qr.invalid-option");
+
+  // unknown keys
+  await rejects(OPERATION_ID, { unknown: true }, "hello", "qr.invalid-option");
+});
+
+test("camelCase aliases accepted", async () => {
+  const result = await run(OPERATION_ID, { errorCorrection: "H", cellSize: 10 }, "hello");
+  assert.equal(result.value.errorCorrection, "H");
+  assert.equal(result.value.cellSize, 10);
+});
+
+test("determinism", async () => {
+  const result1 = await run(OPERATION_ID, { version: 5 }, "hello");
+  const result2 = await run(OPERATION_ID, { version: 5 }, "hello");
+  assert.deepEqual(result1.bytes, result2.bytes, "two runs must produce byte-identical SVG");
+});

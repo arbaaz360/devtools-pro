@@ -23,7 +23,6 @@ const ERROR_CORRECTION_LEVELS = ["L", "M", "Q", "H"];
 export function normalizeOptions(raw) {
   if (raw === undefined || raw === null) raw = {};
   if (typeof raw !== "object" || Array.isArray(raw)) throw invalid("options must be an object", { received: Array.isArray(raw) ? "array" : typeof raw });
-
   const known = new Set(["error-correction", "errorCorrection", "cell-size", "cellSize", "margin", "version"]);
   for (const key of Object.keys(raw)) {
     if (!known.has(key)) throw invalid(`unknown option ${key}`, { option: key, known: [...known] });
@@ -109,7 +108,7 @@ export async function execute(request, context) {
   const modules = qr.getModuleCount();
   const widthPx = modules * options.cellSize + 2 * options.margin * options.cellSize;
 
-  const rawSvg = qr.createSvgTag({ cellSize: options.cellSize, margin: options.margin, scalable: true });
+  const rawSvg = qr.createSvgTag({ cellSize: options.cellSize, margin: options.margin * options.cellSize, scalable: true });
   // Ensure <?xml version="1.0" encoding="UTF-8"?> is added and width/height attributes are in pixels
   let svg = `<?xml version="1.0" encoding="UTF-8"?>\n` + rawSvg;
   svg = svg.replace("<svg ", `<svg width="${widthPx}px" height="${widthPx}px" `);

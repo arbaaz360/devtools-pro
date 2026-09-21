@@ -1,4 +1,5 @@
 {
-  "id": "media.qr",
-  "scope": "plugins/qr"
+  "apiVersion": "devtools.plugin/v2",
+  "manifest": "manifest.json",
+  "processor": "processor.mjs"
 }
