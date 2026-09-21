@@ -1,0 +1,59 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "preview.documents",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Markdown & HTML Preview",
+  "description": "Renders Markdown to HTML with the vendored marked, and wraps or passes through HTML, as a complete document the shell displays in a sandboxed frame with scripts disabled. This package does not sanitise the output.",
+  "tools": [{
+    "id": "preview.documents",
+    "title": "Markdown & HTML Preview",
+    "category": "viewer",
+    "description": "Preview Markdown or HTML as a rendered document, its generated HTML source, or its properties.",
+    "searchAliases": ["markdown preview", "html preview", "render", "marked"],
+    "operationIds": ["preview.markdown", "preview.html"],
+    "workspaceId": "preview"
+  }],
+  "operations": [
+    {
+      "id": "preview.markdown",
+      "title": "Preview Markdown",
+      "executor": { "kind": "javascriptWorker", "id": "preview.documents.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "Markdown", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/markdown"] }],
+      "outputs": [{ "id": "output", "label": "Preview", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["previewDocument", "code", "properties"], "sensitive": false, "exports": ["copyText", "save", "openInBrowser"] }],
+      "options": [
+        { "id": "gfm", "type": "boolean", "label": "GitHub-flavoured Markdown", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "breaks", "type": "boolean", "label": "Render line breaks as <br>", "default": false, "persistence": "instance", "sensitive": false },
+        { "id": "theme", "type": "enum", "label": "Theme", "default": "dark", "choices": [{ "id": "light", "label": "Light" }, { "id": "dark", "label": "Dark" }], "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "4194304", "maxOutputBytes": "16777216", "maxChunkBytes": "16777216", "deadlineMs": "5000" }
+    },
+    {
+      "id": "preview.html",
+      "title": "Preview HTML",
+      "executor": { "kind": "javascriptWorker", "id": "preview.documents.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "HTML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/html"] }],
+      "outputs": [{ "id": "output", "label": "Preview", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["previewDocument", "code", "properties"], "sensitive": false, "exports": ["copyText", "save", "openInBrowser"] }],
+      "options": [],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "4194304", "maxOutputBytes": "16777216", "maxChunkBytes": "16777216", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{
+    "id": "preview",
+    "kind": "transform",
+    "bindings": [
+      { "id": "source", "component": "editor", "inputPort": "input" },
+      { "id": "settings", "component": "form", "optionIds": ["gfm", "breaks", "theme"] },
+      { "id": "rendered", "component": "preview", "outputPort": "output" },
+      { "id": "result", "component": "output", "outputPort": "output" }
+    ],
+    "commands": [],
+    "presentationSettings": []
+  }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-25", "DU-11"], "fixtures": ["markdown", "html"], "uiScenarios": [] }
+}
