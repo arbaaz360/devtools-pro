@@ -23,7 +23,10 @@
   is forwarded into the conversation once, so the agent fixes and re-posts its status.
   The packet is released when the reviewer posts READY_TO_MERGE or
   READY_FOR_NATIVE_REVIEW, when the pull request is merged or closed, when the issue
-  closes, or when the wait limit passes.
+  closes, or when the wait limit passes. The wait limit is per round: forwarding a
+  verdict restarts it, so a review that lands late in a packet's life still gets the
+  full budget. A round that goes quiet (verdict forwarded, nothing pushed for an hour)
+  gets a nudge to push and post status, at most once every 30 minutes.
 
   Before starting a new packet, the loop looks for any open antigravity/* pull request
   whose latest verdict is CHANGES_REQUESTED and has not been forwarded yet, and tracks
@@ -258,14 +261,44 @@ function Test-InFlight($state) {
     Write-Host "packet #$($state.issue): reviewer accepted PR #$($pr.number); releasing"
     return $false
   }
-  if ($latest.body -match '\]\[CHANGES_REQUESTED\]' -and ($state.forwarded -notcontains $latest.id)) {
-    $text = "The integrator reviewed your pull request #$($pr.number) for issue #$($state.issue) and requested changes. Address every numbered item below on the same branch, run the packet's Checks again, push, and post a new [ID][STATUS] comment on the PR. Do not open a new PR. Review comment:`n`n$($latest.body)"
-    Write-Host ("{0}  forwarding CHANGES_REQUESTED on PR #{1} to Antigravity" -f (Get-Date -Format 'HH:mm'), $pr.number)
-    $out = Invoke-AgentApi send-message "--title=[review] PR #$($pr.number)" $ConversationId $text
-    if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "forwarding failed: $out" }
-    else { $state.forwarded = @($state.forwarded) + $latest.id; Write-State $state }
+  if ($latest.body -match '\]\[CHANGES_REQUESTED\]') {
+    if ($state.forwarded -notcontains $latest.id) {
+      $text = "The integrator reviewed your pull request #$($pr.number) for issue #$($state.issue) and requested changes. Address every numbered item below on the same branch, run the packet's Checks again, push, and post a new [ID][STATUS] comment on the PR. Do not open a new PR. Review comment:`n`n$($latest.body)"
+      Write-Host ("{0}  forwarding CHANGES_REQUESTED on PR #{1} to Antigravity" -f (Get-Date -Format 'HH:mm'), $pr.number)
+      $out = Invoke-AgentApi send-message "--title=[review] PR #$($pr.number)" $ConversationId $text
+      if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "forwarding failed: $out" }
+      else {
+        # A new round: the wait limit and the nudge clock start again.
+        $state.forwarded = @($state.forwarded) + $latest.id
+        $state.startedAt = (Get-Date).ToString('o')
+        $state.nudgedAt = $null
+        Write-State $state
+      }
+    } else {
+      Send-ReviewNudge $state $pr $latest
+    }
   }
   return $true
+}
+
+# A forwarded verdict with nothing pushed for an hour: the agent has usually fixed the
+# code locally and stopped short of pushing. Ask for the push and the STATUS comment,
+# at most once every 30 minutes.
+function Send-ReviewNudge($state, $pr, $verdict) {
+  if ($state.nudgedAt -and ((Get-Date) - [datetime]$state.nudgedAt) -lt [timespan]::FromMinutes(30)) { return }
+  $reviewed = [datetime]::Parse($verdict.created_at).ToUniversalTime()
+  if (((Get-Date).ToUniversalTime() - $reviewed) -lt [timespan]::FromMinutes(60)) { return }
+  $branch = gh pr view $pr.number --repo $repo --json headRefName --jq .headRefName 2>$null
+  $pushed = if ($branch) { Get-BranchCommitDate $branch } else { $null }
+  if ($pushed -and $pushed -gt $reviewed) { return }   # a push since the verdict; the reviewer's turn
+  $id = ([regex]::Match($state.packet, 'packets/([A-Z]+-\d+)')).Groups[1].Value
+  $minutes = [int]((Get-Date).ToUniversalTime() - $reviewed).TotalMinutes
+  $text = "Packet #$($state.issue) ([$id]): the review on PR #$($pr.number) was posted $minutes minutes ago and nothing has been pushed to $branch since. Push the fixes you have now, even if an item is still open, run the packet's Checks, and post a new [$id][STATUS] comment on the PR saying which numbered items are done and which are not. Work that stays in your checkout cannot be reviewed or merged."
+  Write-Host ('{0}  nudging Antigravity to push round fixes on PR #{1}' -f (Get-Date -Format 'HH:mm'), $pr.number)
+  $out = Invoke-AgentApi send-message "--title=[nudge] PR #$($pr.number)" $ConversationId $text
+  if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "nudge failed: $out"; return }
+  $state.nudgedAt = (Get-Date).ToString('o')
+  Write-State $state
 }
 
 function Start-Packet($issue) {
