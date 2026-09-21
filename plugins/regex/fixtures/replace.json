@@ -1,0 +1,218 @@
+[
+  {
+    "name": "dollar-dollar is a literal dollar sign",
+    "input": "a",
+    "options": {
+      "pattern": "a",
+      "mode": "replace",
+      "replacement": "$$"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "$"
+    }
+  },
+  {
+    "name": "dollar-ampersand is the whole match",
+    "input": "the cat sat",
+    "options": {
+      "pattern": "cat",
+      "mode": "replace",
+      "replacement": "[$&]"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "the [cat] sat"
+    }
+  },
+  {
+    "name": "dollar-backtick is the text before the match",
+    "input": "the cat sat",
+    "options": {
+      "pattern": "cat",
+      "mode": "replace",
+      "replacement": "$`"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "the the  sat"
+    }
+  },
+  {
+    "name": "dollar-quote is the text after the match",
+    "input": "the cat sat",
+    "options": {
+      "pattern": "cat",
+      "mode": "replace",
+      "replacement": "$'"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "the  sat sat"
+    }
+  },
+  {
+    "name": "numbered group reference reorders captures",
+    "input": "user@host",
+    "options": {
+      "pattern": "(\\w+)@(\\w+)",
+      "mode": "replace",
+      "replacement": "$2@$1"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "host@user"
+    }
+  },
+  {
+    "name": "reference to a group past the pattern's count is literal",
+    "input": "a",
+    "options": {
+      "pattern": "(a)",
+      "mode": "replace",
+      "replacement": "$9"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "$9"
+    }
+  },
+  {
+    "name": "named group reference",
+    "input": "2024",
+    "options": {
+      "pattern": "(?<year>\\d{4})",
+      "mode": "replace",
+      "replacement": "[$<year>]"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "[2024]"
+    }
+  },
+  {
+    "name": "reference to an unknown group name substitutes empty text",
+    "input": "2024",
+    "options": {
+      "pattern": "(?<year>\\d{4})",
+      "mode": "replace",
+      "replacement": "[$<nope>]"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "[]"
+    }
+  },
+  {
+    "name": "global true replaces every occurrence",
+    "input": "banana",
+    "options": {
+      "pattern": "a",
+      "mode": "replace",
+      "replacement": "X",
+      "global": true
+    },
+    "expect": {
+      "replacements": 3,
+      "text": "bXnXnX"
+    }
+  },
+  {
+    "name": "global false replaces the first occurrence only",
+    "input": "banana",
+    "options": {
+      "pattern": "a",
+      "mode": "replace",
+      "replacement": "X",
+      "global": false
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "bXnana"
+    }
+  },
+  {
+    "name": "replacement combines several dollar forms",
+    "input": "xaby",
+    "options": {
+      "pattern": "(a)(b)",
+      "mode": "replace",
+      "replacement": "[$2$1|$&|$$]"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "x[ba|ab|$]y"
+    }
+  },
+  {
+    "name": "ignore-case replace",
+    "input": "CAT cat Cat",
+    "options": {
+      "pattern": "cat",
+      "mode": "replace",
+      "replacement": "dog",
+      "ignoreCase": true,
+      "global": true
+    },
+    "expect": {
+      "replacements": 3,
+      "text": "dog dog dog"
+    }
+  },
+  {
+    "name": "sticky replace only touches the contiguous run from the start",
+    "input": "123abc456",
+    "options": {
+      "pattern": "\\d+",
+      "mode": "replace",
+      "replacement": "N",
+      "sticky": true,
+      "global": true
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "Nabc456"
+    }
+  },
+  {
+    "name": "empty replacement removes the matched text",
+    "input": "a b  c   d",
+    "options": {
+      "pattern": "\\s+",
+      "mode": "replace",
+      "replacement": "",
+      "global": true
+    },
+    "expect": {
+      "replacements": 3,
+      "text": "abcd"
+    }
+  },
+  {
+    "name": "a non-participating group substitutes as empty text",
+    "input": "a b",
+    "options": {
+      "pattern": "(a)|(b)",
+      "mode": "replace",
+      "replacement": "[$1|$2]",
+      "global": true
+    },
+    "expect": {
+      "replacements": 2,
+      "text": "[a|] [|b]"
+    }
+  },
+  {
+    "name": "named reference is literal when the pattern has no named groups at all",
+    "input": "2024",
+    "options": {
+      "pattern": "(\\d{4})",
+      "mode": "replace",
+      "replacement": "[$<year>]"
+    },
+    "expect": {
+      "replacements": 1,
+      "text": "[$<year>]"
+    }
+  }
+]

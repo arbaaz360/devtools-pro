@@ -1,0 +1,44 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "text.regex",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Regular Expression Tester",
+  "description": "Runs a JavaScript (ECMAScript) regular expression over the document, reporting every match and its groups, or producing replaced text.",
+  "tools": [
+    {"id":"text.regex","title":"Regular Expression Tester","category":"text","operationIds":["text.regex"],"workspaceId":"regex"}
+  ],
+  "operations": [
+    {
+      "id":"text.regex",
+      "title":"Run a regular expression",
+      "executor":{"kind":"javascriptWorker","id":"text.regex.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"regexp","cancellation":"cooperative"},
+      "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+      "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["application/json"],"representations":["annotations","table","properties","text"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+      "options":[
+        {"id":"pattern","type":"string","label":"Pattern","default":"","maxLength":"4096","persistence":"instance","sensitive":false},
+        {"id":"mode","type":"enum","label":"Mode","default":"match","choices":[{"id":"match","label":"Match"},{"id":"replace","label":"Replace"}],"persistence":"instance","sensitive":false},
+        {"id":"replacement","type":"string","label":"Replacement","default":"","maxLength":"1048576","persistence":"instance","sensitive":false},
+        {"id":"global","type":"boolean","label":"Global","default":true,"persistence":"instance","sensitive":false},
+        {"id":"ignore-case","type":"boolean","label":"Ignore case","default":false,"persistence":"instance","sensitive":false},
+        {"id":"multiline","type":"boolean","label":"Multiline","default":false,"persistence":"instance","sensitive":false},
+        {"id":"dot-all","type":"boolean","label":"Dot matches newline","default":false,"persistence":"instance","sensitive":false},
+        {"id":"unicode","type":"boolean","label":"Unicode","default":false,"persistence":"instance","sensitive":false},
+        {"id":"sticky","type":"boolean","label":"Sticky","default":false,"persistence":"instance","sensitive":false}
+      ],
+      "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
+      "limits":{"maxInputBytes":"4194304","maxOutputBytes":"16777216","maxChunkBytes":"4194304","deadlineMs":"2000"}
+    }
+  ],
+  "workspaces": [
+    {"id":"regex","kind":"transform","bindings":[
+      {"id":"input","component":"editor","inputPort":"input"},
+      {"id":"result","component":"output","outputPort":"output"},
+      {"id":"result-annotations","component":"annotations","outputPort":"output"}
+    ],"commands":[],"presentationSettings":[]}
+  ],
+  "capabilities": [],
+  "settings": [],
+  "tests": {"requirementIds":["DU-03"],"fixtures":["match","replace","invalid"],"uiScenarios":[]}
+}
