@@ -2,6 +2,8 @@
 
 The `media.qr` plugin generates a QR code (SVG format) from the input text, using the vendored `qrcode-generator` module.
 
+Note that only byte mode is used for encoding, so numeric and alphanumeric inputs still encode as bytes (this produces a larger but exact representation).
+
 ## Options
 
 * **`error-correction`** (enum): The error correction level. Allowed values: `L`, `M`, `Q`, `H`. Default: `M`. Aliases: `errorCorrection`.

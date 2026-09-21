@@ -47,7 +47,11 @@ test("fixtures produce the expected SVG output or error", async () => {
     } else {
       const result = await run(item.operationId, item.options, item.input.input);
       assert.equal(result.text, item.output.output, `fixture ${item.id} output SVG mismatch`);
+      assert.ok(result.text.startsWith('<?xml version="1.0" encoding="UTF-8"?>'), `fixture ${item.id} output must start with XML declaration`);
+      assert.ok(result.text.trim().endsWith("</svg>"), `fixture ${item.id} output must end with </svg>`);
+      const byteLength = encoder.encode(result.text).byteLength;
       if (item.properties) {
+        assert.equal(byteLength, item.properties.bytes, `fixture ${item.id} UTF-8 length must equal properties.bytes`);
         for (const [key, value] of Object.entries(item.properties)) {
           assert.deepEqual(result.value[key], value, `fixture ${item.id} property ${key} mismatch`);
         }

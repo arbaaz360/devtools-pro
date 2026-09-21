@@ -131,9 +131,6 @@ export async function execute(request, context) {
   };
 
   await context.writeValue("output", report);
-  for (let i = 0; i < outputBytes.byteLength; i += 65536) {
-    check(context);
-    await context.write("output", outputBytes.subarray(i, i + 65536));
-  }
+  await context.write("output", outputBytes);
   return report;
 }
