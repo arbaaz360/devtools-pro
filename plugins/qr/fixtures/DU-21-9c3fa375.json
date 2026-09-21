@@ -1,0 +1,11 @@
+{
+  "id": "DU-21-9c3fa375",
+  "operationId": "media.qr",
+  "options": {
+    "unknown": 1
+  },
+  "input": {
+    "input": "test"
+  },
+  "error": "qr.invalid-option"
+}
