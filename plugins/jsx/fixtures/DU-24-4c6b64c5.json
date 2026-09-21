@@ -1,0 +1,15 @@
+{
+  "id": "DU-24-4c6b64c5",
+  "operationId": "convert.jsx",
+  "options": {
+    "wrap": "component",
+    "component-name": "MyComp"
+  },
+  "input": {
+    "input": "<div>a</div>"
+  },
+  "output": {
+    "output": "export default function MyComp() {\n  return (\n    <>\n      <div>\n        a\n      </div>\n    </>\n  );\n}"
+  },
+  "diagnostics": []
+}

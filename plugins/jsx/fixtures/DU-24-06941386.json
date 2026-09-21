@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-06941386",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div style=\"width: 100; z-index: 5\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div style={{ width: \"100\", zIndex: \"5\" }} />\n</>"
+  },
+  "diagnostics": []
+}

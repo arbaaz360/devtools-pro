@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-ba7a6ced",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<button onclick=\"a()\" onmouseover=\"b()\" onkeydown=\"c()\">A</button>"
+  },
+  "output": {
+    "output": "<>\n  <button onClick=\"a()\" onMouseover=\"b()\" onKeydown=\"c()\">\n    A\n  </button>\n</>"
+  },
+  "diagnostics": []
+}

@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-79d6c8b4",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<?xml version=\"1.0\"?><!DOCTYPE html><html></html>"
+  },
+  "output": {
+    "output": "<>\n  <html />\n</>"
+  },
+  "diagnostics": []
+}

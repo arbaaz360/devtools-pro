@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-fde2c2b9",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div tabindex=\"0\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div tabIndex=\"0\" />\n</>"
+  },
+  "diagnostics": []
+}

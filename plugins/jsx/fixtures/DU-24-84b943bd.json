@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-84b943bd",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<input readonly maxlength=\"5\" colspan=\"2\" rowspan=\"3\" autocomplete=\"off\" autofocus enctype=\"abc\" />"
+  },
+  "output": {
+    "output": "<>\n  <input readOnly maxLength=\"5\" colSpan=\"2\" rowSpan=\"3\" autoComplete=\"off\" autoFocus encType=\"abc\" />\n</>"
+  },
+  "diagnostics": []
+}

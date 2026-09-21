@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-08564acd",
+  "operationId": "convert.jsx",
+  "options": {
+    "wrap": "component",
+    "component-name": "123-invalid"
+  },
+  "input": {
+    "input": "<div></div>"
+  },
+  "error": "jsx.invalid-option"
+}

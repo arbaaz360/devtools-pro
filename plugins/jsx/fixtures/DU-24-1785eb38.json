@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-1785eb38",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<form accept-charset=\"utf8\" novalidate><input formnovalidate inputmode=\"text\" minlength=\"1\" /></form>"
+  },
+  "output": {
+    "output": "<>\n  <form acceptCharset=\"utf8\" noValidate>\n    <input formNoValidate=\"true\" inputMode=\"text\" minLength=\"1\" />\n  </form>\n</>"
+  },
+  "diagnostics": []
+}

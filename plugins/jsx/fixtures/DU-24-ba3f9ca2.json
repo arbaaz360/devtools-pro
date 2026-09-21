@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-ba3f9ca2",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div data-foo=\"bar\" aria-label=\"baz\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div data-foo=\"bar\" aria-label=\"baz\" />\n</>"
+  },
+  "diagnostics": []
+}

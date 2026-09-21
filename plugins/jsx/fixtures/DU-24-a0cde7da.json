@@ -1,0 +1,25 @@
+{
+  "id": "DU-24-a0cde7da",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div></div></span>"
+  },
+  "output": {
+    "output": "<>\n  <div />\n</>"
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.stray-end-tag",
+      "severity": "warning",
+      "message": "</span> has no open <span>; it is dropped",
+      "data": {
+        "tag": "span"
+      },
+      "offset": 11,
+      "line": 1,
+      "column": 12,
+      "end": 18
+    }
+  ]
+}

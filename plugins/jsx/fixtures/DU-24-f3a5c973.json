@@ -1,0 +1,61 @@
+{
+  "id": "DU-24-f3a5c973",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div><ul><li><p>abc"
+  },
+  "output": {
+    "output": "<>\n  <div>\n    <ul>\n      <li>\n        <p>\n          abc\n        </p>\n      </li>\n    </ul>\n  </div>\n</>"
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<div> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "div"
+      },
+      "offset": 0,
+      "line": 1,
+      "column": 1,
+      "end": 5
+    },
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<ul> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "ul"
+      },
+      "offset": 5,
+      "line": 1,
+      "column": 6,
+      "end": 9
+    },
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<li> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "li"
+      },
+      "offset": 9,
+      "line": 1,
+      "column": 10,
+      "end": 13
+    },
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<p> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "p"
+      },
+      "offset": 13,
+      "line": 1,
+      "column": 14,
+      "end": 16
+    }
+  ]
+}

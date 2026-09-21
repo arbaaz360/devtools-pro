@@ -1,0 +1,37 @@
+{
+  "id": "DU-24-c9a90777",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div><span>a"
+  },
+  "output": {
+    "output": "<>\n  <div>\n    <span>\n      a\n    </span>\n  </div>\n</>"
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<div> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "div"
+      },
+      "offset": 0,
+      "line": 1,
+      "column": 1,
+      "end": 5
+    },
+    {
+      "code": "jsx.unclosed-element",
+      "severity": "warning",
+      "message": "<span> was never closed; it is closed at end of input",
+      "data": {
+        "tag": "span"
+      },
+      "offset": 5,
+      "line": 1,
+      "column": 6,
+      "end": 11
+    }
+  ]
+}

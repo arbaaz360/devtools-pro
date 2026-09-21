@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-578ec3a0",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div data-y=c\"d></div>"
+  },
+  "output": {
+    "output": "<>\n  <div data-y={\"c\\\"d\"} />\n</>"
+  },
+  "diagnostics": []
+}

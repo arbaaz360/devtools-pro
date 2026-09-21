@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-e57d3122",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<ul><li>1</li><li>2</li></ul>"
+  },
+  "output": {
+    "output": "<>\n  <ul>\n    <li>\n      1\n    </li>\n    <li>\n      2\n    </li>\n  </ul>\n</>"
+  },
+  "diagnostics": []
+}

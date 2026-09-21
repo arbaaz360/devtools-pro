@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-ed4b3a1c",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div>Hello {world}</div>"
+  },
+  "output": {
+    "output": "<>\n  <div>\n    Hello {\"{\"}world{\"}\"}\n  </div>\n</>"
+  },
+  "diagnostics": []
+}

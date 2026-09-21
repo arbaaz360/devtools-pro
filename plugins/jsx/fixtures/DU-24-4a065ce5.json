@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-4a065ce5",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div><svg><path d=\"M0\" /></svg></div>"
+  },
+  "output": {
+    "output": "<>\n  <div>\n    <svg>\n      <path d=\"M0\" />\n    </svg>\n  </div>\n</>"
+  },
+  "diagnostics": []
+}

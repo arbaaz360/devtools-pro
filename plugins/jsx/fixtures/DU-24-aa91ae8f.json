@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-aa91ae8f",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<input disabled checked selected hidden required readonly multiple autofocus autoplay controls loop muted open defer async novalidate />"
+  },
+  "output": {
+    "output": "<>\n  <input disabled checked selected hidden required readOnly multiple autoFocus autoplay controls loop muted open defer async noValidate />\n</>"
+  },
+  "diagnostics": []
+}

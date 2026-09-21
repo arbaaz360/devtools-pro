@@ -1,0 +1,22 @@
+{
+  "id": "DU-24-f118e5cf",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<style>.a { color: red; }</style>"
+  },
+  "output": {
+    "output": "<>\n  <style>\n    {`.a { color: red; }`}\n  </style>\n</>"
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.raw-element-warning",
+      "severity": "warning",
+      "message": "<style> block found, emitting as template literal",
+      "offset": 7,
+      "line": 1,
+      "column": 8,
+      "end": 25
+    }
+  ]
+}

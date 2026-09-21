@@ -1,0 +1,25 @@
+{
+  "id": "DU-24-60aa91d6",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<img src=\"a.png\"></img>"
+  },
+  "output": {
+    "output": "<>\n  <img src=\"a.png\" />\n</>"
+  },
+  "diagnostics": [
+    {
+      "code": "jsx.void-end-tag",
+      "severity": "warning",
+      "message": "</img> is a void element and never has an end tag; it is dropped",
+      "data": {
+        "tag": "img"
+      },
+      "offset": 17,
+      "line": 1,
+      "column": 18,
+      "end": 23
+    }
+  ]
+}
