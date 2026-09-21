@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-88c65c4d",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<label for=\"a\">a</label>"
+  },
+  "output": {
+    "output": "<>\n  <label htmlFor=\"a\">\n    a\n  </label>\n</>"
+  }
+}

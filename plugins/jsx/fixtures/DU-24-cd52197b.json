@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-cd52197b",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div contenteditable spellcheck accesskey=\"s\" hreflang=\"en\" playsinline referrerpolicy=\"no-referrer\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div contentEditable=\"true\" spellCheck=\"true\" accessKey=\"s\" hrefLang=\"en\" playsInline=\"true\" referrerPolicy=\"no-referrer\" />\n</>"
+  }
+}

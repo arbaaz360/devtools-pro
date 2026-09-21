@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-30d8a592",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<area><base><br><col><embed><hr><img><input><link><meta><source><track><wbr>"
+  },
+  "output": {
+    "output": "<>\n  <area />\n  <base />\n  <br />\n  <col />\n  <embed />\n  <hr />\n  <img />\n  <input />\n  <link />\n  <meta />\n  <source />\n  <track />\n  <wbr />\n</>"
+  }
+}

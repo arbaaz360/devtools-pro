@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-ae702d64",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<meta http-equiv=\"refresh\" crossorigin=\"anonymous\"><img srcset=\"a.png\" usemap=\"#a\">"
+  },
+  "output": {
+    "output": "<>\n  <meta httpEquiv=\"refresh\" crossOrigin=\"anonymous\" />\n  <img srcSet=\"a.png\" useMap=\"#a\" />\n</>"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-91689da3",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<iframe frameborder=\"0\" allowfullscreen></iframe><time datetime=\"2024\"></time>"
+  },
+  "output": {
+    "output": "<>\n  <iframe frameBorder=\"0\" allowFullScreen=\"true\" />\n  <time dateTime=\"2024\" />\n</>"
+  }
+}

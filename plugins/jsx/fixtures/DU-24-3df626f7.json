@@ -1,0 +1,13 @@
+{
+  "id": "DU-24-3df626f7",
+  "operationId": "convert.jsx",
+  "options": {
+    "indent": "tab"
+  },
+  "input": {
+    "input": "<div><span>a</span></div>"
+  },
+  "output": {
+    "output": "<>\n\t<div>\n\t\t<span>\n\t\t\ta\n\t\t</span>\n\t</div>\n</>"
+  }
+}

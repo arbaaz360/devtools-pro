@@ -1,0 +1,13 @@
+{
+  "id": "DU-24-fa761b6b",
+  "operationId": "convert.jsx",
+  "options": {
+    "indent": "spaces-4"
+  },
+  "input": {
+    "input": "<div><span>a</span></div>"
+  },
+  "output": {
+    "output": "<>\n    <div>\n        <span>\n            a\n        </span>\n    </div>\n</>"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-fa839e84",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<!-- /* inside */ -->"
+  },
+  "output": {
+    "output": "<>\n  {/* /* inside * / */}\n</>"
+  }
+}

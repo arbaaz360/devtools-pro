@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-b2e64e1c",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<span>  hello  </span>"
+  },
+  "output": {
+    "output": "<>\n  <span>\n      hello  \n  </span>\n</>"
+  }
+}

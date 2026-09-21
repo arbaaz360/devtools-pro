@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-6f2c1cce",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div class=\"\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div className=\"\" />\n</>"
+  }
+}

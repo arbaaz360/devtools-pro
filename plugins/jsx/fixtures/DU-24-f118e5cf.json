@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-f118e5cf",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<style>.a { color: red; }</style>"
+  },
+  "output": {
+    "output": "<>\n  <style>\n    {`.a { color: red; }`}\n  </style>\n</>"
+  }
+}

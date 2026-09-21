@@ -1,0 +1,50 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "convert.jsx",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "HTML/SVG to JSX Converter",
+  "description": "Converts an HTML or SVG fragment into JSX.",
+  "tools": [{
+    "id": "convert.jsx",
+    "title": "HTML/SVG to JSX",
+    "category": "converter",
+    "description": "Convert HTML and SVG to JSX.",
+    "searchAliases": ["html", "svg", "jsx", "convert"],
+    "operationIds": ["convert.jsx"],
+    "workspaceId": "jsx"
+  }],
+  "operations": [
+    {
+      "id": "convert.jsx",
+      "title": "Convert",
+      "executor": { "kind": "javascriptWorker", "id": "convert.jsx.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "Markup", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/html", "image/svg+xml"], "languages": ["html", "svg"] }],
+      "outputs": [{ "id": "output", "label": "JSX", "kind": "artifact", "multiplicity": "one", "mime": ["text/javascript"], "language": "javascript", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save", "useAsInput"] }],
+      "options": [
+        { "id": "wrap", "type": "enum", "label": "Wrap", "default": "fragment", "choices": [{ "id": "none", "label": "None" }, { "id": "fragment", "label": "Fragment" }, { "id": "component", "label": "Component" }], "persistence": "instance", "sensitive": false },
+        { "id": "component-name", "type": "string", "label": "Component Name", "default": "Component", "persistence": "instance", "sensitive": false },
+        { "id": "indent", "type": "enum", "label": "Indentation", "default": "spaces-2", "choices": [{ "id": "spaces-2", "label": "2 spaces" }, { "id": "spaces-4", "label": "4 spaces" }, { "id": "tab", "label": "One tab" }], "persistence": "instance", "sensitive": false },
+        { "id": "svg-attributes", "type": "enum", "label": "SVG Attributes", "default": "camel", "choices": [{ "id": "camel", "label": "Camel Case" }, { "id": "keep", "label": "Keep As Written" }], "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit", "inputChange"], "debounceMs": "200" },
+      "limits": { "maxInputBytes": "4194304", "maxOutputBytes": "16777216", "maxChunkBytes": "16777216", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{
+    "id": "jsx",
+    "kind": "transform",
+    "bindings": [
+      { "id": "source", "component": "editor", "inputPort": "input" },
+      { "id": "settings", "component": "form", "optionIds": ["wrap", "component-name", "indent", "svg-attributes"] },
+      { "id": "result", "component": "output", "outputPort": "output" },
+      { "id": "annotations", "component": "diagnostics", "outputPort": "output" }
+    ],
+    "commands": [],
+    "presentationSettings": []
+  }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-24"], "fixtures": [], "uiScenarios": [] }
+}

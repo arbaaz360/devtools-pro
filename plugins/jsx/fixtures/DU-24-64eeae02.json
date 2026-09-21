@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-64eeae02",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div style=\"-ms-user-select: none; -webkit-transform: scale(1); -moz-box-sizing: border-box; -o-transition: all;\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div style={{ msUserSelect: \"none\", WebkitTransform: \"scale(1)\", MozBoxSizing: \"border-box\", OTransition: \"all\" }} />\n</>"
+  }
+}

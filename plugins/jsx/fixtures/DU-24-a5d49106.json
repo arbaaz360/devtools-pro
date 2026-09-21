@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-a5d49106",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<!-- hello world --><div><!-- nested comment --></div>"
+  },
+  "output": {
+    "output": "<>\n  {/* hello world */}\n  <div>\n    {/* nested comment */}\n  </div>\n</>"
+  }
+}

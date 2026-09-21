@@ -1,0 +1,13 @@
+{
+  "id": "DU-24-4c968ca2",
+  "operationId": "convert.jsx",
+  "options": {
+    "wrap": "fragment"
+  },
+  "input": {
+    "input": "<div>a</div>"
+  },
+  "output": {
+    "output": "<>\n  <div>\n    a\n  </div>\n</>"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-f2511aa6",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<script>const a = `{${b}}`;</script>"
+  },
+  "output": {
+    "output": "<>\n  <script>\n    {`const a = \\`{\\${b}}\\`;`}\n  </script>\n</>"
+  }
+}

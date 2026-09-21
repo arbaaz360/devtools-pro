@@ -1,0 +1,11 @@
+{
+  "id": "DU-24-a1e1c4a9",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div class='a' id=\"b\" data-x='c\"d'></div>"
+  },
+  "output": {
+    "output": "<>\n  <div className='a' id=\"b\" data-x='c\"d' />\n</>"
+  }
+}

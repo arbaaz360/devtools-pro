@@ -1,0 +1,13 @@
+{
+  "id": "DU-24-aaa6c22e",
+  "operationId": "convert.jsx",
+  "options": {
+    "svg-attributes": "keep"
+  },
+  "input": {
+    "input": "<svg viewBox=\"0 0 10 10\"><path stroke-width=\"2\" xlink:href=\"#abc\" xml:space=\"preserve\" /></svg>"
+  },
+  "output": {
+    "output": "<>\n  <svg viewBox=\"0 0 10 10\">\n    <path stroke-width=\"2\" xlink:href=\"#abc\" xml:space=\"preserve\" />\n  </svg>\n</>"
+  }
+}
