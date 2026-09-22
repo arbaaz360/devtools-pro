@@ -25,7 +25,17 @@ export interface ToolCapabilities {
   needsNetwork: boolean;
   needsSecrets: boolean;
 }
-export interface ToolOperation { id: string; label: string; defaultOptions: Record<string, unknown>; }
+export interface ToolOperation {
+  id: string;
+  label: string;
+  defaultOptions: Record<string, unknown>;
+  /** The options this operation declares; siblings may declare different ones. */
+  options?: OptionSpec[];
+  /** trigger.modes includes inputChange: the shell may run it as the document changes. */
+  autoOnInput?: boolean;
+  /** inputChange or heldRepeat: an option change (a generator's only input) may run it. */
+  autoOnOption?: boolean;
+}
 /** Acceptance identity returned by the native host for every new job. */
 export interface ExecutionIdentity {
   pluginId: string;
@@ -54,6 +64,7 @@ export interface ToolManifest {
   /** Generators run without input text. */
   emptyInput?: boolean;
   /** The v2 option declarations the shell renders as controls. */
+  /** @deprecated Options are per operation; read them from `operations[].options`. */
   optionSchema?: OptionSpec[];
 }
 export interface FileDocument {

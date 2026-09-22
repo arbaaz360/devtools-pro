@@ -122,6 +122,19 @@ async function harness(t: TestContext) {
       manifest("encoding.hash", "sha256"),
       manifest("text.url", "encode"),
       manifest("plugin.echo", "run"),
+      {
+        ...manifest("format.explicit", "beautify"),
+        auto: false,
+        operations: [
+          { id: "beautify", label: "Beautify", defaultOptions: { indent: "sp2" }, options: [], autoOnInput: false, autoOnOption: false },
+          { id: "minify", label: "Minify", defaultOptions: { comments: "license" }, options: [], autoOnInput: false, autoOnOption: false },
+        ],
+      },
+      {
+        ...manifest("format.live", "run"),
+        auto: true,
+        operations: [{ id: "run", label: "Run", defaultOptions: {}, options: [], autoOnInput: true, autoOnOption: true }],
+      },
       manifest("text.compare", "compare"),
     ],
     chooseDocumentOutput: async () => null,
@@ -651,4 +664,44 @@ test("does not deduplicate browser drops by filename alone without path identity
   await h.controller.openBrowserFile(fileWithPath2);
   assert.equal(h.controller.state.tabs.length, 3);
   assert.equal(h.controller.state.activeId, configTabId);
+});
+
+
+test("an operation that declares explicit-only execution waits for its button", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab();
+  h.controller.selectTool(id, "format.explicit");
+  h.controller.edit(id, ".a{color:red}");
+  await setImmediate();
+  await setImmediate();
+  assert.equal(h.runs.length, 0, "typing must not start a run the manifest did not ask for");
+
+  // Changing an option is not a request to run either.
+  h.controller.options(id, "beautify", { indent: "sp4" });
+  await setImmediate();
+  await setImmediate();
+  assert.equal(h.runs.length, 0);
+
+  // Pressing the operation runs it.
+  h.controller.options(id, "beautify", { indent: "sp4" }, true);
+  await waitFor(() => h.runs.length === 1, "the press should run the operation");
+  assert.equal(h.runs[0]!.operation, "beautify");
+});
+
+test("a tool that follows the document still runs as it is edited", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab();
+  h.controller.selectTool(id, "format.live");
+  h.controller.edit(id, "hello");
+  await waitFor(() => h.runs.length >= 1, "an inputChange tool runs without a press");
+});
+
+test("switching operation takes the new operation's defaults", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("body{}");
+  h.controller.selectTool(id, "format.explicit");
+  assert.deepEqual(h.controller.tab(id)!.options, { indent: "sp2" });
+  h.controller.options(id, "minify", { indent: "sp4" }, true);
+  assert.deepEqual(h.controller.tab(id)!.options, { comments: "license" },
+    "an option the new operation does not declare must not travel with the switch");
 });

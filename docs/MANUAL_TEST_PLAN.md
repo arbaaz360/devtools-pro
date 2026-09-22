@@ -194,7 +194,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | EDT-12 | Scroll to the middle of a long document, switch tabs, switch back | The scroll position and caret are preserved |
 | EDT-13 | Type continuously for ~10 s in an auto tool | No dropped characters, no caret jumps, no mid-typing result flicker that steals focus |
 | EDT-14 **[P1]** | Type into an auto tool and stop | The result refreshes on its own within ~1 s (debounce is ~350 ms) |
-| EDT-15 | Type into an explicit tool (JSON, CSS, XML) | The result does **not** change until you press an operation button; any stale result is visibly marked stale rather than presented as current |
+| EDT-15 | Type into an explicit tool (CSS, XML) | The result does **not** appear until you press an operation button. JSON is a bundled Rust tool and runs as you type by design — that is not a failure of this case; any stale result is visibly marked stale rather than presented as current |
 | EDT-16 | Paste text containing a NUL byte or lone surrogate | Either sanitised or refused with a message; never a crash or a truncated-without-warning document |
 | EDT-17 | Open the image tool (**Image to Base64**) and open a PNG | The image renders in the input area as a picture, not as bytes |
 | EDT-18 | In an image tool, try to type in the input area | Typing is blocked or ignored cleanly; the app does not corrupt the image |

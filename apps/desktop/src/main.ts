@@ -35,6 +35,7 @@ import {
 import {
   validation,
   type ToolDefinition,
+  optionSchemaFor,
 } from "./workbench/tools";
 import { WorkerEngine } from "./plugins/engine";
 import { annotationMarkup } from "./ui/annotations";
@@ -456,8 +457,10 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
     host.append(label, granularityControl());
     return;
   }
-  if (tool.optionSchema?.length)
-    host.append(...optionControls(tab, tool.optionSchema));
+  // The controls belong to the operation on screen: a sibling operation may
+  // declare different options, and offering its choices produces runs that fail.
+  const schema = optionSchemaFor(tool, tab.operation);
+  if (schema.length) host.append(...optionControls(tab, schema));
 }
 /** Controls for a package tool's declared options: one dense control per option. */
 function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLElement[] {
@@ -850,7 +853,7 @@ function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
     compare.textContent = "Compare";
     compare.title = problem ?? "Compare both sides (runs automatically after edits)";
     compare.disabled = busy || !!problem;
-    compare.onclick = () => controller.options(tab.id, "compare", { ...tab.options });
+    compare.onclick = () => controller.options(tab.id, "compare", { ...tab.options }, true);
     host.append(swap, compare);
     return;
   }
@@ -866,7 +869,7 @@ function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
       tab.phase === "running" ||
       !!validation(tab, tool);
     button.onclick = () =>
-      controller.options(tab.id, operation.id, { ...tab.options });
+      controller.options(tab.id, operation.id, { ...tab.options }, true);
     host.append(button);
   }
 }

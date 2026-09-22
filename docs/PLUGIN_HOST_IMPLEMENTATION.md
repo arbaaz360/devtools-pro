@@ -14,8 +14,26 @@ exactly like a native one:
 
 - `catalog.ts` inlines every `plugins/*/manifest.json` at build time (Vite
   glob) and `describe.ts` turns each v2 tool into the shell's `ToolManifest`
-  shape plus the extras the engine needs: group, icon, option schema, whether
-  it accepts an empty document (generators).
+  shape plus the extras the engine needs: group, icon, whether it accepts an
+  empty document (generators), and, **per operation**, that operation's own
+  options and trigger policy.
+- **Options belong to an operation, not to a tool.** The form renders the
+  options of the operation on screen (`optionSchemaFor`), and switching
+  operation takes the new operation's defaults, keeping only values for
+  options both declare. A tool whose operations declare different options —
+  `format.js` (minify alone has `preserve-comments`), `convert.yaml` (the two
+  directions allow different `indent` choices) — would otherwise offer
+  controls that belong to its sibling and produce runs that fail on a value
+  the UI itself suggested.
+- **`trigger.modes` decides who starts a run.** `inputChange` lets the shell
+  run as the document changes; `heldRepeat` covers a generator, whose options
+  are its only input, so an option change may run those too; an operation that
+  declares neither runs only when its button is pressed
+  (`runsAutomatically(tool, operation, reason)` in `workbench/tools.ts`).
+  `format.css` and `format.xml` declare explicit-only execution precisely
+  because their inputs run to 16 MiB. A bundled Rust tool has no v2 manifest
+  and keeps the catalog's own `auto` flag, so `structured.json` still formats
+  as you type.
 - `engine.ts` merges those tools behind the native `list_tools` result; an id
   the native host serves stays native (`structured.json`, `text.compare`,
   `text.url`, `text.html`, `text.json-string`, `encoding.hash`,

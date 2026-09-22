@@ -14,9 +14,45 @@ export interface ToolDefinition {
   compare?: boolean;
   /** Generators may run with an empty document. */
   emptyInput?: boolean;
+  operations: readonly ToolOperationDefinition[];
+}
+export interface ToolOperationDefinition {
+  id: string;
+  label: string;
   /** Declared options rendered as generic controls (package tools). */
-  optionSchema?: readonly OptionSpec[];
-  operations: readonly { id: string; label: string }[];
+  options?: readonly OptionSpec[];
+  autoOnInput?: boolean;
+  autoOnOption?: boolean;
+}
+/** Why the shell wants to run: a press always runs, the rest ask the manifest. */
+export type RunReason = "explicit" | "input" | "option" | "select";
+export const operationOf = (
+  tool: ToolDefinition,
+  operationId: string | undefined,
+): ToolOperationDefinition | undefined =>
+  tool.operations.find((operation) => operation.id === operationId) ?? tool.operations[0];
+/** The controls to render: the active operation's own options. */
+export const optionSchemaFor = (
+  tool: ToolDefinition,
+  operationId: string | undefined,
+): readonly OptionSpec[] => operationOf(tool, operationId)?.options ?? [];
+/**
+ * Whether the shell may start this run without the user pressing the operation.
+ * A bundled tool has no manifest and keeps the catalog's own `auto` flag; a
+ * package operation is governed by the trigger modes it declares.
+ */
+export function runsAutomatically(
+  tool: ToolDefinition,
+  operationId: string | undefined,
+  reason: RunReason,
+): boolean {
+  if (reason === "explicit") return true;
+  const operation = operationOf(tool, operationId);
+  if (!operation || operation.autoOnInput === undefined) return tool.auto;
+  if (reason === "input") return operation.autoOnInput;
+  // Selecting a tool starts it the same way an option change would: a generator
+  // shows its first value, a document tool waits unless it follows the document.
+  return operation.autoOnOption ?? operation.autoOnInput;
 }
 const op = (id: string, label: string) => ({ id, label });
 const define = (
@@ -148,7 +184,16 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
       ? "COMPARE"
       : "PLUGINS");
   const icon = manifest.icon ?? (manifest.renderer === "binary" ? "▧" : manifest.renderer === "diff" ? "⇄" : "◇");
-  const operations = manifest.operations.map((operation) => op(operation.id, operation.label));
+  // A v1 manifest declares no per-operation policy: leave those fields off entirely
+  // so such a tool keeps the catalog's own `auto` flag rather than an empty policy.
+  const operations: ToolOperationDefinition[] = manifest.operations.map((operation) => ({
+    id: operation.id,
+    label: operation.label,
+    ...(operation.options ? { options: operation.options } : {}),
+    ...(operation.autoOnInput === undefined
+      ? {}
+      : { autoOnInput: operation.autoOnInput, autoOnOption: operation.autoOnOption ?? operation.autoOnInput }),
+  }));
   return {
     id: manifest.id,
     label: manifest.label,
@@ -161,7 +206,6 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
     auto: manifest.auto ?? operations.length > 0,
     compare: manifest.renderer === "diff",
     emptyInput: manifest.emptyInput,
-    optionSchema: manifest.optionSchema,
   };
 }
 

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { PluginManifest } from "../../../../packages/plugin-contract/ts/generated.ts";
-import { defaultOptions, describePackage, engineRunnable, prepareOptions } from "./describe.ts";
+import { autoOnInput, autoOnOption, defaultOptions, describePackage, engineRunnable, prepareOptions } from "./describe.ts";
 
 const load = (dir: string): PluginManifest =>
   JSON.parse(readFileSync(new URL(`../../../../plugins/${dir}/manifest.json`, import.meta.url), "utf8")) as PluginManifest;
@@ -24,7 +24,7 @@ test("a package manifest becomes a shell tool with its options, group and limits
     acronyms: "ID,API,DB,URL,HTTP",
     "preserve-acronyms": true,
   });
-  assert.equal(tool.manifest.optionSchema?.length, 3);
+  assert.equal(tool.manifest.operations[0]!.options?.length, 3);
   assert.equal(tool.manifest.emptyInput, false);
 });
 
@@ -76,4 +76,45 @@ test("the renderer follows the port's mime and representations", async () => {
   assert.equal(rendererFor(port(["application/json"], ["text"]), true, undefined), "json");
   assert.equal(rendererFor(port([], ["properties"]), false, { a: 1 }), "json");
   assert.equal(rendererFor(port(["text/plain"], ["text"]), true, {}), "text");
+});
+
+
+test("each operation keeps its own options: a sibling's controls are not offered", () => {
+  const [js] = describePackage(load("js"), "js");
+  const beautify = js!.manifest.operations.find((operation) => operation.id === "beautify");
+  const minify = js!.manifest.operations.find((operation) => operation.id === "minify");
+  const ids = (operation: typeof beautify) => (operation?.options ?? []).map((option) => option.id).sort();
+  assert.deepEqual(ids(minify), ["preserve-comments"]);
+  assert.ok(!ids(beautify).includes("preserve-comments"));
+  assert.ok(ids(beautify).includes("brace-style"));
+
+  // The YAML tool's two operations declare the same option id with different
+  // choices; offering the wrong list is what made a chosen value fail at run time.
+  const [yaml] = describePackage(load("yaml"), "yaml");
+  const choices = (id: string) =>
+    (yaml!.manifest.operations.find((operation) => operation.id === id)?.options ?? [])
+      .find((option) => option.id === "indent")?.choices?.map((choice) => choice.id);
+  assert.deepEqual(choices("convert.yaml-json"), ["space2", "space4", "minified"]);
+  assert.deepEqual(choices("convert.json-yaml"), ["space2", "space4"]);
+});
+
+test("trigger modes decide whether the shell may run an operation on its own", () => {
+  const [css] = describePackage(load("css"), "css");
+  for (const operation of css!.manifest.operations) {
+    assert.equal(operation.autoOnInput, false, `${operation.id} declares explicit-only execution`);
+    assert.equal(operation.autoOnOption, false);
+  }
+  assert.equal(css!.manifest.auto, false);
+
+  const [stringCase] = describePackage(load("string-case"), "string-case");
+  assert.equal(stringCase!.manifest.operations[0]!.autoOnInput, true);
+  assert.equal(stringCase!.manifest.auto, true);
+
+  // A generator has no document to change; its options are its input, so an
+  // option change may run it while a plain document tool waits for the button.
+  const [examples] = describePackage(load("example-strings"), "example-strings");
+  const generate = examples!.operations[0]!;
+  assert.equal(autoOnInput(generate), false);
+  assert.equal(autoOnOption(generate), true);
+  assert.equal(examples!.manifest.auto, true);
 });
