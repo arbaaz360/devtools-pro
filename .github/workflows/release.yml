@@ -1,0 +1,76 @@
+name: Release
+
+# Tagging v<version> builds the Windows installers and attaches them to a draft
+# release. The draft is deliberate: someone opens it, reads the notes and
+# publishes. Nothing here signs the binaries — see docs/RELEASING.md for what
+# that means for the people who download them.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to build (must already exist)"
+        required: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Install desktop dependencies
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+
+      # The tag and the version in the crate must agree, or the installer people
+      # download says something different from the release they got it from.
+      - name: Check the tag matches the version
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}" -replace '^v', ''
+          $config = Get-Content apps/desktop/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $cargo = (Select-String -Path apps/desktop/src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $declared = if ($config.version) { $config.version } else { $cargo }
+          if ($declared -ne $tag) { throw "tag $tag does not match the declared version $declared (tauri.conf.json/Cargo.toml)" }
+          Write-Host "building version $declared"
+
+      - name: Build the installers
+        run: pnpm --dir apps/desktop tauri build
+
+      - name: Check the installers exist
+        shell: pwsh
+        run: |
+          $bundles = Get-ChildItem -Path target/release/bundle -Recurse -Include *.msi, *-setup.exe
+          if (-not $bundles) { throw 'tauri build produced no installer' }
+          $bundles | ForEach-Object { Write-Host ("{0} ({1:N1} MB)" -f $_.Name, ($_.Length / 1MB)) }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*-setup.exe
+            target/release/devtools-desktop.exe
+
+      - name: Draft the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/nsis/*-setup.exe
