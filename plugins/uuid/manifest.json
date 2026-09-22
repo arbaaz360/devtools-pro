@@ -22,7 +22,7 @@
       {"id":"case","type":"enum","label":"Case","default":"lower","choices":[{"id":"lower","label":"Lowercase"},{"id":"upper","label":"Uppercase"}],"persistence":"instance","sensitive":false},
       {"id":"uuid","type":"string","label":"UUID","default":"","persistence":"instance","sensitive":false,"rules":[{"effect":"visible","when":{"kind":"predicate","optionId":"mode","operator":"equals","value":"decode"}}]}
     ],
-    "trigger":{"modes":["explicit","heldRepeat"],"debounceMs":"0"},
+    "trigger":{"modes":["explicit","inputChange","heldRepeat"],"debounceMs":"200"},
     "limits":{"maxInputBytes":"4096","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"1000"}
   }],
   "workspaces":[{"id":"generator","kind":"generator","bindings":[{"id":"result","component":"editor","outputPort":"uuid"}],"commands":[],"presentationSettings":[]}],

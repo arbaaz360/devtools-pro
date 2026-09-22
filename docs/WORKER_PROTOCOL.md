@@ -101,6 +101,18 @@ limitations: <what is not done, and why>
 Label the PR `needs-native-acceptance` only if the packet says a native run
 is required.
 
+## What the shell reads from your manifest
+
+Two declarations change how the shell behaves, so declare them deliberately:
+
+- `trigger.modes` — include `inputChange` if the operation should run as the
+  user types, `heldRepeat` for a generator driven by its options, and neither
+  if it should run only when its button is pressed (the right choice for an
+  operation whose input limit is large). The shell honours this.
+- `options` — they belong to the operation that declares them. Two operations
+  of one tool may declare different options, or the same option id with
+  different choices; the form follows the operation on screen.
+
 ## Blocked and questions
 
 If you cannot proceed, or the packet can be read two ways, post on the PR (or

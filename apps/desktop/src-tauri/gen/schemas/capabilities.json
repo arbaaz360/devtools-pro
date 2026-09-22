@@ -1,1 +1,1 @@
-{"main":{"identifier":"main","description":"Local workbench window: event transport and native file pickers.","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open","dialog:allow-save"]}}
+{"main":{"identifier":"main","description":"Local workbench window: event transport, native file pickers, and closing the window after the unsaved-changes prompt.","local":true,"windows":["main"],"permissions":["core:default","core:window:allow-destroy","dialog:allow-open","dialog:allow-save"]}}

@@ -35,6 +35,8 @@ import {
   snapshotFormat,
   validation,
   definitionFromManifest,
+  runsAutomatically,
+  type RunReason,
   type ToolDefinition,
 } from "./tools.ts";
 
@@ -603,7 +605,7 @@ export class WorkbenchController {
       operation: tool.defaultOperation,
       options: { ...tool.defaultOptions },
     });
-    this.schedule(id, 0);
+    this.schedule(id, 0, "select");
   }
   edit(id: string, text: string) {
     const existing = this.tab(id);
@@ -707,13 +709,32 @@ export class WorkbenchController {
     this.dispatch({ type, id });
     this.schedule(id);
   }
-  options(id: string, operation: string, options: Record<string, unknown>) {
+  /**
+   * An option change or an operation press. `explicit` marks the press: it runs
+   * whatever the manifest says, while an option change only runs an operation
+   * that declared it may. Switching operations takes the new operation's
+   * defaults, keeping any value the user set for an option both declare.
+   */
+  options(
+    id: string,
+    operation: string,
+    options: Record<string, unknown>,
+    explicit = false,
+  ) {
     const tab = this.tab(id);
     const tool = tab && this.toolDefinition(tab.toolId);
-    if (!tool?.operations.some((op) => op.id === operation)) return;
+    if (!tab || !tool?.operations.some((op) => op.id === operation)) return;
+    let next = options;
+    if (operation !== tab.operation) {
+      const target = tool.operations.find((op) => op.id === operation);
+      const defaults = this.manifests.get(tool.id)?.operations.find((op) => op.id === operation)?.defaultOptions ?? {};
+      next = { ...defaults };
+      for (const option of target?.options ?? [])
+        if (options[option.id] !== undefined) next[option.id] = options[option.id];
+    }
     this.invalidate(id);
-    this.dispatch({ type: "options", id, operation, options });
-    this.schedule(id, 0);
+    this.dispatch({ type: "options", id, operation, options: next });
+    this.schedule(id, 0, explicit ? "explicit" : "option");
   }
   right(id: string, text: string, baseline?: string | null) {
     if (new TextEncoder().encode(text).length > EDIT_LIMIT) {
@@ -754,25 +775,27 @@ export class WorkbenchController {
       if (doc) this.retire(doc.id);
     }
   }
-  private schedule(id: string, delay = 350) {
+  private schedule(id: string, delay = 350, reason: RunReason = "input") {
     const old = this.timers.get(id);
     if (old) clearTimeout(old);
     const tab = this.tab(id);
     const tool = tab && this.toolDefinition(tab.toolId);
-    if (!tab || !tool?.auto || tab.phase === "importing") return;
+    if (!tab || !tool || tab.phase === "importing") return;
+    if (!runsAutomatically(tool, tab.operation, reason)) return;
     if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare && !tool.emptyInput) return;
     this.timers.set(
       id,
       setTimeout(() => {
         this.timers.delete(id);
-        this.run(id);
+        this.run(id, reason);
       }, delay),
     );
   }
-  run(id: string) {
+  run(id: string, reason: RunReason = "explicit") {
     const tab = this.tab(id);
     const tool = tab && this.toolDefinition(tab.toolId);
-    if (!tab || !tool?.auto || tab.phase === "importing") return;
+    if (!tab || !tool || tab.phase === "importing") return;
+    if (!runsAutomatically(tool, tab.operation, reason)) return;
     const problem = validation(tab, tool, this.manifests.get(tool.id));
     if (problem) {
       this.dispatch({ type: "error", id, message: problem });

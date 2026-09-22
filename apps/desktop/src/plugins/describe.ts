@@ -87,6 +87,17 @@ export function prepareOptions(
   return options;
 }
 
+/**
+ * A manifest's trigger policy, as the shell applies it. `inputChange` is the
+ * permission to run as the document changes; `heldRepeat` belongs to generators,
+ * whose options are their only input, so an option change may run those too.
+ * An operation that declares neither runs only when its button is pressed.
+ */
+export const autoOnInput = (operation: OperationSpec): boolean =>
+  operation.trigger.modes.includes("inputChange");
+export const autoOnOption = (operation: OperationSpec): boolean =>
+  autoOnInput(operation) || operation.trigger.modes.includes("heldRepeat");
+
 /** The engine feeds at most one document per run; compare-style tools stay native. */
 export function primaryInput(operation: OperationSpec): OperationSpec["inputs"][number] | undefined {
   const documents = operation.inputs.filter((input) => input.kind === "document");
@@ -159,6 +170,9 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
       id: operation.id,
       label: operation.title,
       defaultOptions: defaultOptions(operation),
+      options: operation.options,
+      autoOnInput: autoOnInput(operation),
+      autoOnOption: autoOnOption(operation),
     }));
     const family = tool.id.split(".")[0] ?? "";
     tools.push({
@@ -188,9 +202,8 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
         engine: "worker",
         group: GROUPS[tool.category] ?? GROUPS[family] ?? tool.category.toUpperCase(),
         icon: tool.icon ?? ICONS[tool.id] ?? "◇",
-        auto: true,
+        auto: operations.some(autoOnOption),
         emptyInput: workspace?.kind === "generator",
-        optionSchema: first.options,
       },
     });
   }
