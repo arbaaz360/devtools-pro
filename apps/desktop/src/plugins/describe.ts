@@ -98,6 +98,15 @@ export const autoOnInput = (operation: OperationSpec): boolean =>
 export const autoOnOption = (operation: OperationSpec): boolean =>
   autoOnInput(operation) || operation.trigger.modes.includes("heldRepeat");
 
+/**
+ * What a port's bytes are. A port declaring image content receives decoded pixels from
+ * the engine rather than a container format, so a processor never parses PNG or JPEG
+ * and stays runnable under node for its own tests.
+ */
+export function inputContentKind(port: OperationSpec["inputs"][number] | undefined): "text" | "image" {
+  return port?.contentKinds?.includes("image") ? "image" : "text";
+}
+
 /** The engine feeds at most one document per run; compare-style tools stay native. */
 export function primaryInput(operation: OperationSpec): OperationSpec["inputs"][number] | undefined {
   const documents = operation.inputs.filter((input) => input.kind === "document");
@@ -185,7 +194,7 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
         id: tool.id,
         label: tool.title,
         contractVersion: 2,
-        inputKinds: ["text"],
+        inputKinds: inputContentKind(primaryInput(first)) === "image" ? ["bytes"] : ["text"],
         limits,
         capabilities: {
           deterministic: true,

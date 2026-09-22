@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import type { PluginManifest } from "../../../../packages/plugin-contract/ts/generated.ts";
-import { autoOnInput, autoOnOption, defaultOptions, describePackage, engineRunnable, prepareOptions } from "./describe.ts";
+import { autoOnInput, autoOnOption, defaultOptions, describePackage, engineRunnable, inputContentKind, prepareOptions } from "./describe.ts";
 
 const load = (dir: string): PluginManifest =>
   JSON.parse(readFileSync(new URL(`../../../../plugins/${dir}/manifest.json`, import.meta.url), "utf8")) as PluginManifest;
@@ -117,4 +117,19 @@ test("trigger modes decide whether the shell may run an operation on its own", (
   assert.equal(autoOnInput(generate), false);
   assert.equal(autoOnOption(generate), true);
   assert.equal(examples!.manifest.auto, true);
+});
+
+test("a port declaring image content makes the tool take bytes, not text", () => {
+  const [qr] = describePackage(load("qr"), "qr");
+  const encode = qr!.operations[0]!;
+  assert.equal(inputContentKind(encode.inputs[0]), "text", "the QR generator reads the text to encode");
+  assert.deepEqual(qr!.manifest.inputKinds, ["text"]);
+
+  // The same manifest with an image input describes a tool the shell feeds pixels.
+  const manifest = JSON.parse(JSON.stringify(load("qr")));
+  manifest.operations[0].inputs[0].contentKinds = ["image"];
+  manifest.operations[0].inputs[0].mime = ["image/png"];
+  const [reader] = describePackage(manifest, "qr");
+  assert.equal(inputContentKind(reader!.operations[0]!.inputs[0]), "image");
+  assert.deepEqual(reader!.manifest.inputKinds, ["bytes"]);
 });

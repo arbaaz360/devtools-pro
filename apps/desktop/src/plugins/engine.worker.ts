@@ -3,6 +3,7 @@ import {
   ProcessorCancelled,
   ProcessorContext,
   type Limits,
+  type InputInfo,
   type NamedReader,
   type OutputArtifact,
   type OutputSink,
@@ -25,7 +26,11 @@ interface Processor {
 
 /** The host hands the worker immutable bytes; the reader only ever copies out of them. */
 class BytesReader implements NamedReader {
-  constructor(private readonly inputs: Record<string, Uint8Array>) {}
+  constructor(
+    private readonly inputs: Record<string, Uint8Array>,
+    private readonly infos: Record<string, InputInfo> = {},
+  ) {}
+  info(port: string): InputInfo { return this.infos[port] ?? { contentKind: "text" }; }
   private port(port: string): Uint8Array {
     const value = this.inputs[port];
     if (!value) throw new Error(`named input ${port} was not supplied`);
@@ -104,7 +109,7 @@ async function run(request: RunRequest): Promise<RunOutcome> {
       throw new Error(`processor for ${request.pluginId} does not export execute`);
     const sink = new CollectingSink();
     const context = new ProcessorContext(
-      new BytesReader(request.inputs),
+      new BytesReader(request.inputs, request.inputInfo ?? {}),
       sink,
       { isCancelled: () => false },
       { now: () => new Date().toISOString() },
