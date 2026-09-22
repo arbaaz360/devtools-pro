@@ -7,13 +7,23 @@
 // right; see the plan's section 7 for the distinction.
 
 import crypto from "node:crypto";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { root, sleep } from "./harness.mjs";
 
 const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
 const base64 = (value) => Buffer.from(value).toString("base64");
 const verdict = (ok, note) => ({ status: ok ? "pass" : "fail", note });
+
+/** A scratch directory for files a check opens or saves, beside the run's other evidence. */
+const scratch = resolve(root, "apps", "desktop", "test-results", "files");
+const scratchFile = (name, contents) => {
+  mkdirSync(scratch, { recursive: true });
+  const file = resolve(scratch, name);
+  if (contents !== undefined) writeFileSync(file, contents);
+  return file;
+};
+const digest = (file) => crypto.createHash("sha256").update(readFileSync(file)).digest("hex");
 
 /**
  * Ids the native host serves itself. The engine lets a native id win over a package of
@@ -191,6 +201,75 @@ export const checks = [
       await driver.runOperation("Format");
       const good = await driver.settle(Buffer.byteLength('{"a":1}'), { changedFrom: bad.signature });
       return verdict(!good.error && good.output.includes('"a"'), `the error cleared and the result is ${JSON.stringify(good.output.slice(0, 40))}`);
+    },
+  },
+  {
+    // Opening a real file through the host, and the promise the product makes about it.
+    id: "DOC-03",
+    async run({ driver, page }) {
+      const file = scratchFile("open-me.json", '{"b":1,"a":[1,2]}\n');
+      await driver.newTab();
+      await driver.openPath(file);
+      const name = (await page.locator("#source-name").innerText()).trim();
+      const size = (await page.locator("#source-size").innerText()).trim();
+      const text = await page.locator("#preview").inputValue();
+      return verdict(name.includes("open-me.json") && text.includes('"b"') && size !== "—",
+        `the tab shows ${JSON.stringify(name)}, ${size}, and the file's text`);
+    },
+  },
+  {
+    // The product's first promise: your input file is never written to.
+    id: "DOC-04",
+    async run({ driver }) {
+      const file = scratchFile("untouched.json", '{"keep":"me"}\n');
+      const before = digest(file);
+      await driver.newTab();
+      await driver.openPath(file);
+      await driver.selectTool("JSON");
+      await driver.runOperation("Format");
+      await driver.settle();
+      await driver.selectTool("Hash generator");
+      await driver.runOperation("SHA-256");
+      await driver.settle();
+      const after = digest(file);
+      return verdict(before === after, before === after
+        ? `the file is byte-identical after two operations (${before.slice(0, 16)}…)`
+        : `the file changed on disk: ${before.slice(0, 16)}… became ${after.slice(0, 16)}…`);
+    },
+  },
+  {
+    // Save the document the dialog would have named, then read back what landed.
+    id: "DOC-17",
+    async run({ driver, page }) {
+      const target = scratchFile("saved-document.txt");
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("save this document");
+      await driver.presetDialogPaths([target]);
+      await page.locator("#save-document").click();
+      const written = await driver.until(() => existsSync(target));
+      if (!written) return { status: "fail", note: "no file appeared at the path the dialog returned" };
+      const contents = readFileSync(target, "utf8");
+      return verdict(contents.includes("save this document"), `wrote ${JSON.stringify(contents.slice(0, 40))}`);
+    },
+  },
+  {
+    // A saved result keeps the extension its type implies, and the whole payload.
+    id: "RES-08",
+    async run({ driver, page }) {
+      const target = scratchFile("saved-result.json");
+      await driver.tool("JSON", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
+      await driver.presetDialogPaths([target]);
+      const save = page.locator("#save-result");
+      if (await save.isHidden()) return { status: "fail", note: "Save result is not offered for a successful result" };
+      await save.click();
+      const written = await driver.until(() => existsSync(target));
+      if (!written) return { status: "fail", note: "no file appeared at the path the dialog returned" };
+      const contents = readFileSync(target, "utf8");
+      let parsed = null;
+      try { parsed = JSON.parse(contents); } catch { /* not JSON */ }
+      return verdict(parsed?.b === 1 && contents.includes(String.fromCharCode(10)),
+        `the saved file re-parses to the formatted value (${contents.length} bytes)`);
     },
   },
   {

@@ -79,7 +79,13 @@ export async function startApp() {
   // webview builder; WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS is the runtime's own hook,
   // honoured on some machines and ignored on the CI runner.
   const app = spawn(exe, [], {
-    env: { ...process.env, DEVTOOLS_SMOKE_BROWSER_ARGS: browserArguments, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArguments },
+    env: {
+      ...process.env,
+      DEVTOOLS_SMOKE_BROWSER_ARGS: browserArguments,
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArguments,
+      // Lets a check name the file a dialog would have returned. A debug build only.
+      DEVTOOLS_TEST_HOOKS: "1",
+    },
     stdio: ["ignore", appOut, appOut],
   });
   children.push(app);
@@ -125,6 +131,8 @@ export async function startApp() {
 
   await page.waitForSelector("#tabs", { timeout: 20_000 });
   await page.locator("#status").filter({ hasText: "Engine connected" }).waitFor({ timeout: 20_000 });
+  const hooks = await page.evaluate(() => Boolean(globalThis.devtoolsTest));
+  if (!hooks) throw new Error("the window did not expose its test hooks; is this a debug build?");
 
   return {
     page,

@@ -7,6 +7,7 @@ import {
   chooseFile,
   chooseDocumentOutput,
   chooseResultOutput,
+  presetDialogPaths,
   openDocument,
   createTextDocument,
   closeDocument,
@@ -1314,6 +1315,15 @@ const api: WorkbenchApi = {
 // native host keeps every id it serves itself.
 const engine = new WorkerEngine(api);
 controller = new WorkbenchController(engine.wrap(api), hooks);
+// Under test (a debug host started with DEVTOOLS_TEST_HOOKS), expose the two things a
+// script cannot do for itself: name the file a dialog would have returned, and open a
+// path directly. Everything after that is the same code a person drives.
+if ((globalThis as Record<string, unknown>).__DEVTOOLS_TEST_HOOKS__ === true) {
+  (globalThis as Record<string, unknown>).devtoolsTest = {
+    openPath: (path: string, toolId?: string) => controller.openPath(path, toolId),
+    presetDialogPaths,
+  };
+}
 state = controller.state;
 $("#new-document").onclick = () => controller.newDocument();
 $("#empty-new").onclick = () => controller.newDocument();
