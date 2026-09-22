@@ -1,0 +1,521 @@
+// What the suite asserts about the shipped window. Ids match docs/MANUAL_TEST_PLAN.md,
+// so a failure here names the case a human would otherwise have run by hand.
+//
+// Expected values come from an independent computation — node's crypto, an RFC
+// constant, a second parse, a re-encode of the same bytes — never from the app's own
+// output. A golden recorded by running the app proves it is stable, not that it is
+// right; see the plan's section 7 for the distinction.
+
+import crypto from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { resolve } from "node:path";
+import { root, sleep } from "./harness.mjs";
+
+const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
+const base64 = (value) => Buffer.from(value).toString("base64");
+const verdict = (ok, note) => ({ status: ok ? "pass" : "fail", note });
+
+/**
+ * Ids the native host serves itself. The engine lets a native id win over a package of
+ * the same name, so the rail shows the bundled tool's panel and the package manifest
+ * describes something the user never sees. Listed in PLUGIN_HOST_IMPLEMENTATION.md.
+ */
+const NATIVE_IDS = new Set([
+  "structured.json", "text.compare", "text.url", "text.html",
+  "text.json-string", "encoding.hash", "text.find-replace",
+]);
+
+/** Every package tool as its manifest declares it, keyed by the title in the rail. */
+function declaredTools() {
+  const declared = new Map();
+  for (const dir of readdirSync(resolve(root, "plugins"))) {
+    const file = resolve(root, "plugins", dir, "manifest.json");
+    if (!existsSync(file)) continue;
+    const manifest = JSON.parse(readFileSync(file, "utf8"));
+    for (const tool of manifest.tools ?? []) {
+      const operations = (manifest.operations ?? []).filter((operation) => (tool.operationIds ?? []).includes(operation.id));
+      if (NATIVE_IDS.has(tool.id)) continue;
+      declared.set(tool.title, {
+        id: tool.id,
+        operations: operations.map((operation) => ({
+          id: operation.id,
+          title: operation.title,
+          options: (operation.options ?? []).map((option) => option.label),
+        })),
+      });
+    }
+  }
+  return declared;
+}
+
+export const checks = [
+  {
+    id: "SMK-01",
+    smoke: true,
+    async run({ page }) {
+      const title = await page.title();
+      const shell = await page.locator(".app-shell").count();
+      return verdict(shell > 0, `title "${title}", app shell present`);
+    },
+  },
+  {
+    id: "SMK-02",
+    smoke: true,
+    async run({ page }) {
+      const engine = (await page.locator("#engine-status").innerText()).trim();
+      return verdict(/local engine/i.test(engine), `engine reads "${engine}"`);
+    },
+  },
+  {
+    id: "SMK-03",
+    smoke: true,
+    async run({ page, state }) {
+      state.tools = await page.locator(".tool-item strong").allTextContents();
+      const missing = ["JSON", "String Case Converter", "Diff & Compare", "QR Code", "Regular Expression Tester"]
+        .filter((name) => !state.tools.includes(name));
+      return verdict(!missing.length, missing.length
+        ? `the rail is missing ${missing.join(", ")}; it lists ${state.tools.length}: ${state.tools.join(" | ")}`
+        : `${state.tools.length} tools listed`);
+    },
+  },
+  {
+    // Every option and operation a manifest declares is reachable, and no operation
+    // button is offered twice. This is what made JS minify's Preserve comments
+    // unreachable and had JSON to YAML offering a choice it rejects.
+    id: "OPT-01",
+    async run({ driver, state }) {
+      const declared = declaredTools();
+      const problems = [];
+      let inspected = 0;
+      for (const name of state.tools ?? []) {
+        if (name === "Text editor") continue;
+        const spec = declared.get(name);
+        if (!spec) continue;   // bundled Rust tools have no v2 manifest
+        inspected += 1;
+        await driver.newTab();
+        await driver.selectTool(name);
+        try { await driver.setInput("a"); } catch { /* compare and image workspaces have no plain editor */ }
+        const operations = await driver.readOperations();
+        const duplicates = operations.filter((label, index) => operations.indexOf(label) !== index);
+        if (duplicates.length) problems.push(`${name}: duplicate operation button ${duplicates.join(", ")}`);
+        for (const operation of spec.operations) {
+          if (!operations.includes(operation.title)) {
+            problems.push(`${name}: no button for operation "${operation.title}"`);
+            continue;
+          }
+          await driver.runOperation(operation.title);
+          await sleep(220);
+          const shown = (await driver.readOptions()).map((option) => option.label);
+          const missing = operation.options.filter((label) => !shown.includes(label));
+          const extra = shown.filter((label) => !operation.options.includes(label));
+          if (missing.length) problems.push(`${name} / ${operation.title}: missing ${missing.join(", ")}`);
+          if (extra.length) problems.push(`${name} / ${operation.title}: offers ${extra.join(", ")}, which it does not declare`);
+        }
+      }
+      return verdict(!problems.length, problems.length ? problems.join(" | ") : `${inspected} package tools: every declared operation and option present, and nothing else`);
+    },
+  },
+  {
+    id: "NAV-02",
+    async run({ page, state }) {
+      await page.locator("#tool-search").fill("json");
+      await sleep(220);
+      const filtered = await page.locator(".tool-item strong").allTextContents();
+      await page.locator("#tool-search").fill("");
+      await sleep(220);
+      const restored = await page.locator(".tool-item strong").count();
+      return verdict(filtered.length > 0 && filtered.length < state.tools.length && restored === state.tools.length,
+        `"json" matched ${filtered.length} of ${state.tools.length}; cleared back to ${restored}`);
+    },
+  },
+  {
+    id: "NAV-08",
+    async run({ driver, page }) {
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("keep this text");
+      await sleep(400);
+      await driver.selectTool("URL Parser");
+      await sleep(400);
+      const text = await page.locator("#preview").inputValue();
+      return verdict(text === "keep this text", `the editor holds "${text}" after switching tools`);
+    },
+  },
+  {
+    id: "EDT-14",
+    async run({ driver }) {
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      const before = (await driver.readResult()).signature;
+      await driver.setInput("auto run me");
+      const started = Date.now();
+      const result = await driver.settle(Buffer.byteLength("auto run me"), { changedFrom: before, timeout: 5000 });
+      return verdict(!result.timedOut && Boolean(result.output), result.timedOut
+        ? "a tool declaring inputChange produced no result within 5 s of typing"
+        : `ran ${Date.now() - started} ms after typing stopped`);
+    },
+  },
+  {
+    // trigger.modes is a contract, not a hint: CSS declares explicit-only execution
+    // for inputs that run to 16 MiB, so typing must not start a run.
+    id: "EDT-15",
+    async run({ driver }) {
+      await driver.newTab();
+      await driver.selectTool("CSS");
+      await driver.setInput(".a{color:red}");
+      await sleep(2000);
+      const idle = await driver.readResult();
+      if (idle.output) return { status: "fail", note: `CSS declares trigger ["explicit"] and ran anyway: ${idle.output.slice(0, 80)}` };
+      await driver.runOperation("Beautify");
+      const pressed = await driver.settle(Buffer.byteLength(".a{color:red}"), { changedFrom: idle.signature });
+      return verdict(pressed.output.includes("color"), `waited for its button, then produced ${JSON.stringify(pressed.output.slice(0, 60))}`);
+    },
+  },
+  {
+    id: "RES-02",
+    async run({ driver }) {
+      const result = await driver.tool("JSON", { text: '{"a": }', operation: "Format" });
+      const message = result.error || result.state;
+      return verdict(Boolean(message) && !result.output, `reported ${JSON.stringify(message.slice(0, 90))} and left the output empty`);
+    },
+  },
+  {
+    id: "RES-03",
+    async run({ driver }) {
+      await driver.newTab();
+      await driver.selectTool("JSON");
+      await driver.setInput('{"a": }');
+      await driver.runOperation("Format");
+      const bad = await driver.settle(Buffer.byteLength('{"a": }'));
+      await driver.setInput('{"a":1}');
+      await driver.runOperation("Format");
+      const good = await driver.settle(Buffer.byteLength('{"a":1}'), { changedFrom: bad.signature });
+      return verdict(!good.error && good.output.includes('"a"'), `the error cleared and the result is ${JSON.stringify(good.output.slice(0, 40))}`);
+    },
+  },
+  {
+    id: "RES-10",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs();
+      await driver.tool("Base64 Text", { text: "chain me" });
+      const before = await page.locator(".tab-wrap").count();
+      const button = page.locator("#open-result");
+      if (await button.isHidden()) return { status: "fail", note: "Open result is not offered for a successful result" };
+      await button.click();
+      await sleep(1200);
+      const after = await page.locator(".tab-wrap").count();
+      const text = await page.locator("#preview").inputValue();
+      return verdict(after === before + 1 && text.trim() === base64("chain me"),
+        `tabs ${before} to ${after}, the new tab holds ${JSON.stringify(text.slice(0, 30))}`);
+    },
+  },
+  {
+    id: "RES-12",
+    async run({ driver, page }) {
+      await driver.tool("String Case Converter", { text: "toggle me" });
+      const toggle = page.locator("#result-toggle");
+      if (await toggle.isHidden()) return { status: "fail", note: "no result toggle after a successful run" };
+      const before = await toggle.innerText();
+      await toggle.click();
+      await sleep(220);
+      const hidden = await page.locator(".results-pane").isHidden();
+      const middle = await toggle.innerText();
+      await toggle.click();
+      await sleep(220);
+      const back = await page.locator(".results-pane").isVisible();
+      return verdict(before !== middle && hidden && back, `"${before}" to "${middle}", pane hidden then restored`);
+    },
+  },
+  {
+    id: "RES-21",
+    async run({ driver, page }) {
+      const text = "2024-02-29 and 1999-12-31";
+      await driver.newTab();
+      await driver.selectTool("Regular Expression Tester");
+      await driver.setInput(text);
+      await driver.setOption("Pattern", "[0-9]{4}");
+      await sleep(1500);
+      const expected = [...text.matchAll(/[0-9]{4}/g)].length;
+      const layer = await page.evaluate(() => ({
+        hidden: document.querySelector("#editor-highlight")?.hidden,
+        marks: document.querySelectorAll("#editor-highlight mark").length,
+      }));
+      return verdict(layer.hidden === false && layer.marks === expected,
+        `node finds ${expected} matches; the editor shows ${layer.marks} highlights (layer hidden=${layer.hidden})`);
+    },
+  },
+
+  // ---- tools, each against an oracle the app had no part in producing
+  {
+    id: "TL-CASE-01",
+    smoke: true,
+    async run({ driver }) {
+      const result = await driver.tool("String Case Converter", { text: "userID_loaderHTTPServer v2Api", options: { Target: "snake" } });
+      return verdict(result.output.trim() === "user_id_loader_http_server_v_2_api", `got ${JSON.stringify(result.output.trim().slice(0, 60))}`);
+    },
+  },
+  {
+    id: "TL-B64TEXT-01",
+    async run({ driver }) {
+      const result = await driver.tool("Base64 Text", { text: "hello" });
+      return verdict(result.output.trim() === base64("hello"), `expected ${base64("hello")}, got ${JSON.stringify(result.output.trim())}`);
+    },
+  },
+  {
+    id: "TL-B64TEXT-02",
+    async run({ driver }) {
+      const result = await driver.tool("Base64 Text", { text: base64("hello"), options: { Mode: "decode" } });
+      return verdict(result.output.trim() === "hello", `got ${JSON.stringify(result.output.trim())}`);
+    },
+  },
+  {
+    id: "TL-HASH-01",
+    async run({ driver }) {
+      const result = await driver.tool("Hash generator", { text: "hello", operation: "SHA-256" });
+      const body = result.output || result.structured;
+      return verdict(body.toLowerCase().includes(sha256("hello")), `node computes ${sha256("hello").slice(0, 20)}…; the app shows ${body.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-NUMBASE-01",
+    async run({ driver }) {
+      // Exercises the option controls too: the defaults would answer this one by accident.
+      const result = await driver.tool("Number Base Converter", { text: "ff", options: { "From Base": "16", "To Base": "2" } });
+      const body = (result.output || "") + " " + (await driver.fullResult());
+      return verdict(body.includes((255).toString(2)), `0xff in base 2 is ${(255).toString(2)}; result: ${body.replace(/\s+/g, " ").slice(0, 110)}`);
+    },
+  },
+  {
+    id: "TL-URL-01",
+    async run({ driver }) {
+      const result = await driver.tool("URL encode / decode", { text: "https://example.com/search?q=hello world", operation: "Encode" });
+      return verdict(/hello(%20|\+)world/.test(result.output), `got ${JSON.stringify(result.output.slice(0, 80))}`);
+    },
+  },
+  {
+    id: "TL-JSON-01",
+    smoke: true,
+    async run({ driver }) {
+      const result = await driver.tool("JSON", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
+      let same = false;
+      try { same = JSON.stringify(JSON.parse(result.output)) === JSON.stringify({ b: 1, a: [1, 2] }); } catch { /* not JSON */ }
+      return verdict(same && result.output.includes("\n"), same ? "re-parses to the same value and is indented" : `output: ${result.output.slice(0, 80)}`);
+    },
+  },
+  {
+    id: "TL-JSON-06",
+    async run({ driver }) {
+      const big = "123456789012345678901234567890";
+      const result = await driver.tool("JSON", { text: `{"n":${big}}`, operation: "Format" });
+      return verdict(result.output.includes(big), `a 30-digit integer is ${result.output.includes(big) ? "preserved exactly" : `changed: ${result.output.slice(0, 80)}`}`);
+    },
+  },
+  {
+    id: "TL-YAML-01",
+    async run({ driver }) {
+      const result = await driver.tool("YAML ↔ JSON", { text: "store:\n  book:\n    - title: Sample\n      price: 8.95\n  open: true\n", operation: "YAML to JSON" });
+      let parsed = null;
+      try { parsed = JSON.parse(result.output); } catch { /* not JSON */ }
+      const ok = parsed?.store?.book?.[0]?.price === 8.95 && parsed?.store?.open === true;
+      return verdict(ok, ok ? "types survive the conversion (number 8.95, boolean true)" : `output: ${result.output.slice(0, 110)}`);
+    },
+  },
+  {
+    id: "TL-TIME-02",
+    async run({ driver }) {
+      await driver.tool("Unix Timestamp Converter", { text: "1700000000" });
+      await sleep(300);
+      const body = await driver.fullResult();
+      const day = new Date(1700000000 * 1000).toISOString().slice(0, 10);
+      return verdict(body.includes(day), `epoch 1700000000 is ${day}; result: ${body.slice(0, 120)}`);
+    },
+  },
+  {
+    id: "TL-UUID-04",
+    async run({ driver }) {
+      // RFC 4122 v5 of the DNS namespace + example.com, computed here, not read back.
+      const namespace = Buffer.from("6ba7b8109dad11d180b400c04fd430c8", "hex");
+      const digest = crypto.createHash("sha1").update(Buffer.concat([namespace, Buffer.from("example.com")])).digest();
+      const bytes = Buffer.from(digest.subarray(0, 16));
+      bytes[6] = (bytes[6] & 0x0f) | 0x50;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = bytes.toString("hex");
+      const expected = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+      await driver.newTab();
+      await driver.selectTool("UUID Generator");
+      for (const [label, value] of [["Version", "v5"], ["Namespace", "dns"], ["Name", "example.com"]]) await driver.setOption(label, value);
+      await sleep(600);
+      await driver.settle(0);
+      const body = await driver.fullResult();
+      return verdict(body.toLowerCase().includes(expected), `RFC 4122 gives ${expected}; result: ${body.slice(0, 120)}`);
+    },
+  },
+  {
+    id: "TL-REGEX-01",
+    async run({ driver }) {
+      const text = "2024-02-29 and 1999-12-31";
+      await driver.newTab();
+      await driver.selectTool("Regular Expression Tester");
+      await driver.setInput(text);
+      await driver.setOption("Pattern", "([0-9]{4})-([0-9]{2})-([0-9]{2})");
+      await sleep(1200);
+      const body = await driver.fullResult();
+      const expected = [...text.matchAll(/([0-9]{4})-([0-9]{2})-([0-9]{2})/g)].length;
+      return verdict(body.includes(`count: ${expected}`), `node finds ${expected} matches; result: ${body.slice(0, 120)}`);
+    },
+  },
+  {
+    id: "TL-JWT-01",
+    async run({ driver }) {
+      const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
+      const payload = Buffer.from(JSON.stringify({ sub: "1234567890", name: "Test User", iat: 1700000000 })).toString("base64url");
+      const signature = crypto.createHmac("sha256", "test-secret").update(`${header}.${payload}`).digest("base64url");
+      await driver.tool("JWT Decoder & Verifier", { text: `${header}.${payload}.${signature}` });
+      const body = await driver.fullResult();
+      return verdict(body.includes("Test User") && body.includes("1234567890"), `the decoded payload is shown: ${body.slice(0, 120)}`);
+    },
+  },
+  {
+    id: "TL-JWT-08",
+    async run({ page }) {
+      const type = await page.locator('.format-control [aria-label="Key"]').first().getAttribute("type").catch(() => null);
+      return verdict(type === "password", `the Key field is an input of type "${type}"`);
+    },
+  },
+  {
+    id: "TL-PREVIEW-01",
+    async run({ driver, page }) {
+      await driver.tool("Markdown & HTML Preview", { text: "# Title\n\nSome **bold** text and a [link](https://example.com).\n", operation: "Preview Markdown" });
+      const frames = await page.locator("#result-media iframe").count();
+      return verdict(frames > 0, frames > 0 ? "rendered in a sandboxed frame" : "no preview frame appeared");
+    },
+  },
+  {
+    id: "TL-PREVIEW-05",
+    async run({ driver, page, dialogs }) {
+      await driver.setInput("# Heading\n\n<script>window.__pwned = 1;</script>\n\n[click](javascript:window.__pwned=2)\n");
+      await sleep(1600);
+      const pwned = await page.evaluate(() => window.__pwned ?? null);
+      return verdict(pwned === null && dialogs.length === 0, `injected script did not run (window.__pwned is ${String(pwned)}, ${dialogs.length} dialogs)`);
+    },
+  },
+  {
+    id: "TL-QR-01",
+    async run({ driver }) {
+      const result = await driver.tool("QR Code", { text: "https://example.com" });
+      return verdict(result.mediaTag === "IMG" && /svg/i.test(result.mediaSrc), `result media is ${result.mediaTag || "absent"}`);
+    },
+  },
+  {
+    id: "TL-DIFF-01",
+    async run({ driver, page }) {
+      await driver.newTab();
+      await driver.selectTool("Diff & Compare");
+      await page.locator("#compare-left").fill("alpha\nbravo\ncharlie\n");
+      await page.locator("#compare-right").fill("alpha\nbravo CHANGED\ncharlie\n");
+      await sleep(1200);
+      const result = await driver.settle(undefined, { timeout: 20_000 });
+      const body = (result.structured || (await driver.fullResult())).replace(/\s+/g, " ");
+      return verdict(/bravo/i.test(body) && !/no differences/i.test(body), `reported: ${body.slice(0, 110)}`);
+    },
+  },
+  {
+    id: "TL-CSS-01",
+    async run({ driver }) {
+      const result = await driver.tool("CSS", { text: ".a{color:red;background:#fff}  .b , .c{margin:0 auto}", operation: "Beautify" });
+      return verdict(result.output.includes("\n") && result.output.includes("color"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-JS-05",
+    async run({ driver }) {
+      // Division, a regex literal, a string containing a comment opener and a kept
+      // licence comment: the four the tokenizer got wrong before AG-115 round two.
+      const source = 'a = b / c / d; x = /b[/]c/g; s = "/*"; /*! keep */ const t = 1;';
+      const result = await driver.tool("JavaScript Formatter", { text: source, operation: "Minify JavaScript" });
+      const dense = result.output.replace(/\s+/g, "");
+      return verdict(dense.includes("a=b/c/d") && dense.includes("/b[/]c/g") && dense.includes('s="/*"') && result.output.includes("/*!"),
+        `minified: ${result.output.slice(0, 110)}`);
+    },
+  },
+  {
+    id: "REG-13",
+    async run({ driver }) {
+      // An option declared on minify alone was unreachable while the form was built
+      // from the first operation's schema.
+      await driver.newTab();
+      await driver.selectTool("JavaScript Formatter");
+      await driver.setInput("const a = 1; // note");
+      const beautify = (await driver.readOptions()).map((option) => option.label);
+      await driver.runOperation("Minify JavaScript");
+      await sleep(900);
+      const minify = (await driver.readOptions()).map((option) => option.label);
+      return verdict(minify.includes("Preserve comments") && !beautify.includes("Preserve comments"),
+        `Beautify offers [${beautify.join(", ")}], Minify offers [${minify.join(", ")}]`);
+    },
+  },
+  {
+    id: "REG-14",
+    async run({ driver }) {
+      // JSON to YAML rejects "minified"; offering it produced a run that always failed.
+      await driver.newTab();
+      await driver.selectTool("YAML ↔ JSON");
+      await driver.setInput('{"a":{"b":[1,2]}}');
+      await driver.runOperation("JSON to YAML");
+      await sleep(700);
+      const indent = (await driver.readOptions()).find((option) => /indent/i.test(option.label));
+      const choices = indent?.choices ?? [];
+      if (!choices.length) return { status: "fail", note: "JSON to YAML offers no indent control" };
+      await driver.setOption(indent.label, choices[choices.length - 1]);
+      await sleep(900);
+      const result = await driver.readResult();
+      return verdict(!choices.includes("minified") && !result.error,
+        `offers [${choices.join(", ")}]; choosing "${choices[choices.length - 1]}" ${result.error ? `fails: ${result.error.slice(0, 60)}` : "runs cleanly"}`);
+    },
+  },
+  {
+    id: "TL-XML-01",
+    async run({ driver }) {
+      const result = await driver.tool("XML", { text: '<?xml version="1.0"?><root><item id="1"><name>a</name></item><empty/></root>', operation: "Beautify" });
+      return verdict(result.output.includes("\n") && result.output.includes("<name>a</name>"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-SQL-01",
+    async run({ driver }) {
+      const result = await driver.tool("SQL Formatter", { text: "select a.id, b.name from users a join orders b on b.user_id=a.id where a.active=1", operation: "Beautify SQL" });
+      return verdict(/SELECT/.test(result.output) && result.output.includes("\n"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-JSX-01",
+    async run({ driver }) {
+      const result = await driver.tool("HTML/SVG to JSX", { text: '<div class="a"><p>Hello</p><!-- note --></div>' });
+      return verdict(result.output.includes("className") && result.output.includes("{/*"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-HTMLFMT-01",
+    async run({ driver }) {
+      const result = await driver.tool("HTML Beautify/Minify", { text: "<div><p>Hello <b>world</b></p></div>", operation: "Beautify" });
+      return verdict(result.output.includes("\n"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    id: "TL-EXAMPLES-01",
+    async run({ driver }) {
+      await driver.tool("Example String Generator", { text: "", options: { Category: "email" } });
+      await sleep(400);
+      const body = await driver.fullResult();
+      return verdict(/@/.test(body), `category email produced: ${body.slice(0, 100)}`);
+    },
+  },
+  {
+    id: "PAGE-ERRORS",
+    smoke: true,
+    async run({ errors }) {
+      const unique = [...new Set(errors)];
+      return verdict(!unique.length, unique.length ? `${unique.length} webview errors: ${unique.slice(0, 5).join(" | ")}` : "no webview console or page errors during the run");
+    },
+  },
+];
