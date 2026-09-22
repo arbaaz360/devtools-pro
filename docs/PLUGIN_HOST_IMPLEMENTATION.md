@@ -25,6 +25,17 @@ exactly like a native one:
   directions allow different `indent` choices) — would otherwise offer
   controls that belong to its sibling and produce runs that fail on a value
   the UI itself suggested.
+- **An image input arrives as pixels.** A port that declares
+  `contentKinds: ["image"]` is fed decoded RGBA pixels — four bytes each,
+  row-major from the top-left — with their width and height available from
+  `context.info(port)`. The engine does the decoding on the main thread
+  (`createImageBitmap` into an `OffscreenCanvas`), which keeps the container
+  format out of every processor and, more usefully, keeps a package's own tests
+  runnable under plain node: a test builds pixels directly instead of needing a
+  canvas. The host's image read is complete rather than a preview, and refuses
+  files over 4 MiB, so a processor never sees a truncated picture. The
+  operation's `maxInputBytes` is measured in pixel bytes, so 64 MiB is 16
+  megapixels.
 - **`trigger.modes` decides who starts a run.** `inputChange` lets the shell
   run as the document changes; `heldRepeat` covers a generator, whose options
   are its only input, so an option change may run those too; an operation that

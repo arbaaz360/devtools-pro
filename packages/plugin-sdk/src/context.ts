@@ -9,8 +9,22 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
 export interface Limits { maxInputBytes: number; maxOutputBytes: number; maxChunkBytes: number; deadlineMs: number; }
 export const defaultLimits = (): Limits => ({ maxInputBytes: 16 * 1024 * 1024, maxOutputBytes: 16 * 1024 * 1024, maxChunkBytes: 1024 * 1024, deadlineMs: 0 });
 export class ProcessorCancelled extends Error { constructor() { super("processor cancelled"); this.name = "ProcessorCancelled"; } }
+/**
+ * What a port's bytes are. Text ports need nothing beyond the bytes; an image port
+ * carries pixels, which are meaningless without their shape, so the host that decoded
+ * the picture states it here rather than making every processor parse a container
+ * format. Pixels are RGBA, four bytes each, row-major from the top-left.
+ */
+export interface InputInfo {
+  contentKind: "text" | "image" | "binary";
+  mime?: string;
+  width?: number;
+  height?: number;
+}
 export interface NamedReader {
   read(port: string, maxBytes: number): Uint8Array | Promise<Uint8Array>;
+  /** Optional description of a port's bytes; absent means text. */
+  info?(port: string): InputInfo | Promise<InputInfo>;
   /** Optional bounded range access used by streaming processors. */
   readRange?(port: string, offset: number, maxBytes: number): Uint8Array | Promise<Uint8Array>;
   /** Optional size probe; hosts should return the immutable byte length. */
@@ -26,6 +40,11 @@ export interface SecretStore { resolve(handle: string): Uint8Array | Promise<Uin
 export class ProcessorContext {
   readonly reader: NamedReader; readonly outputs: OutputSink; readonly cancellation: Cancellation; readonly clock: Clock; readonly randomness: Randomness; readonly secrets: SecretStore; readonly limits: Limits;
   constructor(reader: NamedReader, outputs: OutputSink, cancellation: Cancellation, clock: Clock, randomness: Randomness, secrets: SecretStore, limits: Limits = defaultLimits()) { this.reader = reader; this.outputs = outputs; this.cancellation = cancellation; this.clock = clock; this.randomness = randomness; this.secrets = secrets; this.limits = limits; }
+  /** What the port's bytes are. A host that says nothing is handing over text. */
+  async info(port: string): Promise<InputInfo> {
+    this.check();
+    return this.reader.info ? await this.reader.info(port) : { contentKind: "text" };
+  }
   async read(port: string): Promise<Uint8Array> { this.check(); const value = await this.reader.read(port, this.limits.maxInputBytes); if (value.byteLength > this.limits.maxInputBytes) throw new Error(`read of ${port} exceeds limit`); return value; }
   /**
    * Iterate an input without placing the whole document in processor memory.
@@ -65,7 +84,17 @@ export class ProcessorContext {
 
 export class MemoryReader implements NamedReader {
   readonly inputs = new Map<string, Uint8Array>();
-  insert(port: string, value: Uint8Array | string): this { this.inputs.set(port, typeof value === "string" ? new TextEncoder().encode(value) : value); return this; }
+  readonly infos = new Map<string, InputInfo>();
+  insert(port: string, value: Uint8Array | string, info?: InputInfo): this {
+    this.inputs.set(port, typeof value === "string" ? new TextEncoder().encode(value) : value);
+    if (info) this.infos.set(port, info);
+    return this;
+  }
+  /** Pixels and their shape, as an image port receives them from the host. */
+  insertImage(port: string, pixels: Uint8Array, width: number, height: number, mime = "image/png"): this {
+    return this.insert(port, pixels, { contentKind: "image", mime, width, height });
+  }
+  info(port: string): InputInfo { return this.infos.get(port) ?? { contentKind: "text" }; }
   read(port: string, maxBytes: number): Uint8Array { const value = this.inputs.get(port); if (!value) throw new Error(`named input ${port} was not supplied`); if (value.byteLength > maxBytes) throw new Error(`read of ${port} exceeds the ${maxBytes} byte limit`); return value.slice(); }
   size(port: string): number { const value = this.inputs.get(port); if (!value) throw new Error(`named input ${port} was not supplied`); return value.byteLength; }
   readRange(port: string, offset: number, maxBytes: number): Uint8Array { const value = this.inputs.get(port); if (!value) throw new Error(`named input ${port} was not supplied`); if (!Number.isSafeInteger(offset) || offset < 0) throw new Error(`invalid offset for ${port}`); return value.slice(offset, offset + maxBytes); }

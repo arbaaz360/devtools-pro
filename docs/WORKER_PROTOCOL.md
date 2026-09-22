@@ -109,6 +109,10 @@ Two declarations change how the shell behaves, so declare them deliberately:
   user types, `heldRepeat` for a generator driven by its options, and neither
   if it should run only when its button is pressed (the right choice for an
   operation whose input limit is large). The shell honours this.
+- `contentKinds` on an input port — `["image"]` means the engine decodes the
+  picture and hands your processor RGBA pixels plus their shape
+  (`context.info(port)`); you never parse PNG or JPEG, and your tests build
+  pixels directly under node. Leave it out and the port receives text.
 - `options` — they belong to the operation that declares them. Two operations
   of one tool may declare different options, or the same option id with
   different choices; the form follows the operation on screen.
