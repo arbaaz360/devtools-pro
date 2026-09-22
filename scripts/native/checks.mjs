@@ -202,7 +202,7 @@ export const checks = [
       const button = page.locator("#open-result");
       if (await button.isHidden()) return { status: "fail", note: "Open result is not offered for a successful result" };
       await button.click();
-      await sleep(1200);
+      await driver.until(async () => (await page.locator(".tab-wrap").count()) > before);
       const after = await page.locator(".tab-wrap").count();
       const text = await page.locator("#preview").inputValue();
       return verdict(after === before + 1 && text.trim() === base64("chain me"),
@@ -233,8 +233,9 @@ export const checks = [
       await driver.newTab();
       await driver.selectTool("Regular Expression Tester");
       await driver.setInput(text);
+      const empty = await driver.settle(Buffer.byteLength(text));
       await driver.setOption("Pattern", "[0-9]{4}");
-      await sleep(1500);
+      await driver.settle(Buffer.byteLength(text), { changedFrom: empty.signature });
       const expected = [...text.matchAll(/[0-9]{4}/g)].length;
       const layer = await page.evaluate(() => ({
         hidden: document.querySelector("#editor-highlight")?.hidden,
@@ -343,9 +344,9 @@ export const checks = [
       const expected = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
       await driver.newTab();
       await driver.selectTool("UUID Generator");
+      const defaults = await driver.settle(0);
       for (const [label, value] of [["Version", "v5"], ["Namespace", "dns"], ["Name", "example.com"]]) await driver.setOption(label, value);
-      await sleep(600);
-      await driver.settle(0);
+      await driver.settle(0, { changedFrom: defaults.signature });
       const body = await driver.fullResult();
       return verdict(body.toLowerCase().includes(expected), `RFC 4122 gives ${expected}; result: ${body.slice(0, 120)}`);
     },
@@ -357,8 +358,9 @@ export const checks = [
       await driver.newTab();
       await driver.selectTool("Regular Expression Tester");
       await driver.setInput(text);
+      const empty = await driver.settle(Buffer.byteLength(text));
       await driver.setOption("Pattern", "([0-9]{4})-([0-9]{2})-([0-9]{2})");
-      await sleep(1200);
+      await driver.settle(Buffer.byteLength(text), { changedFrom: empty.signature });
       const body = await driver.fullResult();
       const expected = [...text.matchAll(/([0-9]{4})-([0-9]{2})-([0-9]{2})/g)].length;
       return verdict(body.includes(`count: ${expected}`), `node finds ${expected} matches; result: ${body.slice(0, 120)}`);
@@ -393,10 +395,14 @@ export const checks = [
   {
     id: "TL-PREVIEW-05",
     async run({ driver, page, dialogs }) {
-      await driver.setInput("# Heading\n\n<script>window.__pwned = 1;</script>\n\n[click](javascript:window.__pwned=2)\n");
-      await sleep(1600);
+      const before = await driver.readResult();
+      const hostile = "# Heading\n\n<script>window.__pwned = 1;</script>\n\n[click](javascript:window.__pwned=2)\n";
+      await driver.setInput(hostile);
+      const rendered = await driver.settle(Buffer.byteLength(hostile), { changedFrom: before.signature });
+      if (rendered.timedOut) return { status: "fail", note: "the preview never rendered the document under test, so nothing was proven" };
+      await sleep(600);   // give an injected script the chance this check exists to deny it
       const pwned = await page.evaluate(() => window.__pwned ?? null);
-      return verdict(pwned === null && dialogs.length === 0, `injected script did not run (window.__pwned is ${String(pwned)}, ${dialogs.length} dialogs)`);
+      return verdict(pwned === null && dialogs.length === 0, `the document rendered and its script did not run (window.__pwned is ${String(pwned)}, ${dialogs.length} dialogs)`);
     },
   },
   {
@@ -411,10 +417,10 @@ export const checks = [
     async run({ driver, page }) {
       await driver.newTab();
       await driver.selectTool("Diff & Compare");
+      const before = (await driver.readResult()).signature;
       await page.locator("#compare-left").fill("alpha\nbravo\ncharlie\n");
       await page.locator("#compare-right").fill("alpha\nbravo CHANGED\ncharlie\n");
-      await sleep(1200);
-      const result = await driver.settle(undefined, { timeout: 20_000 });
+      const result = await driver.settle(undefined, { changedFrom: before, timeout: 20_000 });
       const body = (result.structured || (await driver.fullResult())).replace(/\s+/g, " ");
       return verdict(/bravo/i.test(body) && !/no differences/i.test(body), `reported: ${body.slice(0, 110)}`);
     },
@@ -448,8 +454,10 @@ export const checks = [
       await driver.setInput("const a = 1; // note");
       const beautify = (await driver.readOptions()).map((option) => option.label);
       await driver.runOperation("Minify JavaScript");
-      await sleep(900);
-      const minify = (await driver.readOptions()).map((option) => option.label);
+      const minify = (await driver.until(async () => {
+        const labels = (await driver.readOptions()).map((option) => option.label);
+        return labels.join("|") === beautify.join("|") ? null : labels;
+      })) ?? beautify;
       return verdict(minify.includes("Preserve comments") && !beautify.includes("Preserve comments"),
         `Beautify offers [${beautify.join(", ")}], Minify offers [${minify.join(", ")}]`);
     },
@@ -462,13 +470,12 @@ export const checks = [
       await driver.selectTool("YAML ↔ JSON");
       await driver.setInput('{"a":{"b":[1,2]}}');
       await driver.runOperation("JSON to YAML");
-      await sleep(700);
-      const indent = (await driver.readOptions()).find((option) => /indent/i.test(option.label));
+      const indent = await driver.until(async () => (await driver.readOptions()).find((option) => /indent/i.test(option.label)));
       const choices = indent?.choices ?? [];
       if (!choices.length) return { status: "fail", note: "JSON to YAML offers no indent control" };
+      const before = await driver.settle(Buffer.byteLength('{"a":{"b":[1,2]}}'));
       await driver.setOption(indent.label, choices[choices.length - 1]);
-      await sleep(900);
-      const result = await driver.readResult();
+      const result = await driver.settle(Buffer.byteLength('{"a":{"b":[1,2]}}'), { changedFrom: before.signature });
       return verdict(!choices.includes("minified") && !result.error,
         `offers [${choices.join(", ")}]; choosing "${choices[choices.length - 1]}" ${result.error ? `fails: ${result.error.slice(0, 60)}` : "runs cleanly"}`);
     },

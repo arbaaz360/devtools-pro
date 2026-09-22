@@ -40,6 +40,9 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | merged (#74) |
 | AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | merged (#75) |
 | AG-119 | QR code generator package (DU-21) | antigravity | merged (#77) |
+| AG-120 | Parity audit: time, regex, JWT, Base64, URL parser, backslash, UUID | claude | ready |
+| AG-121 | Parity audit: HTML, CSS, JavaScript, XML, number base, example strings | antigravity | ready |
+| AG-122 | Parity audit: YAML, QR, JSX, preview, SQL, string case | claude | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).

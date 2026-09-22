@@ -70,6 +70,21 @@ export function driver(page) {
     return { ...(last ?? {}), timedOut: true };
   }
 
+  /**
+   * Poll until a condition holds. A fixed sleep in place of a condition is the
+   * flake that CI finds and a developer machine hides: the runner is slower, the
+   * read lands early, and the check reports the previous state as this one's.
+   */
+  async function until(predicate, { timeout = 10_000, step = 100 } = {}) {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+      const value = await predicate();
+      if (value) return value;
+      await sleep(step);
+    }
+    return null;
+  }
+
   async function closeExtraTabs(keep = 3) {
     // The shell caps tabs at 16; a run that hoards them starts testing its own mess.
     while ((await page.locator(".tab-wrap").count()) > keep) {
@@ -165,6 +180,6 @@ export function driver(page) {
 
   return {
     page, toolItem, newTab, closeExtraTabs, selectTool, setInput, setOption,
-    runOperation, readOptions, readOperations, readResult, fullResult, settle, tool,
+    runOperation, readOptions, readOperations, readResult, fullResult, settle, tool, until,
   };
 }
