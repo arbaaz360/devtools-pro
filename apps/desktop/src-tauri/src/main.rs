@@ -981,6 +981,13 @@ fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
         .inner_size(1280.0, 840.0)
         .min_inner_size(800.0, 560.0)
         .background_color(Color(0x11, 0x14, 0x19, 0xff));
+    // A test run drives the window instead of a person, and a Win32 file dialog is
+    // the one thing it cannot drive. This flag lets the shell expose a path-taking
+    // open and save; it exists only in a debug build, and only when asked for.
+    #[cfg(debug_assertions)]
+    if std::env::var("DEVTOOLS_TEST_HOOKS").is_ok() {
+        builder = builder.initialization_script("window.__DEVTOOLS_TEST_HOOKS__ = true;");
+    }
     #[cfg(all(debug_assertions, windows))]
     if let Ok(extra) = std::env::var("DEVTOOLS_SMOKE_BROWSER_ARGS") {
         if !extra.trim().is_empty() {

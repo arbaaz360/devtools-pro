@@ -23,6 +23,14 @@ node scripts/native-suite.mjs --smoke     # start-up subset
 node scripts/native-suite.mjs --only TL-  # by id
 ```
 
+The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
+then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
+things a script cannot do for itself: open a path directly, and name the file a dialog
+would have returned. Everything after that point is the code a person drives, so the
+suite can check that opening a real file leaves it byte-identical, and that saving a
+document or a result writes what it should. A release build never sets the variable and
+never injects the flag.
+
 Check ids match [MANUAL_TEST_PLAN.md](MANUAL_TEST_PLAN.md), so a failure names the case
 a human would otherwise run by hand. Expected values are computed independently — node's
 crypto, an RFC constant, a second parse — never recorded from the app's own output: a

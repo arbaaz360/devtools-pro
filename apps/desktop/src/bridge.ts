@@ -114,13 +114,31 @@ export interface JobFinished {
 
 export const native = isTauri();
 
+/**
+ * Under test the window is driven by a script, which cannot operate a Win32 dialog.
+ * `window.__DEVTOOLS_TEST_HOOKS__` is injected by a debug host started with
+ * DEVTOOLS_TEST_HOOKS set; a release build never sets it, so these paths are dead
+ * code there. One preset path is consumed per dialog, so a test says what the user
+ * would have picked and the flow under test is otherwise the real one.
+ */
+const underTest = (): boolean => (globalThis as Record<string, unknown>).__DEVTOOLS_TEST_HOOKS__ === true;
+let presetPaths: string[] = [];
+export function presetDialogPaths(paths: string[]): void {
+  if (underTest()) presetPaths = [...paths];
+}
+const nextPresetPath = (): string | null => (underTest() && presetPaths.length ? presetPaths.shift()! : null);
+
 export async function chooseFile(): Promise<string | null> {
+  const preset = nextPresetPath();
+  if (preset) return preset;
   const selected = await open({ multiple: false, directory: false, title: 'Open a document' });
   return typeof selected === 'string' ? selected : null;
 }
 
 export interface SaveSuggestion { title: string; suffix: string; filterName: string; extensions: string[]; }
 export async function chooseResultOutput(document: FileDocument, suggestion: SaveSuggestion): Promise<string | null> {
+  const preset = nextPresetPath();
+  if (preset) return preset;
   const path = document.path.replace(/(\.[^./\\]+)?$/, suggestion.suffix);
   return save({ title: suggestion.title, defaultPath: path, filters: [{ name: suggestion.filterName, extensions: suggestion.extensions }] });
 }
@@ -146,6 +164,8 @@ export function saveDocument(documentId: string, outputPath: string): Promise<vo
 }
 
 export function chooseDocumentOutput(name: string): Promise<string | null> {
+  const preset = nextPresetPath();
+  if (preset) return Promise.resolve(preset);
   return save({ title: 'Save document as', defaultPath: name });
 }
 

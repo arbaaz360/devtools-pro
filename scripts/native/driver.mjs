@@ -178,8 +178,18 @@ export function driver(page) {
     return settle(text === undefined ? undefined : Buffer.byteLength(text), { changedFrom: before });
   }
 
+  /** Open a real file the way the Open button does, minus the dialog. */
+  async function openPath(path, toolId) {
+    await page.evaluate(([target, tool]) => globalThis.devtoolsTest.openPath(target, tool), [path.replace(/\\/g, "/"), toolId ?? null]);
+    await until(async () => (await page.locator("#source-name").innerText()).trim() !== "No document open");
+  }
+  /** The path the next dialog returns; one per dialog, in order. */
+  const presetDialogPaths = (paths) =>
+    page.evaluate((list) => globalThis.devtoolsTest.presetDialogPaths(list), paths.map((path) => path.replace(/\\/g, "/")));
+
   return {
     page, toolItem, newTab, closeExtraTabs, selectTool, setInput, setOption,
     runOperation, readOptions, readOperations, readResult, fullResult, settle, tool, until,
+    openPath, presetDialogPaths,
   };
 }
