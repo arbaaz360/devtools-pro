@@ -6,5 +6,5 @@
 | DU-14 CSS beautify/minify | `format.css` | 13 | 0 | 0 | 3 | None |
 | DU-15 JavaScript beautify/minify | `format.js` | 8 | 1 | 0 | 1 | Tokenizer misses structural syntax errors |
 | DU-16 XML beautify/minify | `format.xml` | 9 | 0 | 0 | 2 | None |
-| DU-19 Number base converter | `number.base` | 4 | 0 | 0 | 4 | None |
+| DU-19 Number base converter | `number.base` | 7 | 0 | 0 | 4 | None |
 | DU-20 Example string generator | `generate.examples` | 2 | 0 | 0 | 8 | None |
