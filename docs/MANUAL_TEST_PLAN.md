@@ -1,10 +1,14 @@
 # Manual test plan
 
 For a human tester driving the Windows desktop app by hand. Automated suites
-(`pnpm test`, `test:ui`, `scripts/native-smoke.mjs`) already cover the code
+(`pnpm test`, `test:ui`, `scripts/native-suite.mjs`) already cover the code
 paths; this plan covers what only a person can judge — real dialogs, real
 files, real clipboards, real displays, and whether the result on screen is the
 *right* result.
+
+About forty of the cases below now run unattended against the built executable:
+`node scripts/native-suite.mjs` uses these ids, so anything it covers needs your
+attention only when it fails. The ids it owns are marked **(suite)**.
 
 Read [DEVUTILS_REQUIREMENTS.md](DEVUTILS_REQUIREMENTS.md) for what each tool is
 supposed to do; the screenshots it references are the parity reference when a
@@ -125,9 +129,9 @@ node -e "const c=require('crypto'),b=o=>Buffer.from(JSON.stringify(o)).toString(
 
 | ID | Steps | Expected |
 |---|---|---|
-| SMK-01 **[P1]** | Launch the app | A window titled *The DevTools Pro · Native preview* opens within 10 s, dark theme, tool rail on the left, tab bar and workspace on the right. Nothing renders as an unstyled document |
-| SMK-02 **[P1]** | Look at the status bar | The engine dot is lit and reads *Local engine* (not *Browser preview*); the status text reads *Ready* |
-| SMK-03 **[P1]** | Count the tools in the rail | Every group renders with a heading; record the total. CI's native smoke currently reports **32**. A number materially lower means package discovery failed |
+| SMK-01 (suite) **[P1]** | Launch the app | A window titled *The DevTools Pro · Native preview* opens within 10 s, dark theme, tool rail on the left, tab bar and workspace on the right. Nothing renders as an unstyled document |
+| SMK-02 (suite) **[P1]** | Look at the status bar | The engine dot is lit and reads *Local engine* (not *Browser preview*); the status text reads *Ready* |
+| SMK-03 (suite) **[P1]** | Count the tools in the rail | Every group renders with a heading; record the total. CI's native smoke currently reports **32**. A number materially lower means package discovery failed |
 | SMK-04 **[P1]** | Press Ctrl+N, type `hello` | A tab appears, the editor accepts text, the status bar shows *Ln 1, Col 6* |
 | SMK-05 **[P1]** | Choose **JSON**, paste `{"b":1,"a":[1,2]}`, press **Format** | The result pane shows indented JSON and the state line reports success |
 | SMK-06 **[P1]** | Choose **String Case Converter**, type `userID_loaderHTTPServer v2Api`, set Target to `snake` | Result is `user_id_loader_http_server_v_2_api` (this is the value CI asserts) |
@@ -193,8 +197,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | EDT-11 | Type into a very long single line (no newlines) | The editor stays responsive; horizontal behaviour (wrap or scroll) is consistent |
 | EDT-12 | Scroll to the middle of a long document, switch tabs, switch back | The scroll position and caret are preserved |
 | EDT-13 | Type continuously for ~10 s in an auto tool | No dropped characters, no caret jumps, no mid-typing result flicker that steals focus |
-| EDT-14 **[P1]** | Type into an auto tool and stop | The result refreshes on its own within ~1 s (debounce is ~350 ms) |
-| EDT-15 | Type into an explicit tool (CSS, XML) | The result does **not** appear until you press an operation button. JSON is a bundled Rust tool and runs as you type by design — that is not a failure of this case; any stale result is visibly marked stale rather than presented as current |
+| EDT-14 (suite) **[P1]** | Type into an auto tool and stop | The result refreshes on its own within ~1 s (debounce is ~350 ms) |
+| EDT-15 (suite) | Type into an explicit tool (CSS, XML) | The result does **not** appear until you press an operation button. JSON is a bundled Rust tool and runs as you type by design — that is not a failure of this case; any stale result is visibly marked stale rather than presented as current |
 | EDT-16 | Paste text containing a NUL byte or lone surrogate | Either sanitised or refused with a message; never a crash or a truncated-without-warning document |
 | EDT-17 | Open the image tool (**Image to Base64**) and open a PNG | The image renders in the input area as a picture, not as bytes |
 | EDT-18 | In an image tool, try to type in the input area | Typing is blocked or ignored cleanly; the app does not corrupt the image |
@@ -213,13 +217,13 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | ID | Steps | Expected |
 |---|---|---|
 | NAV-01 | Read the rail top to bottom | Tools are grouped under headings; every entry has a name and an icon; no entry is blank or `undefined` |
-| NAV-02 | Type `json` in the search box | Matching tools remain, others hide. Clearing restores the full list |
+| NAV-02 (suite) | Type `json` in the search box | Matching tools remain, others hide. Clearing restores the full list |
 | NAV-03 | Search for a name that does not exist | An empty list or an explicit "no matches" state — not a broken rail |
 | NAV-04 | Search by a word from a tool's description or alias (e.g. `svg`, `qr`, `timestamp`) | Sensible matches appear. Record any tool you cannot find by an obvious word |
 | NAV-05 | Collapse the sidebar with the collapse button | The rail collapses, the workspace widens, the button's label flips to expand |
 | NAV-06 | Expand it again | The rail returns with the same scroll position |
 | NAV-07 | Select a tool for the active tab | The tool header (icon, group eyebrow, title) and the window's title area update; the options shown are that tool's options |
-| NAV-08 **[P1]** | Switch tools within one tab, keeping the same text | The text is preserved; the previous tool's result is cleared or marked stale — never shown as the new tool's output |
+| NAV-08 (suite) **[P1]** | Switch tools within one tab, keeping the same text | The text is preserved; the previous tool's result is cleared or marked stale — never shown as the new tool's output |
 | NAV-09 | Ctrl+K, type part of a tool name, press Enter | The first match runs: that tab switches to the tool |
 | NAV-10 | Ctrl+K, navigate with ↓/↑, press Enter | Selection moves; Enter applies the highlighted command |
 | NAV-11 | Ctrl+K, press Escape | The dialog closes and focus returns to where it was |
@@ -234,7 +238,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 
 | ID | Steps | Expected |
 |---|---|---|
-| OPT-01 **[P1]** | For each tool, read its options against the table in section 8 | Every declared option is present, labelled in words (not raw ids), with its documented default preselected |
+| OPT-01 (suite) **[P1]** | For each tool, read its options against the table in section 8 | Every declared option is present, labelled in words (not raw ids), with its documented default preselected |
 | OPT-02 | Change an enum option (e.g. Indentation) | The result re-runs (auto tools) or the button re-runs with the new value (explicit tools); the output visibly reflects the change |
 | OPT-03 | Toggle a boolean option | Same as OPT-02, in both directions |
 | OPT-04 | Type into a string option (Regex pattern, Find query, Component name) | The value is used; leading/trailing spaces are preserved unless the tool documents trimming |
@@ -262,17 +266,17 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | ID | Steps | Expected |
 |---|---|---|
 | RES-01 **[P1]** | Run any successful operation | The result state line says it succeeded, and the output area shows the output |
-| RES-02 **[P1]** | Run an operation that fails (invalid JSON) | A clear error naming *what* is wrong and *where* (line/column where applicable). The output area stays empty — no blank "success" |
-| RES-03 | After a failure, fix the input and re-run | The error clears completely; no stale error text remains beside the good result |
+| RES-02 (suite) **[P1]** | Run an operation that fails (invalid JSON) | A clear error naming *what* is wrong and *where* (line/column where applicable). The output area stays empty — no blank "success" |
+| RES-03 (suite) | After a failure, fix the input and re-run | The error clears completely; no stale error text remains beside the good result |
 | RES-04 | Look at the metrics row after a run | Metrics (sizes, counts, durations) are plausible and labelled. Record anything that is always zero |
 | RES-05 | Expand **Operation details** | Structured detail about the run is shown; it is readable, not raw JSON with escaped quotes |
 | RES-06 **[P1]** | Press **Copy complete result**, paste into Notepad | The **entire** result is pasted, not the visible preview. Compare lengths for a large result |
 | RES-07 **[P1]** | With a large (truncated) result, click in the output, Ctrl+A, Ctrl+C, paste | You get the complete result, not the truncated preview |
 | RES-08 **[P1]** | Press **Save result**, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
 | RES-09 | Save a result over an existing file and confirm the overwrite | The file is replaced; cancelling the prompt leaves it untouched |
-| RES-10 **[P1]** | Press **Open result** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
+| RES-10 (suite) **[P1]** | Press **Open result** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
 | RES-11 | Chain three tools with Open result (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
-| RES-12 | Press **Hide result**, then **Show result** | The result pane collapses and returns, with the result intact |
+| RES-12 (suite) | Press **Hide result**, then **Show result** | The result pane collapses and returns, with the result intact |
 | RES-13 | Collapse the result with the ›/‹ button in the pane header | Same behaviour; the button's tooltip flips |
 | RES-14 | Run a tool whose output is JSON-ish data (**URL Parser**, **JWT**, **Validate**) | The structured view is readable — keys and values laid out, not a single unwrapped line |
 | RES-15 **[P1]** | Run **Markdown Preview** on `sample.md` | The preview renders as a formatted document (heading, bold, list, code block) inside the result pane |
@@ -281,7 +285,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-18 | Preview HTML referencing a remote image (`<img src="https://example.com/x.png">`) | The preview does not fetch it (watch the network) or the failure is silent — either way, no console errors that break the pane |
 | RES-19 **[P1]** | Run **QR Code** on `https://example.com` | An actual QR image renders in the result. Scan it with a phone: it resolves to `https://example.com` |
 | RES-20 | Save the QR result | The saved `.svg` opens in a browser and shows the same code with its white quiet-zone border intact |
-| RES-21 **[P1]** | Run **Regular Expression Tester** with pattern `\d{4}` on text containing years | Matches are highlighted **in the input editor** at the right positions, and listed in the result |
+| RES-21 (suite) **[P1]** | Run **Regular Expression Tester** with pattern `\d{4}` on text containing years | Matches are highlighted **in the input editor** at the right positions, and listed in the result |
 | RES-22 | With the regex tool, scroll the input | The highlights stay aligned with the text as it scrolls |
 | RES-23 | Change the regex so nothing matches | Highlights clear; the result says zero matches rather than showing the last run's matches |
 | RES-24 **[P1]** | Run **Image to Base64** on the PNG, then **Base64 to Image** on the result | The round trip reproduces the same image; the decoded preview shows a picture, not bytes |
@@ -336,12 +340,12 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 | `{"b":1,"a":[1,2]}` | Format | Indented, keys in source order unless a sort option exists |
+| 01 (suite) | `{"b":1,"a":[1,2]}` | Format | Indented, keys in source order unless a sort option exists |
 | 02 | same | Minify | `{"b":1,"a":[1,2]}` with no spaces |
 | 03 | same | Validate | Reports valid, with structure details |
 | 04 | `{"a": }` | Format | Error naming line and column; empty output |
 | 05 | `{"a":1,"a":2}` | Validate | Duplicate key is reported or the winner is stated — record which |
-| 06 | `1e400`, `1.7976931348623157e308`, `123456789012345678901234567890` | Format | Large numbers are preserved exactly, not rounded to `Infinity` or `1.2345678901234568e+29` |
+| 06 (suite) | `1e400`, `1.7976931348623157e308`, `123456789012345678901234567890` | Format | Large numbers are preserved exactly, not rounded to `Infinity` or `1.2345678901234568e+29` |
 | 07 | `{"s":"\u00e9\ud83d\ude00","esc":"\/"}` | Format | Escapes and astral characters survive a round trip |
 | 08 | `big.json` | Format | Completes; record the time |
 | 09 | `[]`, `{}`, `null`, `"str"`, `42` | Validate | Each is accepted as valid JSON |
@@ -368,7 +372,7 @@ Options: target (camel, pascal, snake, kebab, screaming-kebab, constant), acrony
 
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 | `userID_loaderHTTPServer v2Api` | snake | `user_id_loader_http_server_v_2_api` |
+| 01 (suite) | `userID_loaderHTTPServer v2Api` | snake | `user_id_loader_http_server_v_2_api` |
 | 02 | same | camel / pascal / kebab / screaming-kebab / constant | Each target produces its own convention consistently |
 | 03 | `my URL parser` | preserve-acronyms on vs off | `URL` is kept as a unit when on |
 | 04 | custom acronym list `AWS,GCP` with `myAWSBucket` | snake | `AWS` treated as an acronym |
@@ -381,7 +385,7 @@ Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-di
 | # | Input | Expected |
 |---|---|---|
 | 01 | empty | Runs with no input and shows the current time |
-| 02 | `1700000000` | Interpreted as seconds → 14 Nov 2023 UTC; local time also shown |
+| 02 (suite) | `1700000000` | Interpreted as seconds → 14 Nov 2023 UTC; local time also shown |
 | 03 | `1700000000000` | Interpreted as milliseconds (auto, by digit count) |
 | 04 | `2023-11-14T22:13:20Z` | Parsed as ISO and converted back to epoch |
 | 05 | `0`, `-1`, `2147483648` | Epoch, pre-epoch and post-2038 all handled |
@@ -396,7 +400,7 @@ Options: mode (generate, decode), version (v1, v3, v4, v5), namespace, name, cou
 | 01 | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
 | 02 | Generate, count 100 | 100 UUIDs, all distinct |
 | 03 | Run v4 generation twice | Different values each time (not seeded/repeating) |
-| 04 | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
+| 04 (suite) | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
 | 05 | v1 | Time-based, values increase across successive runs |
 | 06 | case upper/lower | Output case follows the option |
 | 07 | Decode mode with a v1 UUID | Timestamp, variant and version reported |
@@ -407,8 +411,8 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 
 | # | Input | Options | Expected |
 |---|---|---|---|
-| 01 | `hello` | encode | `aGVsbG8=` |
-| 02 | `aGVsbG8=` | decode | `hello` |
+| 01 (suite) | `hello` | encode | `aGVsbG8=` |
+| 02 (suite) | `aGVsbG8=` | decode | `hello` |
 | 03 | `~~~?>>` | encode, variant url | Uses `-` and `_`, never `+` or `/` |
 | 04 | `aGVsbG8` (no padding) | decode, padding required | Error; with padding optional, decodes |
 | 05 | `aGVsbG8=!!` | decode, strict vs tolerant | Strict errors; tolerant/replace documents what it does |
@@ -418,7 +422,7 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 ### TL-URL — URL Encode / Decode · `text.url` · Rust
 | # | Input | Options | Expected |
 |---|---|---|---|
-| 01 | `https://example.com/search?q=hello world` | encode | Space becomes `%20` |
+| 01 (suite) | `https://example.com/search?q=hello world` | encode | Space becomes `%20` |
 | 02 | same | encode, form encoding (if offered) | Space becomes `+` |
 | 03 | `%E2%9C%93` | decode | `✓` |
 | 04 | `%ZZ` | decode | Readable error, not a silent pass-through |
@@ -475,7 +479,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `hello` | SHA-256 `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824`; cross-check with `certutil -hashfile` on a file containing exactly `hello` with no trailing newline |
+| 01 (suite) | `hello` | SHA-256 `2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824`; cross-check with `certutil -hashfile` on a file containing exactly `hello` with no trailing newline |
 | 02 | `hello` | MD5 `5d41402abc4b2a76b9719d911017c592` if MD5 is offered. **Record which algorithms the UI actually exposes** — the Rust path historically shows only SHA-256/512 |
 | 03 | empty input | SHA-256 of empty is `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
 | 04 | the PNG fixture | Matches `certutil -hashfile <png> SHA256` |
@@ -509,7 +513,7 @@ Options: pattern, mode (match, replace), replacement, global, ignore-case, multi
 
 | # | Input / pattern | Expected |
 |---|---|---|
-| 01 | text `2024-02-29 and 1999-12-31`, pattern `(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})` | Two matches; named groups `y`,`m`,`d` and numbered groups both listed; highlights on both dates |
+| 01 (suite) | text `2024-02-29 and 1999-12-31`, pattern `(?<y>\d{4})-(?<m>\d{2})-(?<d>\d{2})` | Two matches; named groups `y`,`m`,`d` and numbered groups both listed; highlights on both dates |
 | 02 | global off | Only the first match |
 | 03 | ignore-case with `HELLO` against `hello` | Match only when the flag is on |
 | 04 | multiline with `^line` against a 3-line text | Matches each line start only when on |
@@ -527,7 +531,7 @@ Options: key (**masked**), secret-encoding (utf8, base64, base64url), clock-tole
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | A valid HS256 token, no key | Header and payload decoded and readable; signature reported as unverified |
+| 01 (suite) | A valid HS256 token, no key | Header and payload decoded and readable; signature reported as unverified |
 | 02 | Same token with the correct secret | Signature reported valid |
 | 03 | Wrong secret | Signature reported invalid — clearly, not a subtle field |
 | 04 | Expired token (`exp` in the past) | Expiry called out; clock-tolerance option shifts the verdict |
@@ -541,14 +545,14 @@ Operations: YAML to JSON, JSON to YAML. Options: indent, sort-keys (YAML→JSON)
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.yaml` → JSON | Correct nesting, types preserved (`8.95` number, `true` boolean) |
+| 01 (suite) | `sample.yaml` → JSON | Correct nesting, types preserved (`8.95` number, `true` boolean) |
 | 02 | That JSON → YAML | Round trip reproduces the original structure |
 | 03 | sort-keys on | Keys ordered alphabetically |
 | 04 | indent space2 / space4 / minified | Output shape follows the option |
 | 05 | YAML with an anchor/alias (`&a`, `*a`) | Documented error (`yaml.alias-unsupported`), readable in the UI |
 | 06 | YAML with a duplicate key | Documented error, not a silent last-wins |
 | 07 | YAML with bad indentation | Error names the line |
-| 08 | YAML `.inf`, `.nan`, `~`, `null` | Handled per the README; record what each becomes |
+| 08 (suite) | YAML `.inf`, `.nan`, `~`, `null` | Handled per the README; record what each becomes |
 | 09 | JSON with a very deep nesting (200 levels) | Either converts or reports a depth limit; no stack crash |
 
 ### TL-XML — XML · `format.xml` · package · explicit
@@ -556,7 +560,7 @@ Operations: Beautify, Minify. Options: indent (sp2, sp4, tab), preserve-comments
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.xml` | Beautify indents the tree; the declaration is preserved |
+| 01 (suite) | `sample.xml` | Beautify indents the tree; the declaration is preserved |
 | 02 | same | Minify removes insignificant whitespace only |
 | 03 | preserve-comments off | `<!-- -->` removed; on, kept |
 | 04 | collapse-empty on/off | `<empty/>` vs `<empty></empty>` |
@@ -569,7 +573,7 @@ Options: indent, preserve-comments, wrap-attributes (auto, force), indent-inner-
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.html` | Beautify produces readable indented markup |
+| 01 (suite) | `sample.html` | Beautify produces readable indented markup |
 | 02 | same | Minify collapses whitespace but does not break `<pre>` or `<textarea>` content |
 | 03 | inline `<script>` and `<style>` | Content is not mangled |
 | 04 | wrap-attributes force on a tag with many attributes | One attribute per line |
@@ -580,7 +584,7 @@ Options: indent (sp2, sp4, tab), preserve-comments, blank-line-between-rules. Li
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.css` | Beautify: one declaration per line, normalised selector spacing |
+| 01 (suite) | `sample.css` | Beautify: one declaration per line, normalised selector spacing |
 | 02 | same | Minify: no spaces around `{`, `:`, `;`; last `;` optional but consistent |
 | 03 | preserve-comments off/on | `/* note */` dropped / kept |
 | 04 | blank-line-between-rules on/off | Blank line between rules appears/disappears |
@@ -608,11 +612,11 @@ Options: dialect (sql, mysql, mariadb, postgresql, plsql), keyword-case, indent,
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.sql` | Beautify: clauses on their own lines, joins readable |
+| 01 (suite) | `sample.sql` | Beautify: clauses on their own lines, joins readable |
 | 02 | keyword-case upper / lower / preserve | `SELECT` vs `select` vs as written |
 | 03 | comma-position end / start | Commas trail / lead |
 | 04 | dialect postgresql with `::text` cast and `$$` block | Not mangled |
-| 05 | mysql backtick identifiers | Preserved |
+| 05 (suite) | mysql backtick identifiers | Preserved |
 | 06 | A string containing `--` or `/*` | Not treated as a comment |
 | 07 | Minify | Single-line statement that still runs |
 
@@ -621,7 +625,7 @@ Options: wrap (none, fragment, component), component-name, indent, svg-attribute
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.html` | `class` → `className`, `<!-- -->` → `{/* */}`, self-closing tags valid JSX |
+| 01 (suite) | `sample.html` | `class` → `className`, `<!-- -->` → `{/* */}`, self-closing tags valid JSX |
 | 02 | wrap none / fragment / component | Bare markup, `<>…</>`, or a named component using component-name |
 | 03 | An SVG with `stroke-width`, `xlink:href` | camel → `strokeWidth`; keep leaves as written |
 | 04 | `style="color:red;font-size:12px"` | Converted to a style object |
@@ -633,7 +637,7 @@ Operations: Preview Markdown, Preview HTML. Markdown options: gfm, breaks, theme
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.md` | Heading, bold, link, list and fenced code all render correctly |
+| 01 (suite) | `sample.md` | Heading, bold, link, list and fenced code all render correctly |
 | 02 | GFM table and task list, gfm on/off | Rendered as a table / as literal text |
 | 03 | breaks on/off | Single newlines become `<br>` or not |
 | 04 | theme light/dark | The preview's own background and text change |
@@ -651,7 +655,7 @@ Options: error-correction (L, M, Q, H), cell-size (1–40), margin (0–16), ver
 | 02 | Same at error-correction L, M, Q, H | All scannable; the module count grows with the level |
 | 03 | cell-size 1 and 40 | Image size changes; at 40 it is large but still correct |
 | 04 | margin 0 and 16 | The white quiet zone disappears / grows. At margin 0 a scanner may fail — that is expected, but the border must visibly change |
-| 05 | version 1 with a long input | Documented capacity error |
+| 05 (suite) | version 1 with a long input | Documented capacity error |
 | 06 | version 40 with `hello` | Large, sparse, still scannable |
 | 07 | 2953 bytes at level L | Encodes; 2954 bytes is a capacity error |
 | 08 | Empty input | Documented `qr.empty` error |
@@ -663,7 +667,7 @@ Options: newline (preserve, lf, crlf, ignore), context-lines (0–64).
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | Two texts differing in one line | The changed line is shown with context |
+| 01 (suite) | Two texts differing in one line | The changed line is shown with context |
 | 02 | Identical texts | "No differences" stated plainly |
 | 03 | context-lines 0 vs 10 | Surrounding context shrinks/grows |
 | 04 | One side CRLF, other LF, newline=ignore vs preserve | Ignore reports no difference; preserve reports every line changed |
@@ -676,7 +680,7 @@ Options: from-base (2–36), to-base (2–36), digits (lower, upper). Limit 64 K
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `255`, 10 → 16 | `ff` (lower) / `FF` (upper) |
+| 01 (suite) | `255`, 10 → 16 | `ff` (lower) / `FF` (upper) |
 | 02 | `ff`, 16 → 2 | `11111111` |
 | 03 | `zz`, 36 → 10 | `1295` |
 | 04 | Very long number (200 digits) | Exact, no floating-point rounding |
@@ -689,7 +693,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 
 | # | Steps | Expected |
 |---|---|---|
-| 01 | Each category once | Output matches the category (an email looks like an email, a URL like a URL) |
+| 01 (suite) | Each category once | Output matches the category (an email looks like an email, a URL like a URL) |
 | 02 | count 1 vs 100 | Exactly that many items |
 | 03 | Run the same category twice | Variety across runs (or documented determinism) |
 | 04 | With no input document | Works — this is a generator |
@@ -697,7 +701,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 ### TL-CURL — cURL to Code · `web.curl-code` · Rust
 | # | Input | Expected |
 |---|---|---|
-| 01 | `curl.txt` | JavaScript fetch output is valid JS with method, URL, headers and body |
+| 01 (suite) | `curl.txt` | JavaScript fetch output is valid JS with method, URL, headers and body |
 | 02 | same | Python requests output is valid Python with the same semantics |
 | 03 | `curl` with `-u user:pass` and cookies | Credentials appear in the generated code (and are not silently dropped) |
 | 04 | Multiline `curl` with `\` continuations | Parsed as one command |
@@ -827,6 +831,8 @@ a fix was lost.
 | REG-10 | Dirty tab replaced by a dropped file | DOC-27 |
 | REG-11 | CRLF handling differed between Windows and CI | DOC-08, DOC-09, TB-09 |
 | REG-12 | Hash algorithms available in the package but not the UI | TL-HASH-02 — record exactly which algorithms the UI offers |
+| REG-13 (suite) | Options were taken from the first operation, so an option declared on a later one was unreachable | JavaScript Formatter: Beautify does not offer *Preserve comments* and Minify does |
+| REG-14 (suite) | The same option id with different choices per operation: the UI offered a value the operation rejects | JSON to YAML offers only `space2`/`space4`, and choosing the last one runs cleanly |
 
 ---
 

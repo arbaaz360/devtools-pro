@@ -6,7 +6,29 @@ Run the repository gate from the checkout root:
 node scripts/quality-gate.mjs
 ```
 
-It generates missing acceptance fixtures (preserving existing files), runs the full Rust workspace tests including native host and large-file acceptance tests, builds the desktop TypeScript/Vite bundle, runs the shell registry/lifecycle tests, checks that the built `index.html` has only relative and existing CSS/JavaScript asset references, verifies the shell's required flex layout declarations in the emitted stylesheet, builds the CLI, runs an inspect/minify/reopen CLI smoke with source immutability, builds the desktop executable and runs the native smoke (`scripts/native-smoke.mjs`: the real window over WebView2's debugging port, a Rust tool and a worker-engine package tool both completing, no webview errors), and runs `git diff --check`. Every failed command exits nonzero. The Windows CI runner matches the currently supported native build.
+It generates missing acceptance fixtures (preserving existing files), runs the full Rust workspace tests including native host and large-file acceptance tests, builds the desktop TypeScript/Vite bundle, runs the shell registry/lifecycle tests, checks that the built `index.html` has only relative and existing CSS/JavaScript asset references, verifies the shell's required flex layout declarations in the emitted stylesheet, builds the CLI, runs an inspect/minify/reopen CLI smoke with source immutability, builds the desktop executable and runs the native suite (`scripts/native-suite.mjs`), and runs `git diff --check`. Every failed command exits nonzero. The Windows CI runner matches the currently supported native build.
+
+## The native suite
+
+`scripts/native-suite.mjs` launches the built executable, connects to its webview over
+WebView2's debugging port and drives the shipped window: about 40 checks covering
+start-up and the catalog, the editor and the result pane, and one end-to-end run per
+tool. It is the only layer where a package manifest meets the UI — where an option a
+manifest declares becomes a control, and a trigger policy becomes the difference
+between running as you type and waiting for a button.
+
+```powershell
+node scripts/native-suite.mjs             # every check (about a minute)
+node scripts/native-suite.mjs --smoke     # start-up subset
+node scripts/native-suite.mjs --only TL-  # by id
+```
+
+Check ids match [MANUAL_TEST_PLAN.md](MANUAL_TEST_PLAN.md), so a failure names the case
+a human would otherwise run by hand. Expected values are computed independently — node's
+crypto, an RFC constant, a second parse — never recorded from the app's own output: a
+golden taken from the thing under test proves it is stable, not that it is right.
+`apps/desktop/test-results/native-suite.json` holds the run; on CI the workflow keeps it
+with the executable's log and a screenshot when the suite fails.
 
 The gate also runs every plugin package's own tests (`plugins/*/test.mjs`, JavaScript processors on the plugin SDK) one package at a time, so a merged package cannot regress unnoticed. To run them standalone, optionally against another plugins root:
 

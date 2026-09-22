@@ -40,9 +40,10 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: native-smoke
+          name: native-suite
           path: |
-            apps/desktop/test-results/desktop-smoke.png
-            apps/desktop/test-results/desktop-smoke.log
-            apps/desktop/test-results/webview2-smoke.log
+            apps/desktop/test-results/native-suite.png
+            apps/desktop/test-results/native-suite.log
+            apps/desktop/test-results/native-suite.json
+            apps/desktop/test-results/webview2-suite.log
           if-no-files-found: ignore
