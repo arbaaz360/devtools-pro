@@ -121,8 +121,13 @@ class NativeMock {
         }
         return;
       }
-      case 'save_document':
-      case 'save_result': if (!this.documents.has(args.documentId ?? args.resultDocumentId)) throw new Error('Mock: saving missing document'); return;
+      case 'save_document': {
+        // As the host does: the tab belongs to the file it just wrote afterwards.
+        const doc = this.documents.get(args.documentId);
+        if (!doc) throw new Error('Mock: saving missing document');
+        return this.document(args.outputPath, doc.bytes, doc.format, doc.mime);
+      }
+      case 'save_result': if (!this.documents.has(args.resultDocumentId)) throw new Error('Mock: saving missing document'); return;
       default: throw new Error(`Unmocked IPC command: ${cmd}`);
     }
   }
