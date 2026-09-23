@@ -13,4 +13,10 @@ evidence, gaps and "Not covered" sections.
 | [DU-07](DU-07.md) Query String Parser / URL Parser | `web.url-parser` | 14 / 0 / 0 / 3 | None found — every Required/Acceptance row is `met`; the only non-`met` rows are legitimately presentation or out of processor scope. |
 | [DU-09](DU-09.md) Backslash Escaper/Unescaper | `text.backslash` | 14 / 0 / 0 / 1 | None found — every Required/Acceptance row is `met`. |
 | [DU-10](DU-10.md) UUID Generator/Decoder | `identity.uuid` | 24 / 1 / 0 / 3 | The operation's shared trigger config declares `inputChange` with no mode-conditional rule, so whether generate mode is actually explicit-action-only (as the card requires) versus decode's live-port detection is unproven from the manifest alone. |
+| DU-13 HTML beautify/minify | `format.html` | 14 | 0 | 1 | 4 | Cannot format embedded CSS/JS |
+| DU-14 CSS beautify/minify | `format.css` | 13 | 0 | 0 | 3 | None |
+| DU-15 JavaScript beautify/minify | `format.js` | 8 | 1 | 0 | 1 | Tokenizer misses structural syntax errors |
+| DU-16 XML beautify/minify | `format.xml` | 9 | 0 | 0 | 2 | None |
+| DU-19 Number base converter | `number.base` | 7 | 0 | 0 | 4 | None |
+| DU-20 Example string generator | `generate.examples` | 2 | 0 | 0 | 8 | None |
 | **Total** | | **126 / 5 / 10 / 24** (165 rows) | |

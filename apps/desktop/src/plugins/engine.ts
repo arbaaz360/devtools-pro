@@ -1,7 +1,7 @@
 import type { ExecutionIdentity, FileDocument, JobFinished, JobProgress, ToolManifest } from "../bridge";
 import type { WorkbenchApi } from "../workbench/controller.ts";
 import { packageTools } from "./catalog.ts";
-import { prepareOptions, primaryInput, primaryOutput, rendererFor, splitAnnotations, type EngineTool } from "./describe.ts";
+import { inputContentKind, prepareOptions, primaryInput, primaryOutput, rendererFor, splitAnnotations, type EngineTool } from "./describe.ts";
 import type { RunOutcome, RunRequest } from "./protocol.ts";
 
 /**
@@ -37,7 +37,7 @@ export class WorkerEngine {
   private jobs = new Map<string, WorkerJob>();
   private listeners = new Set<Listeners>();
   private sequence = 0;
-  constructor(private readonly host: Pick<WorkbenchApi, "readPreview" | "createTextDocument" | "closeDocument">) {}
+  constructor(private readonly host: Pick<WorkbenchApi, "readPreview" | "readBinaryPreview" | "createTextDocument" | "closeDocument">) {}
 
   /** True when a run for this tool belongs to the worker engine. */
   owns(toolId: string): boolean {
@@ -100,10 +100,12 @@ export class WorkerEngine {
     const operation = job.tool.operations.find((item) => item.id === job.operationId)!;
     const input = primaryInput(operation);
     try {
-      // A generator without a document port ignores the tab's text.
-      const text = input ? await this.readDocument(job.documentId) : "";
+      // A generator without a document port ignores the tab's text; an image port
+      // receives decoded pixels, so the processor never parses a container format.
+      const image = input && inputContentKind(input) === "image" ? await this.readImage(job.documentId) : null;
+      const text = input && !image ? await this.readDocument(job.documentId) : "";
       if (job.finished) return;
-      const bytes = new TextEncoder().encode(text);
+      const bytes = image ? image.pixels : new TextEncoder().encode(text);
       job.inputBytes = bytes.byteLength;
       const limits = {
         maxInputBytes: Number(operation.limits.maxInputBytes),
@@ -112,7 +114,9 @@ export class WorkerEngine {
         deadlineMs: Number(operation.limits.deadlineMs),
       };
       if (bytes.byteLength > limits.maxInputBytes)
-        throw new Error(`${job.tool.manifest.label} accepts at most ${Math.round(limits.maxInputBytes / 1024)} KiB per input.`);
+        throw new Error(image
+          ? `${job.tool.manifest.label} accepts images up to ${Math.round(limits.maxInputBytes / 4 / 100_000) / 10} megapixels; this one is ${image.width} by ${image.height}.`
+          : `${job.tool.manifest.label} accepts at most ${Math.round(limits.maxInputBytes / 1024)} KiB per input.`);
       const worker = new Worker(new URL("./engine.worker.ts", import.meta.url), { type: "module" });
       job.worker = worker;
       const outcome = await new Promise<RunOutcome>((resolve, reject) => {
@@ -132,6 +136,7 @@ export class WorkerEngine {
           operationId: job.operationId,
           options,
           inputs: input ? { [input.id]: bytes } : {},
+          inputInfo: image && input ? { [input.id]: { contentKind: "image", mime: image.mime, width: image.width, height: image.height } } : undefined,
           limits,
         };
         worker.postMessage(request, [bytes.buffer as ArrayBuffer]);
@@ -202,6 +207,28 @@ export class WorkerEngine {
   }
 
   /** The complete document text, page by page, the way the result reader works. */
+  /**
+   * An image input, as pixels. The host hands back a complete data URI for an image
+   * document; decoding happens here, on the main thread, so the worker stays a plain
+   * module and a package's own tests can supply pixels directly under node.
+   */
+  private async readImage(id: string): Promise<{ pixels: Uint8Array; width: number; height: number; mime: string }> {
+    const preview = await this.host.readBinaryPreview(id);
+    const binary = atob(preview.data.slice(preview.data.indexOf(",") + 1));
+    const encoded = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) encoded[index] = binary.charCodeAt(index);
+    const bitmap = await createImageBitmap(new Blob([encoded], { type: preview.mime }));
+    try {
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("This build cannot decode images.");
+      context.drawImage(bitmap, 0, 0);
+      const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      return { pixels: new Uint8Array(data.data.buffer.slice(0)), width: bitmap.width, height: bitmap.height, mime: preview.mime };
+    } finally {
+      bitmap.close();
+    }
+  }
   private async readDocument(id: string): Promise<string> {
     const first: FileDocument = await this.host.readPreview(id, 0);
     if (first.contentKind !== "text") throw new Error("Package tools accept text documents.");

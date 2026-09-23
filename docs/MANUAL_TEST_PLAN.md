@@ -149,8 +149,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 |---|---|---|
 | DOC-01 | Ctrl+N three times | Three tabs, each independently selectable; the active one is visually distinct |
 | DOC-02 | Give each tab a different tool and different text; switch between them | Each tab keeps its own text, tool, options and result. Nothing bleeds across tabs |
-| DOC-03 **[P1]** | Open `small.json` with **Open file** | A new tab opens named after the file; the document info shows the file name, its size and kind; the text is the file's content |
-| DOC-04 **[P1]** | Repeat DOC-03, then check the file's hash | The file on disk is byte-identical to before |
+| DOC-03 (suite) **[P1]** | Open `small.json` with **Open file** | A new tab opens named after the file; the document info shows the file name, its size and kind; the text is the file's content |
+| DOC-04 (suite) **[P1]** | Repeat DOC-03, then check the file's hash | The file on disk is byte-identical to before |
 | DOC-05 | Open the same file twice | Either a second tab opens or the existing tab activates — whichever happens, no tab shows stale or duplicated content |
 | DOC-06 | Open `astral.txt` | Emoji, accents, CJK and RTL text render correctly, not as boxes or mojibake |
 | DOC-07 | Open `bom.txt` | The BOM does not appear as a visible character at the start of the text; the encoding indicator still reads UTF-8 |
@@ -163,7 +163,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-14 **[P1]** | Press Ctrl+W on another dirty tab, then **Save…** | The Windows save dialog opens; saving writes the file and closes the tab. Cancelling the save dialog leaves the tab open |
 | DOC-15 | Close a clean (unmodified) tab | It closes with no prompt |
 | DOC-16 | Close the last remaining tab | The app shows the empty state (*A place for your next idea*) and stays usable |
-| DOC-17 **[P1]** | Ctrl+S on an opened file, overwrite it, confirm the overwrite prompt | The file is written; reopening it shows the saved text |
+| DOC-17 (suite) **[P1]** | Ctrl+S on an opened file, overwrite it, confirm the overwrite prompt | The file is written; reopening it shows the saved text |
 | DOC-18 | Ctrl+S, pick an existing file, then **cancel** the overwrite prompt | Nothing is written; the original file's hash is unchanged |
 | DOC-19 | Save into the folder with the space and non-ASCII name | The file is written; its name and path are correct in Explorer |
 | DOC-20 | Save over a **read-only** file | A readable error appears. The app does not crash and does not silently report success |
@@ -272,7 +272,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-05 | Expand **Operation details** | Structured detail about the run is shown; it is readable, not raw JSON with escaped quotes |
 | RES-06 **[P1]** | Press **Copy complete result**, paste into Notepad | The **entire** result is pasted, not the visible preview. Compare lengths for a large result |
 | RES-07 **[P1]** | With a large (truncated) result, click in the output, Ctrl+A, Ctrl+C, paste | You get the complete result, not the truncated preview |
-| RES-08 **[P1]** | Press **Save result**, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
+| RES-08 (suite) **[P1]** | Press **Save result**, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
 | RES-09 | Save a result over an existing file and confirm the overwrite | The file is replaced; cancelling the prompt leaves it untouched |
 | RES-10 (suite) **[P1]** | Press **Open result** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
 | RES-11 | Chain three tools with Open result (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
@@ -354,7 +354,7 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 ### TL-CSV — CSV inspector · `structured.csv` · Rust
 | # | Input | Expected |
 |---|---|---|
-| 01 | `a,b\n1,2\n3,4` | Row and column counts correct |
+| 01 (suite) | `a,b\n1,2\n3,4` | Row and column counts correct |
 | 02 | Quoted field with an embedded comma and newline | Parsed as one field |
 | 03 | Ragged rows (3 columns then 2) | Reported, not silently padded |
 | 04 | Semicolon-delimited data | Either detected or reported as one column — record the behaviour |
@@ -377,14 +377,14 @@ Options: target (camel, pascal, snake, kebab, screaming-kebab, constant), acrony
 | 03 | `my URL parser` | preserve-acronyms on vs off | `URL` is kept as a unit when on |
 | 04 | custom acronym list `AWS,GCP` with `myAWSBucket` | snake | `AWS` treated as an acronym |
 | 05 | `déjà vu` | snake | Accents preserved, not stripped |
-| 06 | `   ` | any | Neutral empty result |
+| 06 (suite) | `   ` | any | Neutral empty result |
 
 ### TL-TIME — Unix Timestamp Converter · `time.unix` · package · generator
 Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-digits (1–20, default 12). Limit 4 KiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | empty | Runs with no input and shows the current time |
+| 01 (suite) | empty | Runs with no input and shows the current time |
 | 02 (suite) | `1700000000` | Interpreted as seconds → 14 Nov 2023 UTC; local time also shown |
 | 03 | `1700000000000` | Interpreted as milliseconds (auto, by digit count) |
 | 04 | `2023-11-14T22:13:20Z` | Parsed as ISO and converted back to epoch |
@@ -398,7 +398,7 @@ Options: mode (generate, decode), version (v1, v3, v4, v5), namespace, name, cou
 | # | Steps | Expected |
 |---|---|---|
 | 01 | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
-| 02 | Generate, count 100 | 100 UUIDs, all distinct |
+| 02 (suite) | Generate, count 100 | 100 UUIDs, all distinct |
 | 03 | Run v4 generation twice | Different values each time (not seeded/repeating) |
 | 04 (suite) | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
 | 05 | v1 | Time-based, values increase across successive runs |
@@ -414,7 +414,7 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 | 01 (suite) | `hello` | encode | `aGVsbG8=` |
 | 02 (suite) | `aGVsbG8=` | decode | `hello` |
 | 03 | `~~~?>>` | encode, variant url | Uses `-` and `_`, never `+` or `/` |
-| 04 | `aGVsbG8` (no padding) | decode, padding required | Error; with padding optional, decodes |
+| 04 (suite) | `aGVsbG8` (no padding) | decode, padding required | Error; with padding optional, decodes |
 | 05 | `aGVsbG8=!!` | decode, strict vs tolerant | Strict errors; tolerant/replace documents what it does |
 | 06 | `👩‍🚀` | encode then decode | Round trip is byte-identical |
 | 07 | 2 MiB text | encode | Completes or reports the limit |
@@ -423,7 +423,7 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 | # | Input | Options | Expected |
 |---|---|---|---|
 | 01 (suite) | `https://example.com/search?q=hello world` | encode | Space becomes `%20` |
-| 02 | same | encode, form encoding (if offered) | Space becomes `+` |
+| 02 (suite) | same | encode, form encoding (if offered) | Space becomes `+` |
 | 03 | `%E2%9C%93` | decode | `✓` |
 | 04 | `%ZZ` | decode | Readable error, not a silent pass-through |
 | 05 | `a+b` | decode in both modes | Record the difference between rfc3986 and form |
@@ -433,7 +433,7 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `https://user:pw@example.com:8443/a/b?x=1&y=two&x=3#frag` | Scheme, credentials, host, port, path, query pairs (including the repeated `x`) and fragment all listed |
+| 01 (suite) | `https://user:pw@example.com:8443/a/b?x=1&y=two&x=3#frag` | Scheme, credentials, host, port, path, query pairs (including the repeated `x`) and fragment all listed |
 | 02 | same | The tree view is readable and the indent option changes the code view |
 | 03 | `not a url` | Readable error |
 | 04 | `https://例え.jp/パス` | IDN host and percent-decoded path shown correctly |
@@ -442,7 +442,7 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 ### TL-HTMLESC — HTML Escape / Unescape · `text.html` · Rust
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;…&amp;…` |
+| 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;…&amp;…` |
 | 02 | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
 | 03 | `&#x2713;` and `&#10003;` | unescape | Both give `✓` |
 | 04 | `&nosuchentity;` | unescape | Left as-is or flagged; not silently deleted |
@@ -489,7 +489,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 ### TL-BASE64IMG — Image to Base64 / Base64 to Image · `encoding.image-base64`, `encoding.base64-image` · Rust
 | # | Steps | Expected |
 |---|---|---|
-| 01 | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
+| 01 (suite) | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
 | 02 | Copy complete result → decode it | The same image comes back; visually identical |
 | 03 | Decode an invalid Base64 string | Readable error, no broken-image placeholder claiming success |
 | 04 | Decode a data URI with the wrong MIME | Either honoured or reported; not a silent mismatch |
@@ -597,14 +597,14 @@ Options (beautify): indent (space-2, space-4, tab), brace-style, preserve-newlin
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.js` | Beautify produces conventionally formatted JS |
+| 01 (suite) | `sample.js` | Beautify produces conventionally formatted JS |
 | 02 | brace-style collapse / expand / end-expand | Brace placement follows the option |
 | 03 | max-preserve-newlines 0 vs 10 | Blank-line runs collapse or survive |
 | 04 | Minify with `/*! license */` and `// note` | License comment kept (preserve-comments=license), others dropped; with `none`, all dropped |
 | 05 **[P1]** | Minify `a = b / c / d; x = /b[/]c/g; s = "/*";` | Division stays division, the regex literal survives, the string is untouched |
 | 06 **[P1]** | Minify `function f(){ return\nvalue }` and `y\n++z` | The newlines that ASI depends on are preserved |
 | 07 | Nested template literals `` `a${`b${c}`}` `` | Preserved exactly |
-| 08 | Minify then Beautify (chain with Open result) | Semantically the same code; record any difference |
+| 08 (suite) | Minify then Beautify (chain with Open result) | Semantically the same code; record any difference |
 | 09 | Unterminated string / template / comment | Documented error, readable |
 
 ### TL-SQL — SQL Formatter · `format.sql` · package
@@ -629,7 +629,7 @@ Options: wrap (none, fragment, component), component-name, indent, svg-attribute
 | 02 | wrap none / fragment / component | Bare markup, `<>…</>`, or a named component using component-name |
 | 03 | An SVG with `stroke-width`, `xlink:href` | camel → `strokeWidth`; keep leaves as written |
 | 04 | `style="color:red;font-size:12px"` | Converted to a style object |
-| 05 | Inline `<script>` or `<style>` | Handled or explicitly reported |
+| 05 (suite) | Inline `<script>` or `<style>` | Handled or explicitly reported |
 | 06 | Malformed markup | Readable error |
 
 ### TL-PREVIEW — Markdown & HTML Preview · `preview.documents` · package · auto
@@ -671,7 +671,7 @@ Options: newline (preserve, lf, crlf, ignore), context-lines (0–64).
 | 02 | Identical texts | "No differences" stated plainly |
 | 03 | context-lines 0 vs 10 | Surrounding context shrinks/grows |
 | 04 | One side CRLF, other LF, newline=ignore vs preserve | Ignore reports no difference; preserve reports every line changed |
-| 05 | `big.json` on each side, one side edited | Completes; record the time |
+| 05 (suite) | `big.json` on each side, one side edited | Completes; record the time |
 | 06 | Left empty, right filled | The footer explains the empty side; no red error |
 | 07 | Files opened into both sides | Neither file is modified (check hashes) |
 
@@ -710,7 +710,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 ### TL-EDITOR — Text editor · `editor.text`
 | # | Steps | Expected |
 |---|---|---|
-| 01 | Select the editor tool | Single-pane layout, no result pane demanded |
+| 01 (suite) | Select the editor tool | Single-pane layout, no result pane demanded |
 | 02 | Type, save, reopen | Content round-trips |
 
 ---

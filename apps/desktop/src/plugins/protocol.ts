@@ -1,4 +1,4 @@
-import type { Limits } from "../../../../packages/plugin-sdk/src/context.ts";
+import type { InputInfo, Limits } from "../../../../packages/plugin-sdk/src/context.ts";
 
 /** One run per worker: the request is posted once, the outcome comes back once. */
 export interface RunRequest {
@@ -10,6 +10,8 @@ export interface RunRequest {
   operationId: string;
   options: Record<string, unknown>;
   inputs: Record<string, Uint8Array>;
+  /** What each input's bytes are, when they are not text: pixels carry their shape. */
+  inputInfo?: Record<string, InputInfo>;
   limits: Limits;
 }
 

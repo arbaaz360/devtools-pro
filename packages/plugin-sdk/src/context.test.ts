@@ -39,3 +39,15 @@ test("memory output sink accumulates chunks written to one port", async () => {
   await assert.rejects(() => sink.write("output", new TextEncoder().encode("h"), limits), /output exceeds limit/);
   await assert.rejects(() => sink.write("other", new TextEncoder().encode("abcde"), limits), /output chunk exceeds limit/);
 });
+
+test("an image input carries its pixels and their shape", async () => {
+  // Four pixels: red, green, blue, white, as the host hands them over.
+  const pixels = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+  const reader = new MemoryReader().insertImage("photo", pixels, 2, 2, "image/png");
+  const ctx = new ProcessorContext(reader, new MemoryOutputSink(), new CancellationToken(), new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
+  assert.deepEqual(await ctx.info("photo"), { contentKind: "image", mime: "image/png", width: 2, height: 2 });
+  assert.deepEqual(await ctx.read("photo"), pixels);
+  // A port the host said nothing about is text, which is what every existing package reads.
+  const plain = new ProcessorContext(new MemoryReader().insert("input", "hello"), new MemoryOutputSink(), new CancellationToken(), new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
+  assert.deepEqual(await plain.info("input"), { contentKind: "text" });
+});
