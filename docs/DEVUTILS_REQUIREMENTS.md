@@ -149,6 +149,23 @@ Source: `uuid-generator-decoder`; images 0, 2, 3. Status: planned. Proposed tool
 
 **Acceptance:** version/variant fields, known v3/v5 vectors, duplicate deterministic batches, output count/case, invalid namespace/count, bounded batches, randomness/clock injection. Later ULID/newer UUID versions extend this baseline rather than replace v1/v3/v4/v5.
 
+## Stated divergences
+
+Where this app deliberately does not match a card, the decision is recorded
+here rather than left for the next audit to re-find as a gap.
+
+- **DU-11 and DU-25, preview permissions.** The cards offer switches for
+  scripts, navigation and remote resource loading. This app withholds all
+  three, permanently: the preview renders in a frame with every sandbox
+  permission denied, and a document you are inspecting because you do not
+  trust it must not be able to run code or call home. There is no toggle
+  because a toggle is the vulnerability. Decided 2026-09-23 on the AG-122
+  audit.
+- **DU-03, regular expression flavour.** The tester is ECMAScript, not ICU:
+  no `x` (extended) mode and no UAX-29 word boundaries. The package README
+  says so, and the tool is labelled by what it is rather than claiming a
+  flavour it does not implement.
+
 ## DU-11 — HTML Preview
 
 Source: `html-preview`; images 0, 2. Status: planned. Proposed tool: `preview.html`.
