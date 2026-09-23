@@ -970,3 +970,23 @@ test("a result save that fails keeps the result, and a chosen path is a confirme
   await h.controller.saveOutput(id);
   assert.deepEqual(h.resultSaves.map((save) => save.replace), ["confirmed"]);
 });
+
+test("a generated value stays usable after typing beside it: copy, and no released handle", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab();
+  h.controller.selectTool(id, "gen.value");
+  await waitFor(() => !!h.controller.tab(id)?.jobId, "generate to run");
+  const generated = h.register("48db5802-4b4e-41fe-b9f3-e419ede464ae");
+  h.complete(h.controller.tab(id)!.jobId!, generated);
+  await waitFor(() => h.controller.tab(id)?.phase === "success", "the value");
+
+  h.controller.edit(id, "unrelated text edit");
+  h.controller.history(id, "undo");
+  await setImmediate();
+  const tab = h.controller.tab(id)!;
+  assert.equal(tab.phase, "success", "typing beside a generator is not a new run");
+  assert.equal(tab.resultStale, false);
+  assert.ok(!h.closed.includes(generated.id), "the result's host handle is not released");
+  assert.equal(await h.controller.readResultClipboard(id), "48db5802-4b4e-41fe-b9f3-e419ede464ae");
+  assert.equal(h.runs.length, 1);
+});
