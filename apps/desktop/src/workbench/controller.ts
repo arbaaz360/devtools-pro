@@ -6,6 +6,7 @@ import type {
   JobProgress,
   ToolManifest,
   SaveSuggestion,
+  SaveReplace,
   ExecutionIdentity,
 } from "../bridge";
 import {
@@ -72,12 +73,12 @@ export interface WorkbenchApi {
   ): Promise<() => void>;
   listTools(): Promise<ToolManifest[]>;
   chooseDocumentOutput(name: string): Promise<string | null>;
-  saveDocument(id: string, path: string): Promise<void>;
+  saveDocument(id: string, path: string, replace?: SaveReplace, ownDocument?: string): Promise<void>;
   chooseResultOutput(
     document: FileDocument,
     suggestion: SaveSuggestion,
   ): Promise<string | null>;
-  saveResult(id: string, path: string): Promise<void>;
+  saveResult(id: string, path: string, replace?: SaveReplace): Promise<void>;
 }
 interface Task {
   token: RunToken;
@@ -1012,19 +1013,38 @@ export class WorkbenchController {
       void this.api.closeDocument(id).catch(() => undefined);
     }
   }
-  async save(id: string): Promise<boolean> {
+  /** The file a Save writes to without asking: the one this tab was last saved to or opened from. */
+  saveTarget(id: string): string | null {
+    const tab = this.tab(id);
+    if (!tab || tab.text === null) return null;
+    return tab.savedPath ?? (tab.source && !tab.pasted ? tab.source.path : null);
+  }
+  /**
+   * Save writes back to the tab's own file when it has one, the way an editor does;
+   * Save As (`as`), or a tab with no file yet, asks where. Every write is atomic, and
+   * the host refuses to replace a file another program changed since it was opened.
+   * A save that fails says why and leaves the tab exactly as it was.
+   */
+  async save(id: string, { as = false }: { as?: boolean } = {}): Promise<boolean> {
     const tab = this.tab(id);
     if (!tab || tab.phase === "importing" || this.saving.has(id)) return false;
     if (!this.api.native) {
       this.hooks.notify("Use the desktop app to save a document.");
       return false;
     }
+    // The file the tab was opened from; pasted text and opened results have none.
+    const own = tab.source && !tab.pasted ? tab.source : null;
+    const target = as ? null : this.saveTarget(id);
+    if (target && !tab.dirty) {
+      this.hooks.notify("No changes to save.");
+      return true;
+    }
     this.saving.add(id);
     let snapshot: FileDocument | undefined;
     try {
-      const path = await this.api.chooseDocumentOutput(
-        tab.savedPath ?? tab.name,
-      );
+      const path =
+        target ??
+        (await this.api.chooseDocumentOutput(tab.savedPath ?? own?.path ?? tab.name));
       if (!path) return false;
       let doc = tab.source;
       if (tab.text !== null) {
@@ -1036,12 +1056,13 @@ export class WorkbenchController {
         doc = snapshot;
       }
       if (!doc) throw new Error("There is no document to save.");
-      await this.api.saveDocument(doc.id, path);
+      await this.api.saveDocument(doc.id, path, target ? "inPlace" : "confirmed", own?.id);
       this.dispatch({ type: "saved", id, text: tab.text, path });
       this.hooks.notify(`Saved ${path}`);
       return true;
     } catch (error) {
-      this.dispatch({ type: "error", id, message: errorText(error) });
+      // A failed save is not a failed tool run: the result and the edits stay.
+      this.hooks.notify(`Not saved: ${errorText(error)}`);
       return false;
     } finally {
       if (snapshot) this.retire(snapshot.id);
@@ -1078,10 +1099,12 @@ export class WorkbenchController {
         );
         return;
       }
-      await this.api.saveResult(resultId, path);
+      // The dialog asked before replacing an existing file, so a chosen path is confirmed.
+      await this.api.saveResult(resultId, path, "confirmed");
       this.hooks.notify(`Saved result: ${path}`);
     } catch (error) {
-      this.dispatch({ type: "error", id, message: errorText(error) });
+      // Keep the result: the save failed, not the tool, and the user may want to try elsewhere.
+      this.hooks.notify(`Result not saved: ${errorText(error)}`);
     } finally {
       this.savingResults.delete(resultId);
       this.cleanup();

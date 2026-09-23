@@ -160,14 +160,14 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-11 **[P1]** | Type in a tab, then press Ctrl+W | The *Save your changes?* dialog appears with Cancel / Discard / Save… |
 | DOC-12 **[P1]** | In that dialog press **Cancel** | The tab stays open with its text intact |
 | DOC-13 **[P1]** | Press Ctrl+W again, then **Discard** | The tab closes; no file was written |
-| DOC-14 **[P1]** | Press Ctrl+W on another dirty tab, then **Save…** | The Windows save dialog opens; saving writes the file and closes the tab. Cancelling the save dialog leaves the tab open |
+| DOC-14 **[P1]** | Press Ctrl+W on another dirty tab, then **Save…** | An untitled tab opens the Windows save dialog; saving writes the file and closes the tab, and cancelling the dialog leaves it open. A tab opened from a file is written back to that file and closes |
 | DOC-15 | Close a clean (unmodified) tab | It closes with no prompt |
 | DOC-16 | Close the last remaining tab | The app shows the empty state (*A place for your next idea*) and stays usable |
-| DOC-17 (suite) **[P1]** | Ctrl+S on an opened file, overwrite it, confirm the overwrite prompt | The file is written; reopening it shows the saved text |
-| DOC-18 | Ctrl+S, pick an existing file, then **cancel** the overwrite prompt | Nothing is written; the original file's hash is unchanged |
+| DOC-17 (suite) **[P1]** | Open a file, edit it, press Ctrl+S | No dialog: the file is written back in place, and the button reads **Save**. Reopening it shows the saved text |
+| DOC-18 | Ctrl+Shift+S (**Save as**), pick an existing file, then **cancel** Windows' *replace?* prompt | Nothing is written; the original file's hash is unchanged. Confirming instead replaces it |
 | DOC-19 | Save into the folder with the space and non-ASCII name | The file is written; its name and path are correct in Explorer |
-| DOC-20 | Save over a **read-only** file | A readable error appears. The app does not crash and does not silently report success |
-| DOC-21 | Open a file, delete it in Explorer, then Ctrl+S | A readable error or a save-as prompt. No crash, no silent loss |
+| DOC-20 (suite) | Open a **read-only** file, edit it, press Ctrl+S | *Not saved: … read-only …* in the status line. The file is unchanged, and the edits (and any result) stay, still marked unsaved |
+| DOC-21 | Open a file, delete it in Explorer, then Ctrl+S | Refused: *moved or deleted … Use Save As*. The edits stay; Ctrl+Shift+S saves them |
 | DOC-22 | Open a file from a removable drive, remove the drive, then Ctrl+S | Readable error; no hang longer than ~10 s |
 | DOC-23 | Open 10 tabs | The tab strip scrolls or condenses; every tab remains reachable and closable |
 | DOC-24 | With many tabs open, close one in the middle | Focus moves to a sensible neighbour, not to a random tab or nothing |
@@ -176,6 +176,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-27 **[P1]** | Type in a tab so it is dirty, then drag a file onto the window | The dirty tab is **not** replaced; the dropped file opens in its own tab |
 | DOC-28 | Drag several files at once | Either all open as tabs or only the first does, with no error dialog spam and no lost tabs |
 | DOC-29 | Drag a folder onto the window | Graceful refusal; no crash |
+| DOC-30 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
+| DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
 | DOC-30 | Drag a file over the window and drag it back out without dropping | The drop highlight appears and then clears; no tab is created |
 
 ---
@@ -273,7 +275,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-06 **[P1]** | Press **Copy complete result**, paste into Notepad | The **entire** result is pasted, not the visible preview. Compare lengths for a large result |
 | RES-07 **[P1]** | With a large (truncated) result, click in the output, Ctrl+A, Ctrl+C, paste | You get the complete result, not the truncated preview |
 | RES-08 (suite) **[P1]** | Press **Save result**, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
-| RES-09 | Save a result over an existing file and confirm the overwrite | The file is replaced; cancelling the prompt leaves it untouched |
+| RES-09 (suite) | Save a result over an existing file and confirm the overwrite | The file is replaced; cancelling the prompt leaves it untouched. A result can never be saved over a file open in a tab, including its own source |
 | RES-10 (suite) **[P1]** | Press **Open result** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
 | RES-11 | Chain three tools with Open result (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
 | RES-12 (suite) | Press **Hide result**, then **Show result** | The result pane collapses and returns, with the result intact |
@@ -296,9 +298,9 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-28 | Produce a result larger than the result limit | A message naming the limit appears. Copy/Save either work on the complete payload or are clearly disabled |
 | RES-29 | Run a tool that produces no output for empty input | A neutral empty state, not a success claim and not an error, unless the tool documents empty as an error (QR does) |
 | RES-30 | Switch tabs while a result is displayed | Each tab shows its own result immediately; no flash of another tab's result |
+| RES-31 (suite) | Run **CSS → Beautify**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
 | RES-32 (suite) **[P1]** | Run **QR Code**, press **Copy image**, paste into Paint or a chat box, and scan the pasted code with a phone | A sharp QR picture pastes (not SVG text), and it scans to the input. **Copy SVG** still copies the markup |
 | RES-33 (suite) | Run **Base64 to Image** on a PNG, press **Copy image**, paste into Paint | The same picture, same size, same colours |
-| RES-31 (suite) | Run **CSS → Beautify**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
 
 ---
 

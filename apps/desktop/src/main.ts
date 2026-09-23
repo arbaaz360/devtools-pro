@@ -1253,6 +1253,13 @@ function render() {
   $("#preview-limit").hidden = sourceError;
   const save = $("#save-document") as HTMLButtonElement;
   save.disabled = !tab || tab.phase === "importing";
+  // The button says whether it will ask: a tab with a file saves straight to it.
+  const target = tab ? controller.saveTarget(tab.id) : null;
+  const saveLabel = target ? "Save" : "Save as…";
+  if (save.textContent?.trim() !== saveLabel) save.textContent = saveLabel;
+  save.title = target
+    ? `Save to ${target.split(/[\\/]/).pop()} (Ctrl+S) · Save as: Ctrl+Shift+S`
+    : "Save as (Ctrl+S)";
   jobIndicator.update(tab && (tab.phase === "queued" || tab.phase === "running")
     ? `${tab.id}:${tab.generation}` : null);
   if (tab) {
@@ -1297,6 +1304,12 @@ function commands() {
   const actions = [
     { label: "New document", run: () => controller.newDocument() },
     { label: "Open file", run: () => void controller.chooseFile() },
+    ...(state.activeId
+      ? [
+          { label: "Save", run: () => void controller.save(state.activeId!) },
+          { label: "Save as…", run: () => void controller.save(state.activeId!, { as: true }) },
+        ]
+      : []),
     ...state.tabs.flatMap((tab) =>
       controller.availableTools()
         .filter((tool) => tool.id !== "editor.text")
@@ -1655,7 +1668,7 @@ document.addEventListener("keydown", (event) => {
     event.key.toLowerCase() === "s"
   ) {
     event.preventDefault();
-    if (state.activeId) void controller.save(state.activeId);
+    if (state.activeId) void controller.save(state.activeId, { as: event.shiftKey });
   } else if (
     (event.ctrlKey || event.metaKey) &&
     event.key.toLowerCase() === "k"

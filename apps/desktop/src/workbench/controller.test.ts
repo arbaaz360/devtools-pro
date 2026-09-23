@@ -52,9 +52,18 @@ async function harness(t: TestContext) {
   const runs: { id: string; tool: string; operation: string; bytes: number; jobId: string }[] = [];
   const closed: string[] = [];
   const notices: string[] = [];
+  const dialogs: string[] = [];
+  const saves: { id: string; path: string; replace?: string; own?: string }[] = [];
+  const resultSaves: { id: string; path: string; replace?: string }[] = [];
   const effects: {
     create?: WorkbenchApi["createTextDocument"];
     read?: WorkbenchApi["readPreview"];
+    /** What the save dialog returns; null is Cancel. */
+    chooseDocument?: (name: string) => string | null;
+    chooseResult?: () => string | null;
+    /** Throw to make the host refuse the write. */
+    saveDocument?: () => void;
+    saveResult?: () => void;
   } = {};
 
   function page(id: string, offset = 0): FileDocument {
@@ -147,10 +156,19 @@ async function harness(t: TestContext) {
       },
       manifest("text.compare", "compare"),
     ],
-    chooseDocumentOutput: async () => null,
-    saveDocument: async () => undefined,
-    chooseResultOutput: async () => null,
-    saveResult: async () => undefined,
+    chooseDocumentOutput: async (name) => {
+      dialogs.push(name);
+      return effects.chooseDocument ? effects.chooseDocument(name) : null;
+    },
+    saveDocument: async (id, path, replace, own) => {
+      effects.saveDocument?.();
+      saves.push({ id, path, replace, own });
+    },
+    chooseResultOutput: async () => (effects.chooseResult ? effects.chooseResult() : null),
+    saveResult: async (id, path, replace) => {
+      effects.saveResult?.();
+      resultSaves.push({ id, path, replace });
+    },
   };
   const controller = new WorkbenchController(api, {
     changed: () => undefined,
@@ -189,7 +207,7 @@ async function harness(t: TestContext) {
     await waitFor(() => controller.tab(id)?.phase === "success", "source result to become current");
     return { id, result };
   }
-  return { controller, effects, register, page, newTab, resultTab, complete, documents, creates, reads, runs, closed, notices };
+  return { controller, effects, register, page, newTab, resultTab, complete, documents, creates, reads, runs, closed, notices, dialogs, saves, resultSaves };
 }
 
 test("copy complete paged Base64 then replace a 64 KiB fragment and decode the full host handle", async (t) => {
@@ -778,4 +796,108 @@ test("a tool that follows the document is updating after an edit, until the docu
   await setImmediate();
   assert.equal(h.runs.length, 2);
   assert.equal(h.controller.tab(id)!.resultOutdated, true);
+});
+
+/** Open a mock file the way Open does, and return its tab. */
+async function openedFile(h: Awaited<ReturnType<typeof harness>>, text: string, name = "notes.txt") {
+  const document = h.register(text, { path: `/mock/${name}`, name });
+  await h.controller.openPath(document.path);
+  const id = h.controller.state.activeId!;
+  await waitFor(() => h.controller.tab(id)?.text === text, "the opened file to become editable text");
+  return { id, document };
+}
+
+test("Save writes back to the file a tab was opened from, without asking", async (t) => {
+  const h = await harness(t);
+  const { id, document } = await openedFile(h, "first draft");
+  h.controller.edit(id, "second draft");
+  assert.equal(await h.controller.save(id), true);
+  assert.deepEqual(h.dialogs, [], "a tab with a file does not ask where");
+  assert.equal(h.saves.length, 1);
+  assert.equal(h.saves[0]!.path, document.path);
+  assert.equal(h.saves[0]!.replace, "inPlace", "so the host checks nothing else changed the file");
+  assert.equal(h.saves[0]!.own, document.id, "the one open file this save may land on");
+  assert.equal(h.controller.tab(id)!.dirty, false);
+});
+
+test("an untitled tab asks once, then saves to what was chosen", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("draft");
+  h.effects.chooseDocument = () => "C:/work/draft.txt";
+  assert.equal(await h.controller.save(id), true);
+  assert.equal(h.dialogs.length, 1);
+  assert.equal(h.saves[0]!.replace, "confirmed", "the dialog asked before replacing");
+  assert.equal(h.controller.tab(id)!.name, "draft.txt");
+
+  h.controller.edit(id, "draft, revised");
+  assert.equal(await h.controller.save(id), true);
+  assert.equal(h.dialogs.length, 1, "the second save does not ask again");
+  assert.deepEqual(h.saves.map((save) => [save.path, save.replace]), [
+    ["C:/work/draft.txt", "confirmed"],
+    ["C:/work/draft.txt", "inPlace"],
+  ]);
+});
+
+test("Save As asks even when the tab has a file, starting from that file", async (t) => {
+  const h = await harness(t);
+  const { id, document } = await openedFile(h, "original");
+  h.controller.edit(id, "a copy");
+  h.effects.chooseDocument = () => "C:/work/copy.txt";
+  assert.equal(await h.controller.save(id, { as: true }), true);
+  assert.deepEqual(h.dialogs, [document.path]);
+  assert.equal(h.saves[0]!.replace, "confirmed");
+  assert.equal(h.controller.saveTarget(id), "C:/work/copy.txt", "later saves follow the copy");
+});
+
+test("a failed save keeps the edits and the result, and says why", async (t) => {
+  const h = await harness(t);
+  const { id } = await openedFile(h, "hello");
+  h.controller.selectTool(id, "format.live");
+  await waitFor(() => !!h.controller.tab(id)?.jobId, "a run");
+  h.complete(h.controller.tab(id)!.jobId!, h.register("HELLO"));
+  await waitFor(() => h.controller.tab(id)?.phase === "success", "the result");
+  h.controller.edit(id, "hello, edited");
+  await waitFor(() => !!h.controller.tab(id)?.jobId, "the edit's run");
+  h.complete(h.controller.tab(id)!.jobId!, h.register("HELLO, EDITED"));
+  await waitFor(() => h.controller.tab(id)?.phase === "success", "the edit's result");
+
+  h.effects.saveDocument = () => { throw new Error("The file could not be replaced: it is read-only."); };
+  assert.equal(await h.controller.save(id), false);
+  const tab = h.controller.tab(id)!;
+  assert.equal(tab.phase, "success", "the tool did not fail");
+  assert.ok(tab.result, "its result is still there");
+  assert.equal(tab.error, null);
+  assert.equal(tab.dirty, true, "the edits are still unsaved, and still there");
+  assert.equal(tab.text, "hello, edited");
+  assert.match(h.notices.at(-1) ?? "", /^Not saved: The file could not be replaced: it is read-only/);
+});
+
+test("Save on an unchanged file writes nothing, and a cancelled dialog changes nothing", async (t) => {
+  const h = await harness(t);
+  const { id } = await openedFile(h, "as it was");
+  assert.equal(await h.controller.save(id), true);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.notices.at(-1), "No changes to save.");
+
+  const untitled = h.newTab("unsaved");
+  h.effects.chooseDocument = () => null;
+  assert.equal(await h.controller.save(untitled), false);
+  assert.equal(h.saves.length, 0);
+  assert.equal(h.controller.tab(untitled)!.dirty, true);
+  assert.equal(h.controller.tab(untitled)!.savedPath, null);
+});
+
+test("a result save that fails keeps the result, and a chosen path is a confirmed replace", async (t) => {
+  const h = await harness(t);
+  const { id } = await h.resultTab("computed", {}, true);
+  h.effects.chooseResult = () => "C:/work/result.txt";
+  h.effects.saveResult = () => { throw new Error("The destination folder does not exist."); };
+  await h.controller.saveOutput(id);
+  assert.ok(h.controller.tab(id)!.result, "the result survives a failed save");
+  assert.equal(h.controller.tab(id)!.phase, "success");
+  assert.match(h.notices.at(-1) ?? "", /^Result not saved: The destination folder does not exist/);
+
+  h.effects.saveResult = undefined;
+  await h.controller.saveOutput(id);
+  assert.deepEqual(h.resultSaves.map((save) => save.replace), ["confirmed"]);
 });
