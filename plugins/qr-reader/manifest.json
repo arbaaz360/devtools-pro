@@ -1,0 +1,47 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "media.qr-reader",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "QR Code Reader",
+  "description": "Reads a QR code out of an image and reports its decoded text.",
+  "tools": [{
+    "id": "media.qr-reader",
+    "title": "QR Code Reader",
+    "category": "converter",
+    "description": "Reads a QR code out of an image and reports its decoded text.",
+    "searchAliases": ["qr", "qrcode", "reader", "scan", "decode", "barcode"],
+    "operationIds": ["media.qr-reader"],
+    "workspaceId": "qr-reader"
+  }],
+  "operations": [
+    {
+      "id": "media.qr-reader",
+      "title": "Read QR Code",
+      "executor": { "kind": "javascriptWorker", "id": "media.qr-reader.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
+      "inputs": [{ "id": "input", "label": "Image", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["image"], "mime": ["image/png", "image/jpeg", "image/webp"] }],
+      "outputs": [{ "id": "output", "label": "Decoded Text", "kind": "value", "multiplicity": "one", "mime": ["text/plain"], "representations": ["text", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "options": [
+        { "id": "invert", "type": "boolean", "label": "Invert", "default": false, "persistence": "instance", "sensitive": false },
+        { "id": "try-harder", "type": "boolean", "label": "Try Harder", "default": true, "persistence": "instance", "sensitive": false }
+      ],
+      "trigger": { "modes": ["explicit"], "debounceMs": "0" },
+      "limits": { "maxInputBytes": "67108864", "maxOutputBytes": "65536", "maxChunkBytes": "65536", "deadlineMs": "5000" }
+    }
+  ],
+  "workspaces": [{
+    "id": "qr-reader",
+    "kind": "transform",
+    "bindings": [
+      { "id": "source", "component": "image", "inputPort": "input" },
+      { "id": "settings", "component": "form", "optionIds": ["invert", "try-harder"] },
+      { "id": "result", "component": "output", "outputPort": "output" }
+    ],
+    "commands": [],
+    "presentationSettings": []
+  }],
+  "capabilities": [],
+  "settings": [],
+  "tests": { "requirementIds": ["DU-21"], "fixtures": [], "uiScenarios": [] }
+}
