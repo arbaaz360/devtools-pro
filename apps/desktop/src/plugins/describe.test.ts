@@ -49,11 +49,12 @@ test("numeric option defaults are numbers and run options are filtered to the de
 });
 
 test("an operation with no document input is still engine-runnable; two inputs are not", () => {
-  const manifest = load("uuid");
-  const generate = manifest.operations[0]!;
-  assert.equal(engineRunnable({ ...generate, inputs: [] }), true);
-  assert.equal(engineRunnable({ ...generate, inputs: [...generate.inputs, { ...generate.inputs[0]!, id: "second" }] }), false);
-  assert.equal(engineRunnable({ ...generate, executor: { ...generate.executor, kind: "rust" } }), false);
+  const operation = load("uuid").operations.find((candidate) => candidate.inputs.length === 1);
+  assert.ok(operation);
+  const input = operation.inputs[0]!;
+  assert.equal(engineRunnable({ ...operation, inputs: [] }), true);
+  assert.equal(engineRunnable({ ...operation, inputs: [input, { ...input, id: "second" }] }), false);
+  assert.equal(engineRunnable({ ...operation, executor: { ...operation.executor, kind: "rust" } }), false);
 });
 
 test("annotations are lifted out of a result value, validated and capped", async () => {
