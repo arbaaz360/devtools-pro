@@ -34,6 +34,11 @@ a debug host as `DEVTOOLS_TEST_PROFILE`. The debug build shares its identifier w
 installed app, so the default folder, `%LOCALAPPDATA%\com.thedevtoolspro.workbench`, is
 the installed copy's profile; the suite used to clear it, and no longer touches it.
 
+`scripts/check-plan-coverage.mjs` runs first in the gate and keeps the manual plan honest
+about the suite: every case marked `(suite)` in `docs/MANUAL_TEST_PLAN.md` has a native
+check of that id, every check names a case, and a case with a check is marked. The
+independent review found 31 of 85 marks with nothing behind them.
+
 The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
 then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
 things a script cannot do for itself: open a path directly, and name the file a dialog
