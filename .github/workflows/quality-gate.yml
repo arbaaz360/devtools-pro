@@ -47,3 +47,48 @@ jobs:
             apps/desktop/test-results/native-suite.json
             apps/desktop/test-results/webview2-suite.log
           if-no-files-found: ignore
+
+  release-smoke:
+    # What only a release build has — the embedded bundle, the custom protocol and the
+    # CSP as shipped — checked in a release window (scripts/release-smoke.mjs). The
+    # build differs from the installer only by the smoke-hooks feature, which adds a
+    # debugging port. Runs beside verify, not after it.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - name: Install desktop dependencies
+        run: pnpm --dir apps/desktop install --frozen-lockfile
+      - name: Ensure the WebView2 runtime for the release window
+        shell: pwsh
+        run: |
+          $key = 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
+          if (Test-Path $key) { Write-Host "WebView2 runtime present: $((Get-ItemProperty $key).pv)"; exit 0 }
+          Write-Host 'WebView2 runtime missing; installing the Evergreen runtime'
+          Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$env:TEMP\MicrosoftEdgeWebview2Setup.exe"
+          Start-Process -FilePath "$env:TEMP\MicrosoftEdgeWebview2Setup.exe" -ArgumentList '/silent','/install' -Wait
+          if (Test-Path $key) { Write-Host "WebView2 runtime installed: $((Get-ItemProperty $key).pv)" } else { Write-Warning 'WebView2 runtime still not registered' }
+      - name: Build the desktop bundle
+        run: pnpm --dir apps/desktop build
+      - name: Build a release window
+        run: cargo build -p devtools-desktop --release --features custom-protocol,smoke-hooks
+      - name: Run the release smoke
+        run: node scripts/release-smoke.mjs
+      - name: Keep release smoke evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke
+          path: |
+            apps/desktop/test-results/release-smoke.json
+            apps/desktop/test-results/native-suite.log
+            apps/desktop/test-results/webview2-suite.log
+          if-no-files-found: ignore

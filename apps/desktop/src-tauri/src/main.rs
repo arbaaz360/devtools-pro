@@ -1058,13 +1058,13 @@ fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
     // The debug build shares its identifier with the installed app, so by default both
     // keep their WebView2 profile in the same folder. A test run starts from a clean
     // profile; this points it at one of its own rather than at the user's.
-    #[cfg(debug_assertions)]
+    #[cfg(any(debug_assertions, feature = "smoke-hooks"))]
     if let Ok(profile) = std::env::var("DEVTOOLS_TEST_PROFILE") {
         if !profile.trim().is_empty() {
             builder = builder.data_directory(std::path::PathBuf::from(profile.trim()));
         }
     }
-    #[cfg(all(debug_assertions, windows))]
+    #[cfg(all(any(debug_assertions, feature = "smoke-hooks"), windows))]
     if let Ok(extra) = std::env::var("DEVTOOLS_SMOKE_BROWSER_ARGS") {
         if !extra.trim().is_empty() {
             builder = builder.additional_browser_args(&format!("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection {}", extra.trim()));
