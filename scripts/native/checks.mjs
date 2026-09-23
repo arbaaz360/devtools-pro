@@ -58,6 +58,8 @@ const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
  * action's.
  */
 const clearStatus = (driver) => driver.page.evaluate(() => { document.querySelector("#status").textContent = ""; });
+/** The next message in the status line, whatever it says. Call clearStatus before acting. */
+const nextStatus = (driver) => driver.until(async () => (await driver.page.locator("#status").innerText()).trim() || null);
 /** The status line once it starts with `prefix`, or null. Call clearStatus before acting. */
 const statusStarting = (driver, prefix) => driver.until(async () => {
   const text = (await driver.page.locator("#status").innerText()).trim();
@@ -433,6 +435,55 @@ export const checks = [
     },
   },
   {
+    // AST-006: a file the tab saved, not opened, is guarded like one it opened. Another
+    // program changes it; the next Ctrl+S must refuse, and that program's text survive.
+    id: "DOC-33",
+    async run({ driver, page }) {
+      const file = freshFile("saved-then-changed.txt");
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("first saved text\n");
+      await driver.presetDialogPaths([file]);
+      await page.locator("#preview").press("Control+s");
+      if (!(await driver.until(() => read(file) === "first saved text\n"))) return verdict(false, `the first save did not land: ${JSON.stringify(read(file))}`);
+      writeFileSync(file, "EXTERNAL EDIT, MUST SURVIVE\n");
+      await driver.setInput("edited inside app\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      return verdict(/changed on disk/.test(status ?? "") && read(file) === "EXTERNAL EDIT, MUST SURVIVE\n",
+        `status "${status}"; the file holds ${JSON.stringify(read(file))}`);
+    },
+  },
+  {
+    // AST-006: after Save As A -> B the tab is B's. B is guarded, and A opens as itself.
+    id: "DOC-34",
+    async run({ driver, page }) {
+      const a = freshFile("save-as-source.txt", "contents of A\n");
+      const b = freshFile("save-as-target.txt");
+      await driver.openPath(a);
+      await driver.setInput("contents for B\n");
+      await driver.presetDialogPaths([b]);
+      await page.locator("#preview").press("Control+Shift+s");
+      if (!(await driver.until(() => read(b) === "contents for B\n"))) return verdict(false, `Save As did not land: ${JSON.stringify(read(b))}`);
+      writeFileSync(b, "EXTERNAL EDIT OF B\n");
+      await driver.setInput("more edits\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      const guarded = /changed on disk/.test(status ?? "") && read(b) === "EXTERNAL EDIT OF B\n";
+      let shown = null;
+      try {
+        await driver.openPath(a);
+        shown = await page.locator("#preview").inputValue();
+      } catch (error) {
+        shown = `(${error.message})`;
+      }
+      return verdict(guarded && shown === "contents of A\n" && read(a) === "contents of A\n",
+        `B: status "${status}", holds ${JSON.stringify(read(b))}; opening A shows ${JSON.stringify(shown)}`);
+    },
+  },
+  {
     // A saved result keeps the extension its type implies, and the whole payload.
     id: "RES-08",
     async run({ driver, page }) {
@@ -650,6 +701,42 @@ export const checks = [
     },
   },
   {
+    // AST-020: every document tab is reachable from the keyboard. Real key presses; the
+    // expectation is the WAI-ARIA tabs pattern, not whatever the strip happens to do.
+    id: "A11Y-10",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      // Three documents at least, whatever the run started with.
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const state = () => page.evaluate(() => {
+        const tabs = [...document.querySelectorAll("#tabs .tab")];
+        return {
+          active: tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
+          focused: tabs.indexOf(document.activeElement),
+          count: tabs.length,
+        };
+      });
+      const start = await state();
+      await page.locator("#tabs .tab[aria-selected=true]").focus();
+      const steps = [];
+      for (const key of ["ArrowLeft", "ArrowLeft", "End", "Home", "ArrowRight"]) {
+        await page.keyboard.press(key);
+        steps.push([key, await state()]);
+      }
+      // From the editor: Ctrl+Tab moves to the next tab and leaves focus in the editor.
+      await page.locator("#preview").focus();
+      const before = (await state()).active;
+      await page.keyboard.press("Control+Tab");
+      const after = await state();
+      const n = start.count, last = n - 1;
+      const expected = [last - 1, last - 2, last, 0, 1];
+      const moved = steps.every(([, s], i) => s.active === expected[i] && s.focused === expected[i]);
+      const ctrlTab = after.active === (before + 1) % n && after.focused === -1;
+      return verdict(n >= 3 && start.active === last && moved && ctrlTab,
+        `${n} tabs; ${steps.map(([k, s]) => `${k}->${s.active}${s.focused === s.active ? "" : `(focus ${s.focused})`}`).join(", ")}; Ctrl+Tab ${before}->${after.active}`);
+    },
+  },
+  {
     id: "TL-NUMBASE-01",
     async run({ driver }) {
       // Exercises the option controls too: the defaults would answer this one by accident.
@@ -735,6 +822,19 @@ export const checks = [
       }, { timeout: 2500 });
       if (disturbed) return verdict(false, `typing beside Generate changed the result to "${disturbed.state}" (error "${disturbed.error}")`);
       if (!(await page.locator("#copy-result").isVisible())) return verdict(false, "typing beside Generate hid Copy on the value it generated");
+      // AST-013: a visible button is not a working one. Press it, and read what reached
+      // the system clipboard through .NET; then open the value as a tab.
+      clearClipboard();
+      await clearStatus(driver);
+      await page.locator("#copy-result").click();
+      const copied = await driver.until(() => clipboardShell("[System.Windows.Forms.Clipboard]::GetText()") || null, { timeout: 6000, step: 300 });
+      if (copied?.trim() !== first) return verdict(false, `Copy after typing put ${JSON.stringify(copied)} on the clipboard (status "${(await page.locator("#status").innerText()).trim()}"); the value was ${first}`);
+      const tabs = await page.locator(".tab-wrap").count();
+      await page.locator("#open-result").click();
+      const opened = await driver.until(async () => (await page.locator(".tab-wrap").count()) > tabs);
+      const openedText = opened ? (await page.locator("#preview").inputValue()).trim() : null;
+      if (openedText !== first) return verdict(false, `Open as tab after typing gave ${JSON.stringify(openedText)}; the value was ${first}`);
+      await page.locator(".tab-wrap").nth(tabs - 1).locator(".tab-button, button").first().click();
       await driver.runOperation("Generate");
       const next = await driver.settle(undefined, { changedFrom: generated.signature });
       const value = next.output.trim();

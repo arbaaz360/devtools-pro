@@ -75,7 +75,7 @@ export interface WorkbenchApi {
   ): Promise<() => void>;
   listTools(): Promise<ToolManifest[]>;
   chooseDocumentOutput(name: string): Promise<string | null>;
-  saveDocument(id: string, path: string, replace?: SaveReplace, ownDocument?: string): Promise<void>;
+  saveDocument(id: string, path: string, replace?: SaveReplace, ownDocument?: string): Promise<FileDocument>;
   chooseResultOutput(
     document: FileDocument,
     suggestion: SaveSuggestion,
@@ -139,6 +139,8 @@ export const isBinaryResult = (event: JobFinished) =>
   event.renderer === "binary" || (!!event.resultMime?.startsWith("image/") && event.renderer !== "svg");
 
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
+/** A path as a person writes it: without the `\\?\` prefix Windows gives a canonical one. */
+const displayPath = (path: string): string => (path.startsWith("\\\\?\\") ? path.slice(4) : path);
 /** The last segment of a Windows or POSIX path. */
 const baseName = (path: string): string => path.split(/[\\/]/).pop() || path;
 
@@ -682,9 +684,24 @@ export class WorkbenchController {
       this.hooks.changed(this.state);
       return;
     }
+    if (this.editLeavesResult(id)) {
+      this.dispatch({ type: "edit", id, text, keepsResult: true });
+      return;
+    }
     this.invalidate(id);
     this.dispatch({ type: "edit", id, text });
     this.schedule(id);
+  }
+  /**
+   * An edit to a document the active operation never reads (Generate has no input)
+   * changes nothing about its result: the value, its host handle and any run in
+   * flight all stay, so Copy, Save and Open as tab keep working. Anything else that
+   * reads the document is invalidated as usual.
+   */
+  private editLeavesResult(id: string): boolean {
+    const tab = this.tab(id);
+    const tool = tab && this.toolDefinition(tab.toolId);
+    return !!tab && !!tool && !readsDocument(tool, tab.operation);
   }
   /** Paste is an explicit input transaction. Large input goes straight to an
    * immutable host snapshot, with only a bounded preview retained by the tab. */
@@ -770,6 +787,10 @@ export class WorkbenchController {
     }
   }
   history(id: string, type: "undo" | "redo") {
+    if (this.editLeavesResult(id)) {
+      this.dispatch({ type, id, keepsResult: true });
+      return;
+    }
     this.invalidate(id);
     this.dispatch({ type, id });
     this.schedule(id);
@@ -1126,9 +1147,13 @@ export class WorkbenchController {
         doc = snapshot;
       }
       if (!doc) throw new Error("There is no document to save.");
-      await this.api.saveDocument(doc.id, path, target ? "inPlace" : "confirmed", own?.id);
-      this.dispatch({ type: "saved", id, text: tab.text, path });
-      this.hooks.notify(`Saved ${path}`);
+      const saved = await this.api.saveDocument(doc.id, path, target ? "inPlace" : "confirmed", own?.id);
+      // The tab now belongs to the file it wrote. Adopting that document is what lets
+      // the next Save check the file for outside changes, and lets the file it came
+      // from be opened again as itself rather than finding this tab.
+      this.dispatch({ type: "saved", id, text: tab.text, path: saved.path, source: saved });
+      if (tab.source && tab.source.id !== saved.id) this.retire(tab.source.id);
+      this.hooks.notify(`Saved ${displayPath(saved.path)}`);
       return true;
     } catch (error) {
       // A failed save is not a failed tool run: the result and the edits stay.

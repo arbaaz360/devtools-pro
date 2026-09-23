@@ -34,11 +34,6 @@ a debug host as `DEVTOOLS_TEST_PROFILE`. The debug build shares its identifier w
 installed app, so the default folder, `%LOCALAPPDATA%\com.thedevtoolspro.workbench`, is
 the installed copy's profile; the suite used to clear it, and no longer touches it.
 
-`scripts/check-plan-coverage.mjs` runs first in the gate and keeps the manual plan honest
-about the suite: every case marked `(suite)` in `docs/MANUAL_TEST_PLAN.md` has a native
-check of that id, every check names a case, and a case with a check is marked. The
-independent review found 31 of 85 marks with nothing behind them.
-
 The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
 then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
 things a script cannot do for itself: open a path directly, and name the file a dialog
@@ -53,6 +48,11 @@ crypto, an RFC constant, a second parse — never recorded from the app's own ou
 golden taken from the thing under test proves it is stable, not that it is right.
 `apps/desktop/test-results/native-suite.json` holds the run; on CI the workflow keeps it
 with the executable's log and a screenshot when the suite fails.
+
+`scripts/check-plan-coverage.mjs` runs first in the gate and keeps the manual plan honest
+about the suite: every case marked `(suite)` in `docs/MANUAL_TEST_PLAN.md` has a native
+check of that id, every check names a case, and a case with a check is marked. The
+independent review found 31 of 85 marks with nothing behind them.
 
 The gate also runs every plugin package's own tests (`plugins/*/test.mjs`, JavaScript processors on the plugin SDK) one package at a time, so a merged package cannot regress unnoticed. To run them standalone, optionally against another plugins root:
 
@@ -72,6 +72,35 @@ pnpm --dir apps/desktop tauri build --debug --no-bundle
 ```
 
 The Cargo workspace executable is produced at `target/debug/devtools-desktop.exe` on Windows. For an iterative native preview, run `pnpm tauri dev` from `apps/desktop`.
+
+## The release smoke
+
+The native suite drives a **debug** build: it loads its bundle from a dev server, with
+no CSP, and exposes test hooks. What only a release build has — the embedded bundle,
+the custom protocol, the CSP from `tauri.conf.json` — is checked separately, in a
+release window, by `scripts/release-smoke.mjs` (the `release-smoke` job, beside
+`verify`):
+
+| Check | Asserts |
+|---|---|
+| REL-01 | the page is served from `http://tauri.localhost`, and no test hook exists |
+| REL-02 | the CSP refuses a page `fetch` to the network before it is sent |
+| REL-03 | the preview frame has every sandbox permission withheld: a document's image and script reach nothing |
+| REL-04 | a tool runs end to end from the embedded bundle |
+
+A loopback server stands in for the network and records every request, so "nothing
+left the page" is observed from outside the app. Loosening `connect-src` to allow
+loopback makes REL-02 fail with the server's log in the message; the debug suite
+cannot see that change at all.
+
+```text
+pnpm --dir apps/desktop build
+cargo build -p devtools-desktop --release --features custom-protocol,smoke-hooks
+node scripts/release-smoke.mjs
+```
+
+`smoke-hooks` compiles in the debugging port and the isolated profile a debug build
+has; nothing else. `tauri build` never enables it, so an installer has neither.
 
 ## Performance baseline
 

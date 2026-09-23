@@ -23,3 +23,8 @@ thiserror.workspace = true
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
+# Compiles in the two hooks the release smoke needs to reach a release window: a
+# debugging port (DEVTOOLS_SMOKE_BROWSER_ARGS) and its own profile (DEVTOOLS_TEST_PROFILE).
+# Built only by the gate's release-smoke job; `tauri build` never enables it, so a
+# shipped installer has neither. See docs/QUALITY_CHECKS.md.
+smoke-hooks = []

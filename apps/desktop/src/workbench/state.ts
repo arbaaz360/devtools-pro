@@ -172,7 +172,8 @@ function history(items: readonly string[]): string[] {
 export type Action =
   | { type: "add"; tab: TabState }
   | { type: "activate" | "close"; id: string }
-  | { type: "edit"; id: string; text: string }
+  /** `keepsResult`: the operation does not read the document, so the run stays as it is. */
+  | { type: "edit"; id: string; text: string; keepsResult?: boolean }
   | { type: "import-start"; id: string }
   | {
       type: "imported";
@@ -180,7 +181,7 @@ export type Action =
       source: FileDocument;
       text: string | null;
     }
-  | { type: "undo" | "redo"; id: string }
+  | { type: "undo" | "redo"; id: string; keepsResult?: boolean }
   | {
       type: "tool";
       id: string;
@@ -233,7 +234,8 @@ export type Action =
       image: BinaryPreview | null;
       error: string | null;
     }
-  | { type: "saved"; id: string; text: string | null; path: string };
+  /** A save succeeded; `source` is the document the tab belongs to from now on. */
+  | { type: "saved"; id: string; text: string | null; path: string; source: FileDocument };
 
 /** The only workspace state transition function: no DOM, clocks, files or IPC. */
 export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
@@ -282,7 +284,8 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "edit":
           if (tab.text === null || tab.text === action.text) return tab;
           return {
-            ...reset(tab),
+            // An edit the operation does not read keeps the run exactly as it was.
+            ...(action.keepsResult ? tab : reset(tab)),
             text: action.text,
             dirty: action.text !== tab.savedText,
             revision: tab.revision + 1,
@@ -295,7 +298,7 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
           if (tab.text === null || !from.length) return tab;
           const text = from[from.length - 1];
           return {
-            ...reset(tab),
+            ...(action.keepsResult ? tab : reset(tab)),
             text,
             dirty: text !== tab.savedText,
             revision: tab.revision + 1,
@@ -392,6 +395,8 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "saved":
           return {
             ...tab,
+            source: action.source,
+            pasted: false,
             savedPath: action.path,
             name: action.path.split(/[\\/]/).pop() ?? tab.name,
             savedText: action.text,
