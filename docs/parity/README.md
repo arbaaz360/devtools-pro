@@ -12,9 +12,9 @@ see `docs/packets/` for the packet that produced each batch of cards.
 | DU-21 QR Code | `media.qr` | 5 | 1 | 7 | 7 | Generator silently corrupts non-ASCII text (no real UTF-8 encoding); no reader, templates or watermark exist yet |
 | DU-24 HTML/SVG to JSX | `convert.jsx` | 21 | 0 | 0 | 2 | None found; every acceptance scenario passed |
 | DU-25 Markdown Preview | `preview.markdown` | 10 | 1 | 1 | 7 | Inherits DU-11's missing JS/navigation/resource-loading toggles; no CSS-free "HTML source" view distinct from "HTML+CSS source" |
-| DU-26 SQL Formatter | `format.sql` | 14 | 1 | 3 | 2 | The manifest's own "4 spaces" indent choice (`space-4`) silently no-ops to 2 spaces; PL/SQL `BEGIN`/`IF`/`END` blocks are not restructured |
+| DU-26 SQL Formatter | `format.sql` | 15 | 1 | 3 | 2 | The manifest's own "4 spaces" indent choice (`space-4`) silently no-ops to 2 spaces; PL/SQL `BEGIN`/`IF`/`END` blocks are not restructured |
 | DU-27 String Case Converter | `text.case` | 18 | 1 | 0 | 2 | Acronym list is a plain text option, not a structured, resettable list widget |
-| **Total** | | **100** | **4** | **16** | **30** | 150 rows across 8 cards |
+| **Total** | | **101** | **4** | **16** | **30** | 151 rows across 8 cards |
 
 ## Three most significant gaps, packet-wide
 
