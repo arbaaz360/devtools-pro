@@ -178,12 +178,33 @@ test("AST-011: a child is one of the object's own members, never inherited", () 
 
 test("AST-012: every path the evaluator gives back selects its own node again", () => {
   const backslash = String.fromCharCode(92);
-  const keys = [`a${backslash}b`, "a'b", `it's ${backslash} fine`, 'a"b', "", "line\nbreak", "__proto__", "plain", "with space"];
+  const keys = [
+    `a${backslash}b`, "a'b", `it's ${backslash} fine`, 'a"b', "", "line\nbreak", "__proto__", "plain", "with space",
+    "tab\there", "cr\r\nlf", "\u0001", "\u001f", "\b\f", `${backslash}n`, "é ✓ 😀",
+  ];
   const document = JSON.parse(JSON.stringify(Object.fromEntries(keys.map((key, index) => [key, index]))));
   const matches = evaluateJsonPath(document, "$.*").matches;
   assert.equal(matches.length, keys.length);
   for (const match of matches) {
+    // A path is pasted into a one-line box, which drops a raw newline: none may carry one.
+    assert.doesNotMatch(match.path, /[\u0000-\u001f]/, `the path ${JSON.stringify(match.path)} carries a control character`);
     const again = evaluateJsonPath(document, match.path).matches;
     assert.deepEqual(again.map((found) => found.value), [match.value], `the path ${JSON.stringify(match.path)}`);
   }
+});
+
+test("a quoted name reads JSON's escapes, as RFC 9535 §2.3.1.1 defines them", () => {
+  const document = { "line\nbreak": 1, "tab\t": 2, A: 3, "\u0001": 4, "it's": 5, "a/b": 6, 'q"': 7 };
+  const value = (path: string) => evaluateJsonPath(document, path).matches.map((match) => match.value);
+  assert.deepEqual(value("$['line\\nbreak']"), [1]);
+  assert.deepEqual(value('$["tab\\t"]'), [2]);
+  assert.deepEqual(value("$['\\u0041']"), [3]);
+  assert.deepEqual(value("$['\\u0001']"), [4]);
+  assert.deepEqual(value("$['it\\'s']"), [5]);
+  assert.deepEqual(value("$['a\\/b']"), [6]);
+  assert.deepEqual(value('$["q\\""]'), [7]);
+  // An escape the grammar does not define is refused, not read as the letter after it.
+  assert.throws(() => parseJsonPath("$['a\\qb']"), /Unknown escape \\q/);
+  assert.throws(() => parseJsonPath("$['\\u12']"), /four hex digits/);
+  assert.throws(() => parseJsonPath("$['a\\"), /Unclosed/);
 });

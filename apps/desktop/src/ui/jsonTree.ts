@@ -10,6 +10,7 @@
  */
 
 import { JsonNumber } from "./losslessJson.ts";
+import { pathSegment as segment } from "./jsonPath.ts";
 
 export interface TreeOptions {
   /** Children rendered per container before a "show more" row. */
@@ -27,9 +28,7 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null;
 };
 
-const PLAIN_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
-const segment = (key: string | number): string =>
-  typeof key === "number" ? `[${key}]` : PLAIN_NAME.test(key) ? `.${key}` : `['${key.replace(/'/g, "\\'")}']`;
+
 
 /** What a value is, in one word, for the badge beside a node. */
 export function describeValue(value: unknown): { type: string; summary: string; expandable: boolean } {

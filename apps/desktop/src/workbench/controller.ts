@@ -140,7 +140,7 @@ export const isBinaryResult = (event: JobFinished) =>
 
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
 /** A path as a person writes it: without the `\\?\` prefix Windows gives a canonical one. */
-const displayPath = (path: string): string => (path.startsWith("\\\\?\\") ? path.slice(4) : path);
+export const displayPath = (path: string): string => (path.startsWith("\\\\?\\") ? path.slice(4) : path);
 /** The last segment of a Windows or POSIX path. */
 const baseName = (path: string): string => path.split(/[\\/]/).pop() || path;
 
