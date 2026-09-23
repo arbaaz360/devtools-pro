@@ -137,6 +137,18 @@ export async function chooseFile(): Promise<string | null> {
   return typeof selected === 'string' ? selected : null;
 }
 
+/**
+ * Open lets several files be picked at once; each opens in its own tab. Under test one
+ * preset answers one dialog, so several paths arrive joined by newlines (no Windows path
+ * contains one).
+ */
+export async function chooseFiles(): Promise<string[]> {
+  const preset = nextPresetPath();
+  if (preset) return preset.split('\n');
+  const selected = await open({ multiple: true, directory: false, title: 'Open documents' });
+  return Array.isArray(selected) ? selected : typeof selected === 'string' ? [selected] : [];
+}
+
 export interface SaveSuggestion { title: string; suffix: string; filterName: string; extensions: string[]; }
 export async function chooseResultOutput(document: FileDocument, suggestion: SaveSuggestion): Promise<string | null> {
   const preset = nextPresetPath();

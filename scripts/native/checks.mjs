@@ -266,6 +266,32 @@ export const checks = [
     },
   },
   {
+    // Several files in one drop: each gets a tab, in order; a folder among them is
+    // refused by name in the one notice (DOC-29). The OS drag cannot be scripted, so
+    // this enters where the drop event does, in the shell's handler.
+    id: "DOC-28",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      const names = ["drop-one.json", "drop-two.txt", "drop-three.md"];
+      const paths = names.map((name, i) => scratchFile(name, i === 0 ? '{"n":1}' : `file ${i + 1}`));
+      const folder = scratchFile("drop-folder");
+      mkdirSync(folder, { recursive: true });
+      const before = await page.locator(".tab-wrap").count();
+      await page.evaluate(() => { document.querySelector("#status").textContent = ""; });
+      await page.evaluate((list) => globalThis.devtoolsTest.dropPaths(list), [...paths, folder].map((path) => path.replace(/\\/g, "/")));
+      const status = await driver.until(async () => {
+        const text = (await page.locator("#status").innerText()).trim();
+        return text.startsWith("Opened") ? text : null;
+      });
+      const tabs = await page.locator(".tab-wrap .tab-name").allInnerTexts();
+      const added = tabs.slice(before).map((text) => text.trim());
+      return verdict(
+        JSON.stringify(added) === JSON.stringify(names) && /^Opened 3 of 4 files · drop-folder: /.test(status ?? ""),
+        `new tabs ${JSON.stringify(added)}; status "${status}"`,
+      );
+    },
+  },
+  {
     // A saved result keeps the extension its type implies, and the whole payload.
     id: "RES-08",
     async run({ driver, page }) {

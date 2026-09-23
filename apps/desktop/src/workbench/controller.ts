@@ -44,6 +44,8 @@ import {
 export interface WorkbenchApi {
   native: boolean;
   chooseFile(): Promise<string | null>;
+  /** Several at once, for Open; the other pickers choose one file for one input. */
+  chooseFiles(): Promise<string[]>;
   openDocument(path: string): Promise<FileDocument>;
   createTextDocument(
     text: string,
@@ -135,6 +137,9 @@ export const isBinaryResult = (event: JobFinished) =>
   event.renderer === "binary" || (!!event.resultMime?.startsWith("image/") && event.renderer !== "svg");
 
 /** Effects live here; the reducer owns all tab state. No effect targets the active tab implicitly. */
+/** The last segment of a Windows or POSIX path. */
+const baseName = (path: string): string => path.split(/[\\/]/).pop() || path;
+
 export class WorkbenchController {
   private api: WorkbenchApi;
   private hooks: WorkbenchHooks;
@@ -228,11 +233,55 @@ export class WorkbenchController {
   }
   async chooseFile(toolOverride?: string) {
     try {
-      const path = await this.api.chooseFile();
-      if (path) await this.openPath(path, toolOverride);
+      if (toolOverride) {
+        // A tool asking for its input wants one file.
+        const path = await this.api.chooseFile();
+        if (path) await this.openPath(path, toolOverride);
+        return;
+      }
+      const paths = await this.api.chooseFiles();
+      if (paths.length) await this.openPaths(paths);
     } catch (error) {
       this.hooks.notify(errorText(error));
     }
+  }
+  /**
+   * Open several files at once: a multi-file drop, or several picked in Open. Each
+   * gets its own tab, in the order given, until the tab limit. What did not open is
+   * reported once, by name, rather than as a notice per file.
+   */
+  async openPaths(paths: readonly string[]) {
+    await this.openMany([...new Set(paths)], (path, quiet) => this.openPath(path, undefined, quiet), baseName);
+  }
+  async openBrowserFiles(files: readonly File[]) {
+    await this.openMany(files, (file, quiet) => this.openBrowserFile(file, undefined, quiet), (file) => file.name);
+  }
+  private async openMany<T>(
+    items: readonly T[],
+    open: (item: T, quiet: boolean) => Promise<string | null>,
+    name: (item: T) => string,
+  ) {
+    // One file keeps the single-file behaviour, including its own error notice.
+    if (items.length <= 1) {
+      if (items[0] !== undefined) await open(items[0], false);
+      return;
+    }
+    const failures: string[] = [];
+    let opened = 0;
+    let beyondLimit = 0;
+    for (const [index, item] of items.entries()) {
+      if (this.state.tabs.length >= MAX_TABS) {
+        beyondLimit = items.length - index;
+        break;
+      }
+      const error = await open(item, true);
+      if (error) failures.push(`${name(item)}: ${error}`);
+      else opened += 1;
+    }
+    const summary =
+      opened === items.length ? `Opened ${opened} files` : `Opened ${opened} of ${items.length} files`;
+    const limit = beyondLimit ? [`${beyondLimit} more would pass the ${MAX_TABS}-tab limit`] : [];
+    this.hooks.notify([summary, ...limit, ...failures].join(" · "));
   }
   async readEditable(document: FileDocument): Promise<string | null> {
     if (
@@ -342,12 +391,18 @@ export class WorkbenchController {
     );
     this.dispatch({ type: "add", tab });
   }
-  async openPath(path: string, toolOverride?: string) {
+  /**
+   * Open one file in its own tab, or activate the tab that already has it. Returns why
+   * it did not open, or null. It reports that itself unless `quiet`, which lets several
+   * opens share one summary.
+   */
+  async openPath(path: string, toolOverride?: string, quiet = false): Promise<string | null> {
     if (!this.api.native) {
-      this.hooks.notify("Open the native desktop app to read local files.");
-      return;
+      const message = "Open the native desktop app to read local files.";
+      if (!quiet) this.hooks.notify(message);
+      return message;
     }
-    if (this.openingPaths.has(path)) return;
+    if (this.openingPaths.has(path)) return null;
     this.openingPaths.add(path);
     let opened: FileDocument | undefined;
     try {
@@ -358,7 +413,7 @@ export class WorkbenchController {
       );
       if (existing) {
         this.activate(existing.id);
-        return;
+        return null;
       }
       opened = await this.api.openDocument(path);
       const existingCanonical = this.state.tabs.find(
@@ -368,7 +423,7 @@ export class WorkbenchController {
       if (existingCanonical) {
         this.retire(opened.id);
         this.activate(existingCanonical.id);
-        return;
+        return null;
       }
       const defaultToolId =
         opened.contentKind === "binary" ? "encoding.hash" : defaultTool(opened);
@@ -405,12 +460,16 @@ export class WorkbenchController {
       this.schedule(tab.id, 0);
     } catch (error) {
       if (opened) this.retire(opened.id);
-      this.hooks.notify(errorText(error));
+      const message = errorText(error);
+      if (!quiet) this.hooks.notify(message);
+      return message;
     } finally {
       this.openingPaths.delete(path);
     }
+    return null;
   }
-  async openBrowserFile(file: File, toolOverride?: string): Promise<void> {
+  /** The browser-preview counterpart of openPath, with the same return and `quiet`. */
+  async openBrowserFile(file: File, toolOverride?: string, quiet = false): Promise<string | null> {
     try {
       if (this.state.tabs.length >= MAX_TABS) {
         throw new Error("Close a tab before opening another (16-tab limit).");
@@ -425,7 +484,7 @@ export class WorkbenchController {
         );
         if (existing) {
           this.activate(existing.id);
-          return;
+          return null;
         }
       }
       const isImage =
@@ -473,7 +532,7 @@ export class WorkbenchController {
             },
           },
         });
-        return;
+        return null;
       }
       const isText =
         file.type.startsWith("text/") ||
@@ -538,7 +597,7 @@ export class WorkbenchController {
         if (file.size <= EDIT_LIMIT) {
           this.schedule(tab.id, 0);
         }
-        return;
+        return null;
       }
       // Binary file (e.g. .bin)
       if (file.size > TEXT_IMPORT_LIMIT) {
@@ -578,8 +637,11 @@ export class WorkbenchController {
       });
       this.schedule(tab.id, 0);
     } catch (error) {
-      this.hooks.notify(errorText(error));
+      const message = errorText(error);
+      if (!quiet) this.hooks.notify(message);
+      return message;
     }
+    return null;
   }
   private async loadImage(tabId: string, documentId: string) {
     try {
