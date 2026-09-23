@@ -166,6 +166,54 @@ here rather than left for the next audit to re-find as a gap.
   says so, and the tool is labelled by what it is rather than claiming a
   flavour it does not implement.
 
+## Owner decisions
+
+Decided 2026-09-24 on the independent review of `5866a49`. These bind every card
+they touch, and every packet cites them.
+
+### Transforms preserve meaning
+
+Beautify, minify, format and convert change **layout, never meaning**. The output
+must parse, evaluate or render exactly as the input does: the same program, the
+same query result, the same text, the same values. "Completed successfully" is a
+claim about that, not about the output having a shape.
+
+- Where a language gives whitespace or adjacency meaning, the transform keeps it:
+  JavaScript line terminators that automatic semicolon insertion depends on; a line
+  comment's end; SQL `-` next to `-` (which starts a comment); JSX text beside an
+  inline element; XML text in a leaf element; a number followed by `.`.
+- Anything destructive — trimming text, dropping comments, lowercasing — happens
+  only through an option whose label says it changes content, off by default unless
+  the card asks otherwise.
+- An input the transform cannot handle without changing its meaning is **refused
+  with a diagnostic**, never passed through changed.
+- Each package proves this against an **independent oracle**: a language engine
+  (node's `vm` for JavaScript, `node:sqlite` for SQL), a compiler (TypeScript for
+  JSX), a parser (`JSON.parse`), or the specification's text for the exact case.
+  Asserting that the output contains some keywords is not evidence of this.
+
+### Byte tools read the file's bytes
+
+A tool whose input is bytes (hashes, and any later encoders) reads the **file's own
+bytes** while the document is unedited: a UTF-8 BOM, CRLF line ends and any other
+bytes the editor does not show are part of what is hashed. Once the document is
+edited, the tool reads the edited text encoded as UTF-8, and the result says so.
+
+### Plugins are trusted code, for now
+
+Packages are built into the app and reviewed before they ship; the worker engine
+runs them with the webview's own capabilities, network included. That is a
+statement of trust, not isolation. **A sandbox design is a precondition for
+installing plugins from outside the repository** (P09), and it is recorded in
+`docs/PLUGIN_HOST_IMPLEMENTATION.md`.
+
+### Release behaviour is tested, not inferred
+
+The native suite drives a debug build, which loads the bundle from a dev server.
+What only a release build has — the embedded bundle, the custom protocol and the
+CSP as shipped — gets its own check in the gate, run against a release-profile
+build without test hooks. See `docs/QUALITY_CHECKS.md`.
+
 ## DU-11 — HTML Preview
 
 Source: `html-preview`; images 0, 2. Status: planned. Proposed tool: `preview.html`.
