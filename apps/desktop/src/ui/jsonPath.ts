@@ -12,7 +12,7 @@
  *   $                 the whole result
  *   .name  ['name']   a child, by name
  *   [0] [-1]          an element, counting from the end when negative
- *   [1:4] [:2] [2:]   a slice
+ *   [1:4] [:2] [::2] [::-1]   a slice, with an optional step (RFC 9535 semantics)
  *   [*]  .*           every child of an object or array
  *   ..name  ..[*]     recursive descent
  *
@@ -36,13 +36,17 @@ export class JsonPathError extends Error {
 type Step =
   | { kind: "child"; name: string }
   | { kind: "index"; index: number }
-  | { kind: "slice"; from: number | null; to: number | null }
+  | { kind: "slice"; from: number | null; to: number | null; step: number }
   | { kind: "wildcard" }
   | { kind: "descend"; name: string | null };
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*/;
 /** A key that can be written as `.name`; anything else is emitted in brackets. */
 const PLAIN_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** A decimal integer as an index or slice bound: no hex, no exponent, no blank. */
+const INTEGER = /^-?\d+$/;
+/** Values the steps before the last may produce before a query stops early. */
+export const WORK_LIMIT = 200_000;
 
 /** Parse an expression into steps, or throw with what went wrong and where. */
 export function parseJsonPath(expression: string): Step[] {
@@ -111,19 +115,24 @@ export function parseJsonPath(expression: string): Step[] {
       const body = source.slice(at, close);
       at = close + 1;
       if (body.includes(",")) throw new JsonPathError("Unions like [0,2] are not supported");
+      // Check the whole bracket against the grammar before converting any of it:
+      // Number("") is 0 and Number("0x10") is 16, so a lenient conversion turns a
+      // typo into a different, valid-looking query.
       if (body.includes(":")) {
-        const [from, to] = body.split(":");
-        const parse = (part: string | undefined) => (part === undefined || part.trim() === "" ? null : Number(part));
-        const start = parse(from);
-        const end = parse(to);
-        if ((start !== null && !Number.isInteger(start)) || (end !== null && !Number.isInteger(end)))
-          throw new JsonPathError(`A slice takes whole numbers: [${body}]`);
-        steps.push({ kind: "slice", from: start, to: end });
+        const parts = body.split(":").map((part) => part.trim());
+        if (parts.length > 3 || parts.some((part) => part !== "" && !INTEGER.test(part)))
+          throw new JsonPathError(`A slice is [start:end:step], each a whole number or empty: [${body}]`);
+        const [from = "", to = "", step = ""] = parts;
+        steps.push({
+          kind: "slice",
+          from: from === "" ? null : Number(from),
+          to: to === "" ? null : Number(to),
+          step: step === "" ? 1 : Number(step),
+        });
         continue;
       }
-      const index = Number(body);
-      if (!Number.isInteger(index)) throw new JsonPathError(`Expected a number, a slice or * inside [ ]: [${body}]`);
-      steps.push({ kind: "index", index });
+      if (!INTEGER.test(body.trim())) throw new JsonPathError(`Expected a number, a slice or * inside [ ]: [${body}]`);
+      steps.push({ kind: "index", index: Number(body.trim()) });
       continue;
     }
     throw new JsonPathError(`Unexpected "${source[at]}" at position ${at}`);
@@ -131,12 +140,43 @@ export function parseJsonPath(expression: string): Step[] {
   return steps;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/** A JSON object: plain, from JSON.parse. Not an array, and not a kept number. */
+const isObject = (value: unknown): value is Record<string, unknown> => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
 
-/** A path segment as it is written, so a reader can paste the result back in. */
+/**
+ * A path segment as it is written, so a reader can paste the result back in. The
+ * parser treats a backslash in quotes as an escape, so both it and the quote are
+ * escaped here; otherwise a key containing `\\` would not select itself again.
+ */
 const segment = (key: string | number): string =>
-  typeof key === "number" ? `[${key}]` : PLAIN_NAME.test(key) ? `.${key}` : `['${key.replace(/'/g, "\\'")}']`;
+  typeof key === "number"
+    ? `[${key}]`
+    : PLAIN_NAME.test(key)
+      ? `.${key}`
+      : `['${key.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}']`;
+
+/** The indices an RFC 9535 slice selects, in selection order. */
+function sliceIndices(size: number, from: number | null, to: number | null, step: number): number[] {
+  if (step === 0) return [];
+  const normalize = (index: number) => (index >= 0 ? index : size + index);
+  const start = from ?? (step > 0 ? 0 : size - 1);
+  const end = to ?? (step > 0 ? size : -size - 1);
+  const indices: number[] = [];
+  if (step > 0) {
+    const lower = Math.min(Math.max(normalize(start), 0), size);
+    const upper = Math.min(Math.max(normalize(end), 0), size);
+    for (let index = lower; index < upper; index += step) indices.push(index);
+  } else {
+    const upper = Math.min(Math.max(normalize(start), -1), size - 1);
+    const lower = Math.min(Math.max(normalize(end), -1), size - 1);
+    for (let index = upper; lower < index; index += step) indices.push(index);
+  }
+  return indices;
+}
 
 /**
  * Every descendant of `match`, in document order, that `name` selects (or all of
@@ -173,21 +213,33 @@ function descend(match: PathMatch, name: string | null, into: PathMatch[], budge
 }
 
 /**
- * Evaluate a parsed path. `limit` bounds the result set: a recursive descent over
- * a large document can match a great many nodes, and the pane can only show so
- * many, so the caller is told it was capped rather than being handed everything.
+ * Evaluate a parsed path. Two bounds, kept apart. `limit` caps the matches the pane
+ * is handed; `truncated` says there were more. `WORK_LIMIT` caps what the steps
+ * before the last may produce, so a query over a huge result cannot lock the pane;
+ * `stopped` says it was reached and the matches are only those found so far.
+ *
+ * One shared budget used to serve both, so the intermediate matches of `$[*]` over
+ * 5,000 objects used it all and `$[*].id` reported no matches at all.
  */
-export function evaluateJsonPath(value: unknown, expression: string, limit = 5_000): { matches: PathMatch[]; truncated: boolean } {
+export function evaluateJsonPath(
+  value: unknown,
+  expression: string,
+  limit = 5_000,
+): { matches: PathMatch[]; truncated: boolean; stopped: boolean } {
   const steps = parseJsonPath(expression);
   let current: PathMatch[] = [{ path: "$", value }];
-  const budget = { left: limit };
-  for (const step of steps) {
+  let truncated = false;
+  let stopped = false;
+  for (const [position, step] of steps.entries()) {
+    const last = position === steps.length - 1;
+    // The last step collects one more than it keeps, to know whether there were more.
+    const budget = { left: last ? limit + 1 : WORK_LIMIT };
     const next: PathMatch[] = [];
     for (const match of current) {
       if (budget.left <= 0) break;
       switch (step.kind) {
         case "child": {
-          if (isObject(match.value) && step.name in match.value) {
+          if (isObject(match.value) && Object.hasOwn(match.value, step.name)) {
             next.push({ path: `${match.path}${segment(step.name)}`, value: match.value[step.name] });
             budget.left -= 1;
           }
@@ -205,13 +257,8 @@ export function evaluateJsonPath(value: unknown, expression: string, limit = 5_0
         }
         case "slice": {
           if (Array.isArray(match.value)) {
-            const size = match.value.length;
-            const clamp = (raw: number | null, fallback: number) => {
-              if (raw === null) return fallback;
-              const resolved = raw < 0 ? size + raw : raw;
-              return Math.min(Math.max(resolved, 0), size);
-            };
-            for (let index = clamp(step.from, 0); index < clamp(step.to, size) && budget.left > 0; index += 1) {
+            for (const index of sliceIndices(match.value.length, step.from, step.to, step.step)) {
+              if (budget.left <= 0) break;
               next.push({ path: `${match.path}[${index}]`, value: match.value[index] });
               budget.left -= 1;
             }
@@ -237,8 +284,12 @@ export function evaluateJsonPath(value: unknown, expression: string, limit = 5_0
         }
       }
     }
-    current = next;
+    if (budget.left <= 0) {
+      if (last) truncated = true;
+      else stopped = true;
+    }
+    current = last ? next.slice(0, limit) : next;
     if (!current.length) break;
   }
-  return { matches: current, truncated: budget.left <= 0 };
+  return { matches: current, truncated: truncated || stopped, stopped };
 }
