@@ -5,6 +5,12 @@ worker needs: branch, allowed files, requirements, exact checks, required
 evidence. The matching GitHub issue (labels `packet`, `ready`) is the queue
 entry; this file is the contract. See [`../WORKER_PROTOCOL.md`](../WORKER_PROTOCOL.md).
 
+A packet's **Evidence** section says where each expected value comes from. It may
+not be a recording of the tool under test wherever anything else can supply it —
+see "Where an expected value comes from" in
+[`../WORKER_PROTOCOL.md`](../WORKER_PROTOCOL.md), and `plugins/qr`, which passed
+27 fixtures of its own output while producing QR codes that scan as nothing.
+
 Every packet has these sections, in this order, and `scripts/check-packet-scope.mjs`
 parses **Allowed files** from the fenced block under that heading:
 
