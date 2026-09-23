@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile, readdir } from "node:fs/promises";
+import { mkdtempSync, writeFileSync, renameSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { pathToFileURL } from "node:url";
+import { createRequire } from "node:module";
 import {
   CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorContext, SeededRandom,
 } from "../../packages/plugin-sdk/src/context.ts";
 import { validateManifest } from "../../packages/plugin-contract/ts/validate.ts";
-import { execute, JsxError, normalizeOptions } from "./processor.mjs";
+import { execute, format, JsxError, normalizeOptions } from "./processor.mjs";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
@@ -96,5 +102,142 @@ test("every package file uses LF line endings", async () => {
       text = await readFile(new URL(`./${file}`, import.meta.url), "utf8");
     } catch { continue; }
     assert.equal(text.includes("\r"), false, `${file} must use LF line endings`);
+  }
+});
+
+// AG-129: the independent review (AST-014/015/016) found that this converter could change
+// what an HTML fragment means while reporting success. A fixture that compares this tool's
+// own output against a hand-recorded copy of that same output cannot catch that class of
+// bug (see "Where an expected value comes from" in docs/WORKER_PROTOCOL.md): it would keep
+// passing while the tool is wrong. So this corpus is judged by an oracle the converter does
+// not share: the TypeScript 7 compiler (for "does this JSX mean what we think"), and text,
+// attribute and style expectations written by hand from the HTML, never produced by running
+// the converter itself.
+const ORACLE_CASES = [
+  // AST-014 reproduction: text beside an inline element must not lose its spaces.
+  { id: "DU-24-ORACLE-text-inline-space", html: "<p>Hello <b>world</b> !</p>", expectedText: "Hello world !" },
+  { id: "DU-24-ORACLE-inline-at-start", html: "<p><b>Start</b> middle text</p>", expectedText: "Start middle text" },
+  { id: "DU-24-ORACLE-inline-at-end", html: "<p>leading text <b>End</b></p>", expectedText: "leading text End" },
+  { id: "DU-24-ORACLE-nested-inline", html: "<p>a <b>bold <i>and italic</i> end</b> z</p>", expectedText: "a bold and italic end z" },
+  // JSX text decodes named character references itself (a language-level rule, independent
+  // of this converter), so &nbsp; in the source becomes a literal U+00A0 in the rendered text.
+  { id: "DU-24-ORACLE-nbsp", html: "<p>a &nbsp;<b>b</b></p>", expectedText: "a  b" },
+  { id: "DU-24-ORACLE-several-spaces", html: "<p>a    <b>b</b>    c</p>", expectedText: "a b c" },
+  // <pre> text is exact: no collapsing, no reflowing.
+  { id: "DU-24-ORACLE-pre", html: "<pre>  line one\n  line two  </pre>", expectedText: "  line one\n  line two  " },
+
+  // AST-015 reproduction: an unquoted attribute value ends only at whitespace or '>'.
+  {
+    id: "DU-24-ORACLE-unquoted-value-chars",
+    html: "<a href=http://x.com/a?b=c&d=e>link</a>",
+    check: (root) => assert.equal(root.props.href, "http://x.com/a?b=c&d=e"),
+  },
+
+  // AST-016 reproductions: style objects keep what they were given.
+  {
+    id: "DU-24-ORACLE-custom-property",
+    html: '<div style="--brand-color: red; color: var(--brand-color)"></div>',
+    check: (root) => {
+      assert.equal(root.props.style["--brand-color"], "red");
+      assert.equal(root.props.style.color, "var(--brand-color)");
+    },
+  },
+  {
+    id: "DU-24-ORACLE-data-url-style",
+    html: '<div style="background-image: url(data:image/png;base64,YQ==)"></div>',
+    check: (root) => assert.equal(root.props.style.backgroundImage, "url(data:image/png;base64,YQ==)"),
+  },
+  {
+    id: "DU-24-ORACLE-quoted-semicolon-style",
+    html: "<div style='content: \"a;b\"; color: red'></div>",
+    check: (root) => {
+      assert.equal(root.props.style.content, '"a;b"');
+      assert.equal(root.props.style.color, "red");
+    },
+  },
+  {
+    id: "DU-24-ORACLE-svg-presentation",
+    html: '<svg viewBox="0 0 10 10"><path stroke-width="2" fill-opacity="0.5" /></svg>',
+    check: (root) => {
+      assert.equal(root.props.viewBox, "0 0 10 10");
+      const path = root.children.find((c) => c && c.type === "path");
+      assert.ok(path, "expected an svg <path> child");
+      assert.equal(path.props.strokeWidth, "2");
+      assert.equal(path.props.fillOpacity, "0.5");
+    },
+  },
+];
+
+// Every JSXText node must sit on a single source line, so we strip format()'s outer
+// fragment wrapper (added for every case regardless of the "wrap" option) and return the
+// element expression as-is; this keeps the compiled tree's root the case's own element.
+function unwrapFragment(output) {
+  const match = /^<>\n([\s\S]*)\n<\/>$/.exec(output);
+  assert.ok(match, `expected format() to wrap output in a fragment: ${output}`);
+  return match[1];
+}
+
+function textOf(node) {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (node === null || node === undefined || typeof node === "boolean") return "";
+  if (Array.isArray(node)) return node.map(textOf).join("");
+  if (node && typeof node === "object" && "children" in node) return node.children.map(textOf).join("");
+  return "";
+}
+
+test("independent oracle: emitted JSX compiles and renders the HTML's meaning (AG-129)", async () => {
+  let tscPath;
+  try {
+    const desktopRequire = createRequire(new URL("../../apps/desktop/package.json", import.meta.url));
+    tscPath = join(dirname(desktopRequire.resolve("typescript/package.json")), "bin/tsc");
+  } catch (error) {
+    assert.fail(
+      `TypeScript must be installed at apps/desktop for this oracle (run "pnpm --dir apps/desktop install --frozen-lockfile" first): ${error.message}`,
+    );
+  }
+
+  const preamble = [
+    "declare global {",
+    "  const React: { createElement: (...args: unknown[]) => unknown; readonly Fragment: unique symbol };",
+    "  namespace JSX { interface IntrinsicElements { [name: string]: unknown } interface Element {} }",
+    "}",
+    "",
+  ].join("\n");
+
+  let source = preamble;
+  for (const [index, testCase] of ORACLE_CASES.entries()) {
+    const result = format(testCase.html, testCase.options ?? {}, () => {});
+    source += `\nexport function Case${index}() {\n  return (\n${unwrapFragment(result.output)}\n  );\n}\n`;
+  }
+
+  const dir = mkdtempSync(join(tmpdir(), "jsx-oracle-"));
+  const tsxFile = join(dir, "oracle.tsx");
+  writeFileSync(tsxFile, source, "utf8");
+
+  const compiled = spawnSync(process.execPath, [tscPath, "--ignoreConfig", "--jsx", "react", "--target", "ES2020", tsxFile], { encoding: "utf8" });
+  assert.equal(compiled.status, 0, `emitted JSX must compile with no diagnostics:\n${compiled.stdout}${compiled.stderr}`);
+
+  const jsFile = tsxFile.replace(/\.tsx$/, ".js");
+  const mjsFile = tsxFile.replace(/\.tsx$/, ".mjs");
+  renameSync(jsFile, mjsFile);
+
+  const previousReact = globalThis.React;
+  globalThis.React = {
+    createElement(type, props, ...children) {
+      return { type, props: props || {}, children };
+    },
+    Fragment: Symbol("Fragment"),
+  };
+  try {
+    const compiledModule = await import(pathToFileURL(mjsFile).href);
+    for (const [index, testCase] of ORACLE_CASES.entries()) {
+      const root = compiledModule[`Case${index}`]();
+      if (testCase.expectedText !== undefined) {
+        assert.equal(textOf(root), testCase.expectedText, `${testCase.id}: rendered text`);
+      }
+      if (testCase.check) testCase.check(root);
+    }
+  } finally {
+    globalThis.React = previousReact;
   }
 });

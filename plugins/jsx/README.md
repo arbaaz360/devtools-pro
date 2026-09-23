@@ -28,3 +28,32 @@ The converter produces structured `warning` diagnostics for malformed inputs (wh
 - `component-name`: The name of the component function (default `Component`). Must be a valid JavaScript identifier.
 - `indent`: Indentation style. Accepts `2`, `4`, or `tab`.
 - `svg-attributes`: Defines how SVG attributes are handled. Accepts `camel` (default) or `keep`.
+
+## Preserving meaning (AG-129)
+
+The converter must render the same text, attribute values and style declarations the
+HTML has, not just something shaped like them:
+
+- **Text beside an inline element.** JSX only keeps a text node's whitespace exactly as
+  written when that text sits on a single source line; splitting it across lines (as a
+  pretty-printer naturally would) lets JSX's own line-trimming eat a trailing or leading
+  space. So whenever a run of children mixes text with an inline element (`b`, `i`, `a`,
+  `span`, `code`, and the rest of the standard inline set — see `INLINE_ELEMENTS` in
+  `processor.mjs`), the whole run is emitted on one line, with runs of HTML whitespace in
+  that text collapsed to a single space (matching how a browser renders it). Text-only or
+  element-only content is still laid out however is clearest, since there is no adjacency
+  to lose. `<pre>` content is emitted as a JS string expression (`{"…"}`) instead of raw
+  JSX text, so its whitespace is never touched by JSX's own reflow rules.
+- **Unquoted attribute values** end only at ASCII whitespace or `>`, as the HTML
+  specification's unquoted-attribute-value state requires — `/` is part of the value, not
+  a terminator (`<br class=a/>` has the value `a/`).
+- **Style objects** keep what they were given: a custom property (`--anything`) keeps its
+  name verbatim as a quoted key rather than being camelCased away, declarations split on
+  `;` only outside parentheses and quotes (so a `url(data:image/png;base64,...)` or a
+  quoted `"a;b"` value survives intact), and values are copied through unchanged.
+
+This is verified against an independent oracle — the TypeScript compiler plus a minimal
+`React.createElement` evaluator — in `test.mjs`, rather than by comparing the tool's
+output against a recording of its own past output. A few of the plain fixtures in
+`fixtures/` cover the same inputs for fast regression signal; they are pinned for
+stability and their correctness is what the oracle test actually proves.

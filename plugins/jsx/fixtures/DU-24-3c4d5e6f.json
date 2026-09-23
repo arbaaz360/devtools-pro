@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-3c4d5e6f",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div style=\"background-image: url(data:image/png;base64,YQ==)\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div style={{ backgroundImage: \"url(data:image/png;base64,YQ==)\" }} />\n</>"
+  },
+  "diagnostics": []
+}

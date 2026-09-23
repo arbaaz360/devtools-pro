@@ -252,7 +252,7 @@ function readStartTag(source, start, sink) {
       continue;
     }
     const valueStart = k;
-    while (k < length && !isSpace(source[k]) && source[k] !== ">" && source[k] !== "/") k += 1;
+    while (k < length && !isSpace(source[k]) && source[k] !== ">") k += 1;
     const valueRaw = source.slice(valueStart, k);
     attrs.push({ rawName: attrName, name: attrName.toLowerCase(), value: valueRaw, quote: "" });
     j = k;
@@ -370,30 +370,57 @@ function toCamelCase(str) {
   }).join("");
 }
 
+function splitDeclarations(styleStr) {
+  const decls = [];
+  let depth = 0;
+  let quote = null;
+  let start = 0;
+  for (let i = 0; i < styleStr.length; i += 1) {
+    const ch = styleStr[i];
+    if (quote) {
+      if (ch === "\\") { i += 1; continue; }
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { quote = ch; continue; }
+    if (ch === "(") { depth += 1; continue; }
+    if (ch === ")") { if (depth > 0) depth -= 1; continue; }
+    if (ch === ";" && depth === 0) {
+      decls.push(styleStr.slice(start, i));
+      start = i + 1;
+    }
+  }
+  decls.push(styleStr.slice(start));
+  return decls;
+}
+
 function parseStyle(styleStr) {
-  const obj = {};
-  for (const decl of styleStr.split(";")) {
+  const entries = [];
+  for (const decl of splitDeclarations(styleStr)) {
     const idx = decl.indexOf(":");
     if (idx < 0) continue;
     let prop = decl.slice(0, idx).trim();
     const val = decl.slice(idx + 1).trim();
     if (!prop || !val) continue;
+    if (prop.startsWith("--")) {
+      entries.push({ key: prop, value: val, quoted: true });
+      continue;
+    }
     if (prop.startsWith("-ms-")) prop = prop.slice(1);
     let camelProp = toCamelCase(prop);
     if (prop.startsWith("-webkit-") || prop.startsWith("-moz-") || prop.startsWith("-o-")) {
       camelProp = camelProp.charAt(0).toUpperCase() + camelProp.slice(1);
     }
-    obj[camelProp] = val;
+    entries.push({ key: camelProp, value: val, quoted: false });
   }
-  return obj;
+  return entries;
 }
 
-function renderStyle(obj) {
-  const keys = Object.keys(obj);
-  if (keys.length === 0) return null;
-  const parts = keys.map(k => {
-    const val = obj[k];
-    return `${k}: ${JSON.stringify(val)}`;
+function renderStyle(entries) {
+  if (entries.length === 0) return null;
+  const parts = entries.map(({ key, value, quoted }) => {
+    const keyStr = quoted ? JSON.stringify(key) : key;
+    return `${keyStr}: ${JSON.stringify(value)}`;
   });
   return `{{ ${parts.join(", ")} }}`;
 }
@@ -413,17 +440,24 @@ function renameAttribute(attr, inSvg, options) {
   return attr.rawName;
 }
 
-function renderElement(node, depth, options, metrics, sink, inSvgContext) {
-  const lines = [];
-  const indent = options.indentText.repeat(depth);
-  const isSvg = inSvgContext || SVG_ELEMENTS.has(node.rawName);
+const INLINE_ELEMENTS = new Set([
+  "a", "abbr", "acronym", "b", "bdi", "bdo", "big", "br", "button", "cite", "code", "data",
+  "del", "dfn", "em", "font", "i", "img", "ins", "kbd", "label", "mark", "output", "q",
+  "rp", "rt", "rtc", "ruby", "s", "samp", "select", "small", "span", "strike", "strong",
+  "sub", "sup", "textarea", "time", "tt", "u", "var", "wbr",
+]);
 
-  let startTag = `${indent}<${node.rawName}`;
+const isInlineNode = (node) => node.type === "element" && INLINE_ELEMENTS.has(node.name);
+const collapseWhitespace = (text) => text.replace(/[ \t\n\r\f]+/g, " ");
+const escapeJsxText = (text) => text.replace(/[\{\}]/g, m => (m === "{" ? '{"{"}' : '{"}"}'));
+
+function renderStartTagAttrs(node, isSvg, options, metrics) {
+  let startTag = `<${node.rawName}`;
   for (const attr of node.attrs) {
     if (attr.name === "style" && attr.value !== null) {
       metrics.stylesConverted += 1;
-      const styleObj = parseStyle(attr.value);
-      const styleStr = renderStyle(styleObj);
+      const entries = parseStyle(attr.value);
+      const styleStr = renderStyle(entries);
       if (styleStr) startTag += ` style=${styleStr}`;
       continue;
     }
@@ -436,7 +470,6 @@ function renderElement(node, depth, options, metrics, sink, inSvgContext) {
     }
 
     let val = attr.value === null ? "true" : attr.value;
-    let quote = attr.quote || "\"";
     const isDoubleQuotedOrWillBe = attr.quote === '"' || attr.quote === "";
     if (isDoubleQuotedOrWillBe && val.includes('"')) {
       startTag += ` ${newName}={"${val.replace(/"/g, '\\"')}"}`;
@@ -445,47 +478,113 @@ function renderElement(node, depth, options, metrics, sink, inSvgContext) {
       startTag += ` ${newName}=${q}${val}${q}`;
     }
   }
+  return startTag;
+}
 
-  const isSelfClosing = node.isVoid || node.selfClosing || node.children.length === 0;
-  if (isSelfClosing) {
-    startTag += " />";
-    lines.push(startTag);
-    return lines;
+// Renders a node with no line breaks of our own, for use inside a run where text sits
+// beside an inline element: JSX only preserves a text node's whitespace verbatim when
+// that text is a single source line, so the whole run must stay on one output line.
+function renderInlineNode(node, options, metrics, sink, isSvg) {
+  if (node.type === "text") return escapeJsxText(collapseWhitespace(node.value));
+  if (node.type === "comment") return `{/*${node.value.replace(/\*\//g, "* /")}*/}`;
+  if (node.type === "raw") {
+    sink.diagnostic({
+      code: "jsx.raw-element-warning",
+      severity: "warning",
+      message: `<${node.tagName}> block found, emitting as template literal`,
+      charOffset: node.start,
+      charEnd: node.startEnd,
+    });
+    const val = node.value.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
+    return "{`" + val + "`}";
   }
+  const isSvgHere = isSvg || SVG_ELEMENTS.has(node.rawName);
+  const startTag = renderStartTagAttrs(node, isSvgHere, options, metrics);
+  const isSelfClosing = node.isVoid || node.selfClosing || node.children.length === 0;
+  if (isSelfClosing) return `${startTag} />`;
+  const inner = node.children.map(c => renderInlineNode(c, options, metrics, sink, isSvgHere)).join("");
+  return `${startTag}>${inner}</${node.rawName}>`;
+}
 
-  startTag += ">";
-  lines.push(startTag);
+function pushBlockText(lines, rawValue, depth, options) {
+  const text = escapeJsxText(rawValue);
+  if (text.trim() || text.includes("\n")) {
+    const textLines = text.split("\n");
+    for (let i = 0; i < textLines.length; i++) {
+      if (i === 0) lines.push(options.indentText.repeat(depth) + textLines[i]);
+      else lines.push(textLines[i]);
+    }
+  }
+}
 
-  for (const child of node.children) {
+function renderChildrenLines(children, depth, options, metrics, sink, isSvg, preformatted) {
+  const lines = [];
+  const indent = options.indentText.repeat(depth);
+  let i = 0;
+
+  while (i < children.length) {
     if ((sink.count++ & (CANCELLATION_STRIDE_TOKENS - 1)) === 0) sink.check();
-    if (child.type === "element") {
-      lines.push(...renderElement(child, depth + 1, options, metrics, sink, isSvg));
-    } else if (child.type === "text") {
-      const text = child.value.replace(/[\{\}]/g, m => m === '{' ? '{"{"}' : '{"}"}');
-      if (text.trim() || text.includes("\n")) {
-        const textLines = text.split("\n");
-        for (let i = 0; i < textLines.length; i++) {
-          if (i === 0) lines.push(options.indentText.repeat(depth + 1) + textLines[i]);
-          else lines.push(textLines[i]);
+    const child = children[i];
+
+    if (preformatted && child.type === "text") {
+      if (child.value.length > 0) lines.push(indent + "{" + JSON.stringify(child.value) + "}");
+      i += 1;
+      continue;
+    }
+
+    if (!preformatted && (child.type === "text" || isInlineNode(child))) {
+      let j = i;
+      while (j < children.length && (children[j].type === "text" || isInlineNode(children[j]))) j += 1;
+      const run = children.slice(i, j);
+      const isMixed = run.length > 1 && run.some(isInlineNode) && run.some(n => n.type === "text");
+
+      if (isMixed) {
+        const rendered = run.map(n => renderInlineNode(n, options, metrics, sink, isSvg)).join("");
+        if (rendered !== "") lines.push(indent + rendered);
+      } else {
+        for (const item of run) {
+          if (item.type === "text") pushBlockText(lines, item.value, depth, options);
+          else lines.push(...renderElement(item, depth, options, metrics, sink, isSvg, preformatted));
         }
       }
+      i = j;
+      continue;
+    }
+
+    if (child.type === "element") {
+      lines.push(...renderElement(child, depth, options, metrics, sink, isSvg, preformatted));
     } else if (child.type === "comment") {
-      let val = child.value.replace(/\*\//g, "* /");
-      lines.push(options.indentText.repeat(depth + 1) + `{/*${val}*/}`);
+      lines.push(indent + `{/*${child.value.replace(/\*\//g, "* /")}*/}`);
     } else if (child.type === "raw") {
       sink.diagnostic({
         code: "jsx.raw-element-warning",
         severity: "warning",
         message: `<${child.tagName}> block found, emitting as template literal`,
         charOffset: child.start,
-        charEnd: child.startEnd
+        charEnd: child.startEnd,
       });
       const val = child.value.replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
-      lines.push(options.indentText.repeat(depth + 1) + `{` + "`" + val + "`" + `}`);
+      lines.push(indent + "{`" + val + "`}");
     }
+    i += 1;
   }
 
-  lines.push(options.indentText.repeat(depth) + `</${node.rawName}>`);
+  return lines;
+}
+
+function renderElement(node, depth, options, metrics, sink, inSvgContext, inPreContext) {
+  const indent = options.indentText.repeat(depth);
+  const isSvg = inSvgContext || SVG_ELEMENTS.has(node.rawName);
+  const preformatted = inPreContext || node.name === "pre";
+
+  const startTag = indent + renderStartTagAttrs(node, isSvg, options, metrics);
+
+  const isSelfClosing = node.isVoid || node.selfClosing || node.children.length === 0;
+  if (isSelfClosing) return [startTag + " />"];
+
+  const lines = [startTag + ">"];
+  lines.push(...renderChildrenLines(node.children, depth + 1, options, metrics, sink, isSvg, preformatted));
+  lines.push(indent + `</${node.rawName}>`);
   return lines;
 }
 
