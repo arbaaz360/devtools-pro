@@ -95,7 +95,26 @@ test("the result set is bounded, and says when it was capped", () => {
 });
 
 test("a deeply nested document does not overflow the stack", () => {
+  // Deep enough that any recursive walk fails on any engine: at 5,000 levels a
+  // recursive version passed on one machine and overflowed on a CI runner.
+  const depth = 100_000;
   let deep: unknown = { leaf: true };
-  for (let level = 0; level < 5_000; level += 1) deep = { child: deep };
-  assert.doesNotThrow(() => evaluateJsonPath(deep, "$..leaf", 10));
+  for (let level = 0; level < depth; level += 1) deep = { child: deep };
+  const { matches } = evaluateJsonPath(deep, "$..leaf", 10);
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0]!.value, true);
+  assert.equal(matches[0]!.path, "$" + ".child".repeat(depth) + ".leaf");
+});
+
+test("recursive descent returns matches in document order", () => {
+  // The order a reader sees in the document, written out by hand: pre-order, siblings in turn.
+  const document = { a: { id: 1, b: { id: 2 } }, c: [{ id: 3 }, { d: { id: 4 } }], id: 5 };
+  const { matches } = evaluateJsonPath(document, "$..id");
+  assert.deepEqual(matches.map((match) => [match.path, match.value]), [
+    ["$.a.id", 1],
+    ["$.a.b.id", 2],
+    ["$.c[0].id", 3],
+    ["$.c[1].d.id", 4],
+    ["$.id", 5],
+  ]);
 });
