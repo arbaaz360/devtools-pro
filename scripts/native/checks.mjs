@@ -582,6 +582,31 @@ export const checks = [
     },
   },
   {
+    // AST-007: an unedited file is hashed as its bytes, BOM included; once edited, as
+    // its text in UTF-8. The result says which. node:crypto supplies both digests.
+    id: "TL-HASH-07",
+    async run({ driver, page }) {
+      const bytes = Buffer.from([0xef, 0xbb, 0xbf, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+      const file = freshFile("bom-hello.txt");
+      writeFileSync(file, bytes);
+      const readRow = () => page.evaluate(() => {
+        const term = [...document.querySelectorAll("#result-metrics dt")].find((dt) => dt.textContent.trim() === "Read");
+        return term?.nextElementSibling?.textContent.trim() ?? null;
+      });
+      const before = (await driver.readResult()).signature;
+      await driver.openPath(file, "encoding.hash");
+      await driver.runOperation("SHA-256");
+      const first = await driver.settle(bytes.length, { changedFrom: before });
+      const fileDigest = crypto.createHash("sha256").update(bytes).digest("hex");
+      const unedited = (first.output || first.structured).toLowerCase().includes(fileDigest) && (await readRow()) === "the file's bytes";
+      await driver.setInput("hello, edited");
+      const second = await driver.settle(Buffer.byteLength("hello, edited"), { changedFrom: first.signature });
+      const edited = (second.output || second.structured).toLowerCase().includes(sha256("hello, edited")) && (await readRow()) === "the text, as UTF-8";
+      return verdict(unedited && edited,
+        `unedited: expected ${fileDigest.slice(0, 16)}…, shows ${(first.output || first.structured).replace(/\s+/g, " ").slice(0, 70)} (input ${first.inputBytes} B); edited: ${edited ? "text digest, labelled" : (second.output || second.structured).slice(0, 60)}`);
+    },
+  },
+  {
     id: "TL-NUMBASE-01",
     async run({ driver }) {
       // Exercises the option controls too: the defaults would answer this one by accident.

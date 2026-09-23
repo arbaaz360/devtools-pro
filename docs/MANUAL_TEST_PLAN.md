@@ -493,6 +493,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 | 04 | the PNG fixture | Matches `certutil -hashfile <png> SHA256` |
 | 05 | case option upper | Hex digits uppercase, same value |
 | 06 | 64 MiB file | Completes within the deadline or reports the limit; record the time |
+| 07 (suite) **[P1]** | Open a file of the bytes `EF BB BF 68 65 6C 6C 6F` (a UTF-8 BOM, then `hello`) without editing; then type in it | Unedited: 8 bytes in, SHA-256 `7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862` (`certutil -hashfile`), and **Read: the file's bytes**. Edited: the digest of the typed text in UTF-8, and **Read: the text, as UTF-8** |
 
 ### TL-BASE64IMG — Image to Base64 / Base64 to Image · `encoding.image-base64`, `encoding.base64-image` · Rust
 | # | Steps | Expected |
