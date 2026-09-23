@@ -16,10 +16,15 @@ export function driver(page) {
   const toolItem = (label) =>
     page.locator(".tool-item").filter({ has: page.locator("strong", { hasText: new RegExp(`^${escape(label)}$`) }) }).first();
 
+  /**
+   * What the result pane shows now. Only what a person could see counts: a pane keeps
+   * its last text while hidden, and that text belongs to whatever it last showed —
+   * often another tab. Reading it made a new tab look finished before it had run.
+   */
   const readResult = () => page.evaluate(() => {
     const visible = (selector) => {
       const node = document.querySelector(selector);
-      if (!node || node.hidden) return "";
+      if (!node || node.closest("[hidden]")) return "";
       return (node.value ?? node.innerText ?? "").trim();
     };
     const error = document.querySelector("#error");
@@ -33,11 +38,14 @@ export function driver(page) {
       mediaTag: media && !media.hidden ? (media.querySelector("img, iframe")?.tagName ?? "empty") : "",
       mediaSrc: media?.querySelector("img")?.src?.slice(0, 120) ?? "",
       highlights: document.querySelectorAll("#editor-highlight mark").length,
+      // The input size of the run on screen, from its own <dd>. The metrics' joined text
+      // runs together ("Input9 BOutput12 B"), which a text search misread, and a size
+      // that is never read never disagrees. Exact only in bytes; a rounded KB is null.
       inputBytes: (() => {
-        const metrics = (document.querySelector("#result-metrics")?.textContent ?? "") + " " + (document.querySelector("#result-content")?.textContent ?? "");
-        const match = /Input\s*([\d,]+(?:\.\d+)?)\s*(B|KB|KiB|MB|MiB)\b/i.exec(metrics);
-        if (!match) return null;
-        return /^B$/i.test(match[2]) ? Number(match[1].replace(/,/g, "")) : null;
+        if (!shown) return null;
+        const term = [...document.querySelectorAll("#result-metrics dt")].find((dt) => dt.textContent.trim() === "Input");
+        const match = /^([\d,]+)\s*B$/.exec(term?.nextElementSibling?.textContent.trim() ?? "");
+        return match ? Number(match[1].replace(/,/g, "")) : null;
       })(),
       signature: [
         document.querySelector("#result-state")?.textContent ?? "",
