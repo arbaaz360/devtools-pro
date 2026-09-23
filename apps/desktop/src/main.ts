@@ -1395,7 +1395,7 @@ const api: WorkbenchApi = {
   },
   readPreview,
   readBinaryPreview,
-  saveDocument,
+  saveDocument: (...args) => saveDocument(...args).then(remember),
   saveResult,
   runTool,
   runCompare: (left, right, options) => {

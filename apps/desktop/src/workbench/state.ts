@@ -228,7 +228,8 @@ export type Action =
       image: BinaryPreview | null;
       error: string | null;
     }
-  | { type: "saved"; id: string; text: string | null; path: string };
+  /** A save succeeded; `source` is the document the tab belongs to from now on. */
+  | { type: "saved"; id: string; text: string | null; path: string; source: FileDocument };
 
 /** The only workspace state transition function: no DOM, clocks, files or IPC. */
 export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
@@ -387,6 +388,8 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "saved":
           return {
             ...tab,
+            source: action.source,
+            pasted: false,
             savedPath: action.path,
             name: action.path.split(/[\\/]/).pop() ?? tab.name,
             savedText: action.text,

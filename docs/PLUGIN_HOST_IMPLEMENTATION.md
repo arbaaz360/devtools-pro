@@ -114,9 +114,11 @@ by `Replace`, which the shell passes and the host enforces:
 
 Whatever `Replace` says, a save never lands on another open document's file (a tab may
 replace only its own, named by `own_document`), never on the snapshot it is copying, and a
-result is never saved over its own source. After a tab writes its own file, the host records
-the new size and time, so the next read or save does not mistake the app's write for someone
-else's. A refused or failed save leaves the tab, its edits and its result as they were; the
+result is never saved over its own source. **Every save binds the tab to the file it wrote**:
+the host records that file's size and time and returns it as the tab's document, which the tab
+adopts. So a file the tab created or moved to with Save As is guarded exactly like one it
+opened, the app's own write is never mistaken for someone else's, and the file a tab came
+from can be opened again as itself. A refused or failed save leaves the tab, its edits and its result as they were; the
 shell reports it in the status line.
 
 The current adapter is not yet a fully dynamic third-party runtime. Discovery is build-time and

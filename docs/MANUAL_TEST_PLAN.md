@@ -178,6 +178,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-29 (suite) | Drag a folder onto the window, alone and among files | Refused by name (*Choose a regular file*); the files beside it still open; no crash |
 | DOC-30 | Drag a file over the window and drag it back out without dropping | The drop highlight appears and then clears; no tab is created |
 | DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
+| DOC-33 (suite) **[P1]** | New tab, type, Ctrl+S to a new file; change that file in Notepad; edit in the app and Ctrl+S | Refused: *changed on disk*. Notepad's version survives — a file the tab *saved* is guarded exactly like one it opened |
+| DOC-34 (suite) **[P1]** | Open A, edit, Ctrl+Shift+S to B; change B in Notepad; Ctrl+S; then open A | The save to B is refused and B keeps Notepad's text. Opening A shows A's own contents in its own tab, not the tab that now holds B |
 | DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
