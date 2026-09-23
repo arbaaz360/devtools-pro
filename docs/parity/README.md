@@ -9,10 +9,10 @@ see `docs/packets/` for the packet that produced each batch of cards.
 | [DU-01](DU-01.md) Unix Timestamp Converter | `time.unix` | 24 / 1 / 2 / 5 | No local-time representation at all — every output is UTC-only, despite the card asking for "local and UTC/ISO representations." |
 | [DU-03](DU-03.md) RegExp Tester | `text.regex` | 19 / 2 / 4 / 4 | Not ICU (plain ECMAScript `RegExp`); no whitespace/comment (`x`) mode and no real Unicode UAX 29 word boundary, which are the two flavor features the card calls out by name. |
 | [DU-04](DU-04.md) JWT Debugger, decode/sign/verify | `security.jwt` | 17 / 1 / 3 / 2 | No signing at all — the card is titled "decode/sign/verify" and only decode/verify exist; there is no private-key input or re-signing workflow. |
-| [DU-06](DU-06.md) Base64 String Encoder/Decoder | `encoding.base64-text` | 14 / 0 / 1 / 6 | The output port has no `useAsInput` export, so the card's "Use as input" action has nothing to bind to (Copy/Save both exist). |
+| [DU-06](DU-06.md) Base64 String Encoder/Decoder | `encoding.base64-text` | 14 / 0 / 1 / 6 | Fixed in #101 (AG-125): the output port declares `useAsInput`. |
 | [DU-07](DU-07.md) Query String Parser / URL Parser | `web.url-parser` | 14 / 0 / 0 / 3 | None found — every Required/Acceptance row is `met`; the only non-`met` rows are legitimately presentation or out of processor scope. |
 | [DU-09](DU-09.md) Backslash Escaper/Unescaper | `text.backslash` | 14 / 0 / 0 / 1 | None found — every Required/Acceptance row is `met`. |
-| [DU-10](DU-10.md) UUID Generator/Decoder | `identity.uuid` | 24 / 1 / 0 / 3 | The operation's shared trigger config declares `inputChange` with no mode-conditional rule, so whether generate mode is actually explicit-action-only (as the card requires) versus decode's live-port detection is unproven from the manifest alone. |
+| [DU-10](DU-10.md) UUID Generator/Decoder | `identity.uuid` | 24 / 1 / 0 / 3 | The operation's shared trigger config declares `inputChange` with no mode-conditional rule, confirmed in the window: typing while generating fails with "UUID must be canonical". AG-126 splits it into two operations. |
 | DU-11 HTML Preview | `preview.html` | 5 | 0 | 5 | 6 | No way to ever enable JS/navigation/resource loading — only a permanent "off," not the card's three independent toggles |
 | DU-13 HTML beautify/minify | `format.html` | 14 | 0 | 1 | 4 | Cannot format embedded CSS/JS |
 | DU-14 CSS beautify/minify | `format.css` | 13 | 0 | 0 | 3 | None |
@@ -22,10 +22,10 @@ see `docs/packets/` for the packet that produced each batch of cards.
 | DU-18 JSON to YAML | `convert.json-yaml` | 12 | 0 | 0 | 2 | None found; every acceptance scenario passed |
 | DU-19 Number base converter | `number.base` | 7 | 0 | 0 | 4 | None |
 | DU-20 Example string generator | `generate.examples` | 2 | 0 | 0 | 8 | None |
-| DU-21 QR Code | `media.qr` | 5 | 1 | 7 | 7 | Generator silently corrupts non-ASCII text (no real UTF-8 encoding); no reader, templates or watermark exist yet |
+| DU-21 QR Code | `media.qr` | 5 | 1 | 7 | 7 | Fixed in #102 (AG-124): non-ASCII round-trips. A reader exists since #96; templates and watermark remain unbuilt |
 | DU-24 HTML/SVG to JSX | `convert.jsx` | 21 | 0 | 0 | 2 | None found; every acceptance scenario passed |
 | DU-25 Markdown Preview | `preview.markdown` | 10 | 1 | 1 | 7 | Inherits DU-11's missing JS/navigation/resource-loading toggles; no CSS-free "HTML source" view distinct from "HTML+CSS source" |
-| DU-26 SQL Formatter | `format.sql` | 15 | 1 | 3 | 2 | The manifest's own "4 spaces" indent choice (`space-4`) silently no-ops to 2 spaces; PL/SQL `BEGIN`/`IF`/`END` blocks are not restructured |
+| DU-26 SQL Formatter | `format.sql` | 15 | 1 | 3 | 2 | Fixed in #101 (AG-125): `space-4` indents four spaces; PL/SQL `BEGIN`/`IF`/`END` blocks are not restructured |
 | DU-27 String Case Converter | `text.case` | 18 | 1 | 0 | 2 | Acronym list is a plain text option, not a structured, resettable list widget |
 | **Total** | | **101** | **4** | **16** | **30** | 151 rows across 8 cards |
 
