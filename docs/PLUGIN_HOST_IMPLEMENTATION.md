@@ -100,6 +100,25 @@ document data, options, cancellation and progress; it does not get an arbitrary 
 path. This keeps the native safety policy in one place and lets a future v2 executor use named
 ports, range readers and artifact sinks without changing the UI or save code.
 
+## Save policy
+
+Every write is a sibling temporary file published with one rename, so a reader sees the old
+file or the new one and a failed save leaves no fragment. What a save may replace is decided
+by `Replace`, which the shell passes and the host enforces:
+
+| Replace | When the shell sends it | An existing file at the destination |
+|---|---|---|
+| `never` (default) | any caller that says nothing | refused |
+| `confirmed` | the path came from the save dialog, which asks before replacing (`FOS_OVERWRITEPROMPT` is the Windows default, and rfd keeps it) | replaced |
+| `inPlace` | **Save** on a tab that already has a file: the one it was opened from, or last saved to | replaced, unless it is the file the tab was opened from and its size or modified time no longer match what was read — then refused, *changed on disk … Use Save As* |
+
+Whatever `Replace` says, a save never lands on another open document's file (a tab may
+replace only its own, named by `own_document`), never on the snapshot it is copying, and a
+result is never saved over its own source. After a tab writes its own file, the host records
+the new size and time, so the next read or save does not mistake the app's write for someone
+else's. A refused or failed save leaves the tab, its edits and its result as they were; the
+shell reports it in the status line.
+
 The current adapter is not yet a fully dynamic third-party runtime. Discovery is build-time and
 the remaining P03 work must connect v2 `ExecuteRequest` ports, capability grants, complete output
 handles and terminal events. Runtime install and process isolation remain P09 work. The important

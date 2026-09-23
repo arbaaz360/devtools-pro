@@ -7,7 +7,7 @@
 // right; see the plan's section 7 for the distinction.
 
 import crypto from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { root, sleep } from "./harness.mjs";
 
@@ -36,6 +36,29 @@ const scratchFile = (name, contents) => {
   return file;
 };
 const digest = (file) => crypto.createHash("sha256").update(readFileSync(file)).digest("hex");
+/**
+ * A scratch path with nothing left from an earlier run: a save check that finds last
+ * run's file passes whether or not this run wrote anything. With `contents`, the file
+ * starts with exactly that; without, it does not exist.
+ */
+const freshFile = (name, contents) => {
+  const file = scratchFile(name);
+  if (existsSync(file)) { chmodSync(file, 0o644); rmSync(file); }
+  if (contents !== undefined) writeFileSync(file, contents);
+  return file;
+};
+const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
+/**
+ * The status line is a sink that keeps its last message, so a check that reads it can
+ * find the previous check's. Blank it before the action; whatever appears after is this
+ * action's.
+ */
+const clearStatus = (driver) => driver.page.evaluate(() => { document.querySelector("#status").textContent = ""; });
+/** The status line once it starts with `prefix`, or null. Call clearStatus before acting. */
+const statusStarting = (driver, prefix) => driver.until(async () => {
+  const text = (await driver.page.locator("#status").innerText()).trim();
+  return text.startsWith(prefix) ? text : null;
+});
 
 /**
  * Ids the native host serves itself. The engine lets a native id win over a package of
@@ -250,19 +273,80 @@ export const checks = [
     },
   },
   {
-    // Save the document the dialog would have named, then read back what landed.
+    // Save writes back to the file the tab was opened from and asks nothing. A decoy
+    // is the dialog's answer, so a dialog that should not have opened leaves a file.
     id: "DOC-17",
     async run({ driver, page }) {
-      const target = scratchFile("saved-document.txt");
+      const file = freshFile("in-place.txt", "first draft\n");
+      const decoy = freshFile("in-place-decoy.txt");
+      await driver.openPath(file);
+      await driver.setInput("second draft\n");
+      const label = (await page.locator("#save-document").innerText()).trim();
+      await driver.presetDialogPaths([decoy]);
+      await page.locator("#preview").press("Control+s");
+      const written = await driver.until(() => read(file) === "second draft\n");
+      await driver.presetDialogPaths([]);
+      return verdict(!!written && !existsSync(decoy) && label === "Save",
+        `button "${label}"; the file holds ${JSON.stringify(read(file))}; ${existsSync(decoy) ? "a dialog was asked for" : "no dialog"}`);
+    },
+  },
+  {
+    // An untitled tab asks once; after that Save goes where it went.
+    id: "DOC-31",
+    async run({ driver, page }) {
+      const target = freshFile("untitled-saved.txt");
+      const decoy = freshFile("untitled-decoy.txt");
       await driver.newTab();
       await driver.selectTool("String Case Converter");
-      await driver.setInput("save this document");
+      await driver.setInput("first version\n");
       await driver.presetDialogPaths([target]);
-      await page.locator("#save-document").click();
-      const written = await driver.until(() => existsSync(target));
-      if (!written) return { status: "fail", note: "no file appeared at the path the dialog returned" };
-      const contents = readFileSync(target, "utf8");
-      return verdict(contents.includes("save this document"), `wrote ${JSON.stringify(contents.slice(0, 40))}`);
+      await page.locator("#preview").press("Control+s");
+      const first = await driver.until(() => read(target) === "first version\n");
+      if (!first) return verdict(false, `the dialog's path holds ${JSON.stringify(read(target))}`);
+      await driver.setInput("second version\n");
+      await driver.presetDialogPaths([decoy]);
+      await page.locator("#preview").press("Control+s");
+      const second = await driver.until(() => read(target) === "second version\n");
+      await driver.presetDialogPaths([]);
+      return verdict(!!second && !existsSync(decoy),
+        `after the second Ctrl+S the file holds ${JSON.stringify(read(target))}; ${existsSync(decoy) ? "it asked again" : "it did not ask again"}`);
+    },
+  },
+  {
+    // A read-only file is refused in words; the file and the edits both survive.
+    id: "DOC-20",
+    async run({ driver, page }) {
+      const file = freshFile("read-only.txt", "locked\n");
+      chmodSync(file, 0o444);
+      try {
+        await driver.openPath(file);
+        await driver.setInput("locked, edited\n");
+        await clearStatus(driver);
+        await page.locator("#preview").press("Control+s");
+        const status = await statusStarting(driver, "Not saved:");
+        const kept = await page.locator("#preview").inputValue();
+        const dirty = await page.locator(".tab-wrap.active .dirty-indicator").count();
+        return verdict(/read-only/.test(status ?? "") && read(file) === "locked\n" && kept === "locked, edited\n" && dirty === 1,
+          `status "${status}"; file ${JSON.stringify(read(file))}; editor ${JSON.stringify(kept)}; ${dirty ? "still unsaved" : "marked saved"}`);
+      } finally {
+        chmodSync(file, 0o644);
+      }
+    },
+  },
+  {
+    // Another program wrote the file after the app read it. A silent Save must not
+    // replace that; the refusal says what happened and what to do instead.
+    id: "DOC-32",
+    async run({ driver, page }) {
+      const file = freshFile("changed-elsewhere.txt", "as opened\n");
+      await driver.openPath(file);
+      writeFileSync(file, "written by another program\n");
+      await driver.setInput("edited in the app\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await statusStarting(driver, "Not saved:");
+      return verdict(/changed on disk/.test(status ?? "") && /Save As/.test(status ?? "") && read(file) === "written by another program\n",
+        `status "${status}"; the other program's file holds ${JSON.stringify(read(file))}`);
     },
   },
   {
@@ -295,7 +379,7 @@ export const checks = [
     // A saved result keeps the extension its type implies, and the whole payload.
     id: "RES-08",
     async run({ driver, page }) {
-      const target = scratchFile("saved-result.json");
+      const target = freshFile("saved-result.json");
       await driver.tool("JSON", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
       await driver.presetDialogPaths([target]);
       const save = page.locator("#save-result");
@@ -308,6 +392,20 @@ export const checks = [
       try { parsed = JSON.parse(contents); } catch { /* not JSON */ }
       return verdict(parsed?.b === 1 && contents.includes(String.fromCharCode(10)),
         `the saved file re-parses to the formatted value (${contents.length} bytes)`);
+    },
+  },
+  {
+    // The dialog asked and the user confirmed: the old file is replaced by the result.
+    id: "RES-09",
+    async run({ driver, page }) {
+      const target = freshFile("replaced-result.json", "old contents that must go\n");
+      await driver.tool("JSON", { text: '{"replaced":true}', operation: "Format" });
+      await driver.presetDialogPaths([target]);
+      await page.locator("#save-result").click();
+      const replaced = await driver.until(() => read(target) !== "old contents that must go\n");
+      let parsed = null;
+      try { parsed = JSON.parse(read(target) ?? ""); } catch { /* not JSON */ }
+      return verdict(!!replaced && parsed?.replaced === true, `the file now holds ${JSON.stringify((read(target) ?? "").slice(0, 40))}`);
     },
   },
   {

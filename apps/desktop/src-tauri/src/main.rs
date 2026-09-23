@@ -850,15 +850,36 @@ fn canonical_for_compare(path: &Path) -> PathBuf {
     fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
+/// What a save may do to a file that is already at the destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum Replace {
+    /// Refuse. The default, and what every caller that says nothing gets.
+    #[default]
+    Never,
+    /// The user chose this file in the save dialog and confirmed replacing it.
+    Confirmed,
+    /// Save to the file the tab already belongs to. If that is the file the tab
+    /// was opened from, it is replaced only if nothing else changed it since.
+    InPlace,
+}
+
 /// Copy a generated result to a new sibling temporary file, then publish it
 /// with one rename. The temporary path is reserved with `create_new`, and is
 /// removed on every error so interrupted/failed saves cannot leave artifacts.
-fn atomic_copy_with<F>(destination: &Path, copy: F) -> Result<(), String>
+/// With `replace`, the rename replaces an existing file in one step; a reader
+/// sees the old file or the new one, never a partial write.
+fn atomic_copy_with<F>(destination: &Path, replace: bool, copy: F) -> Result<(), String>
 where
     F: FnOnce(&Path) -> io::Result<()>,
 {
     if path_entry_exists(destination) {
-        return Err("Choose a new destination; existing files are not overwritten.".into());
+        if !replace {
+            return Err("Choose a new destination; existing files are not overwritten.".into());
+        }
+        if !destination.is_file() {
+            return Err("Choose a file to replace, not a folder.".into());
+        }
     }
     let parent = destination.parent().filter(|p| !p.as_os_str().is_empty()).unwrap_or_else(|| Path::new("."));
     if !parent.exists() {
@@ -881,10 +902,10 @@ where
         copy(&temporary).map_err(|error| error.to_string())?;
         // Re-check immediately before publication. A destination created by
         // another process is rejected on platforms where rename overwrites.
-        if path_entry_exists(destination) {
+        if !replace && path_entry_exists(destination) {
             return Err("Choose a new destination; existing files are not overwritten.".into());
         }
-        fs::rename(&temporary, destination).map_err(|error| error.to_string())
+        fs::rename(&temporary, destination).map_err(|error| write_error(&error))
     })();
     if result.is_err() {
         let _ = fs::remove_file(&temporary);
@@ -892,8 +913,16 @@ where
     result
 }
 
-fn atomic_copy(source: &Path, destination: &Path) -> Result<(), String> {
-    atomic_copy_with(destination, |temporary| {
+/// Say why Windows refused a write in words a person can act on.
+fn write_error(error: &io::Error) -> String {
+    match error.kind() {
+        io::ErrorKind::PermissionDenied => "The file could not be replaced: it is read-only, open in another program, or in a folder you cannot write to.".into(),
+        _ => error.to_string(),
+    }
+}
+
+fn atomic_copy(source: &Path, destination: &Path, replace: bool) -> Result<(), String> {
+    atomic_copy_with(destination, replace, |temporary| {
         let mut input = File::open(source)?;
         let mut output = File::options().write(true).truncate(true).open(temporary)?;
         io::copy(&mut input, &mut output)?;
@@ -902,16 +931,19 @@ fn atomic_copy(source: &Path, destination: &Path) -> Result<(), String> {
     })
 }
 
+/// `own` names the open document the saving tab was opened from: its file is the
+/// one open file a save may land on. Every other open file stays unchanged.
 fn validate_save_destination(
     destination: &Path,
     result: &RegisteredDocument,
     open_documents: &HashMap<String, RegisteredDocument>,
+    own: Option<&str>,
 ) -> Result<(), String> {
     let destination_path = canonical_for_compare(destination);
     if destination_path == canonical_for_compare(&result.path) {
         return Err("Choose a different destination.".into());
     }
-    if open_documents.values().any(|open| !open.temporary && open.path == destination_path) {
+    if open_documents.iter().any(|(id, open)| !open.temporary && open.path == destination_path && Some(id.as_str()) != own) {
         return Err("Choose a new destination; source files stay unchanged.".into());
     }
     if let Some(origin) = &result.origin_path {
@@ -929,6 +961,7 @@ fn validate_save_destination(
 fn save_result(
     result_document_id: String,
     output_path: String,
+    replace: Option<Replace>,
     state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<(), String> {
     let document = state.documents.lock().map_err(|e| e.to_string())?
@@ -936,26 +969,60 @@ fn save_result(
     if !document.temporary { return Err("Only generated results can be saved here.".into()); }
     let destination = PathBuf::from(output_path);
     let open_documents = state.documents.lock().map_err(|e| e.to_string())?;
-    validate_save_destination(&destination, &document, &open_documents)?;
+    validate_save_destination(&destination, &document, &open_documents, None)?;
     drop(open_documents);
-    atomic_copy(&document.path, &destination)
+    // A result has no file of its own, so only the dialog's confirmation replaces one.
+    atomic_copy(&document.path, &destination, replace == Some(Replace::Confirmed))
 }
 
-/// Save any open immutable document or generated snapshot to a new path.
-/// Publication is atomic and never overwrites an existing directory entry.
+/// Save an open document or generated snapshot. Publication is atomic. An existing
+/// file is replaced only when `replace` says the user asked for it: confirmed in the
+/// save dialog, or a Save to the tab's own file (`own_document` names the file the
+/// tab was opened from, which is the one open file a save may land on).
 #[tauri::command]
 fn save_document(
     document_id: String,
     output_path: String,
+    replace: Option<Replace>,
+    own_document: Option<String>,
     state: tauri::State<'_, Arc<HostState>>,
 ) -> Result<(), String> {
+    let replace = replace.unwrap_or_default();
     let document = state.documents.lock().map_err(|e| e.to_string())?
         .get(&document_id).cloned().ok_or("Document is no longer available.")?;
     let destination = PathBuf::from(output_path);
     let open_documents = state.documents.lock().map_err(|e| e.to_string())?;
-    validate_save_destination(&destination, &document, &open_documents)?;
+    validate_save_destination(&destination, &document, &open_documents, own_document.as_deref())?;
+    let own = own_document.as_deref()
+        .and_then(|id| open_documents.get(id))
+        .filter(|own| own.path == canonical_for_compare(&destination))
+        .cloned();
     drop(open_documents);
-    atomic_copy(&document.path, &destination)
+    if let (Replace::InPlace, Some(own)) = (replace, &own) {
+        unchanged_since_opened(own)?;
+    }
+    atomic_copy(&document.path, &destination, replace != Replace::Never)?;
+    // The tab's own file now holds what was just written. Record that, or the next
+    // read of it (or the next in-place save) would report a change nobody else made.
+    if let (Some(id), Some(_)) = (own_document, own) {
+        if let Ok(meta) = fs::metadata(&destination) {
+            if let Some(entry) = state.documents.lock().map_err(|e| e.to_string())?.get_mut(&id) {
+                entry.size = meta.len();
+                entry.modified = meta.modified().ok();
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A silent save must not replace edits another program made to the file after
+/// this app read it. Save As, where the user confirms the replace, may.
+fn unchanged_since_opened(own: &RegisteredDocument) -> Result<(), String> {
+    match fs::metadata(&own.path) {
+        Ok(meta) if meta.len() == own.size && meta.modified().ok() == own.modified => Ok(()),
+        Ok(_) => Err("This file changed on disk after it was opened. Use Save As to replace it anyway, or reopen it.".into()),
+        Err(_) => Err("This file was moved or deleted after it was opened. Use Save As to save it again.".into()),
+    }
 }
 
 #[tauri::command]
@@ -1051,7 +1118,7 @@ mod tests {
         let original = br#"{"a":1,"b":[true,false]}"#;
         fs::write(&source, original).unwrap();
 
-        atomic_copy(&source, &destination).unwrap();
+        atomic_copy(&source, &destination, false).unwrap();
 
         assert_eq!(fs::read(&source).unwrap(), original);
         assert_eq!(fs::read(&destination).unwrap(), original);
@@ -1066,7 +1133,7 @@ mod tests {
         fs::write(&source, b"source").unwrap();
         fs::write(&destination, b"keep me").unwrap();
 
-        let error = atomic_copy(&source, &destination).unwrap_err();
+        let error = atomic_copy(&source, &destination, false).unwrap_err();
 
         assert!(error.contains("existing files are not overwritten"));
         assert_eq!(fs::read(&destination).unwrap(), b"keep me");
@@ -1092,7 +1159,7 @@ mod tests {
         let mut open = HashMap::new();
         open.insert("source".into(), source_doc);
 
-        let error = validate_save_destination(&source, &result_doc, &open).unwrap_err();
+        let error = validate_save_destination(&source, &result_doc, &open, None).unwrap_err();
 
         assert!(error.contains("source files stay unchanged"));
         fs::remove_dir_all(dir).unwrap();
@@ -1105,7 +1172,7 @@ mod tests {
         let destination = dir.join("copy.json");
         fs::write(&source, b"source").unwrap();
 
-        let error = atomic_copy_with(&destination, |temporary| {
+        let error = atomic_copy_with(&destination, false, |temporary| {
             fs::write(temporary, b"partial").map_err(|error| io::Error::new(error.kind(), error.to_string()))?;
             Err(io::Error::new(io::ErrorKind::Interrupted, "simulated interrupted save"))
         }).unwrap_err();
@@ -1117,6 +1184,99 @@ mod tests {
         }).count();
         assert_eq!(leftovers, 0);
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replacing_save_publishes_the_new_bytes_in_one_rename() {
+        let dir = test_dir("replace");
+        let source = dir.join("edited.json");
+        let destination = dir.join("opened.json");
+        fs::write(&source, b"{\"new\":true}").unwrap();
+        fs::write(&destination, b"{\"old\":true}").unwrap();
+
+        atomic_copy(&source, &destination, true).unwrap();
+
+        assert_eq!(fs::read(&destination).unwrap(), b"{\"new\":true}");
+        let leftovers = fs::read_dir(&dir).unwrap().filter_map(Result::ok)
+            .filter(|entry| entry.file_name().to_string_lossy().starts_with(".devtools-pro-save-")).count();
+        assert_eq!(leftovers, 0);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replacing_save_refuses_a_folder_and_a_read_only_file_with_words() {
+        let dir = test_dir("replace-refused");
+        let source = dir.join("edited.txt");
+        fs::write(&source, b"new").unwrap();
+        let folder = dir.join("folder");
+        fs::create_dir(&folder).unwrap();
+        assert!(atomic_copy(&source, &folder, true).unwrap_err().contains("not a folder"));
+
+        let locked = dir.join("locked.txt");
+        fs::write(&locked, b"keep me").unwrap();
+        let mut permissions = fs::metadata(&locked).unwrap().permissions();
+        permissions.set_readonly(true);
+        fs::set_permissions(&locked, permissions.clone()).unwrap();
+        let error = atomic_copy(&source, &locked, true).unwrap_err();
+        assert!(error.contains("read-only"), "{error}");
+        assert_eq!(fs::read(&locked).unwrap(), b"keep me");
+
+        #[allow(clippy::permissions_set_readonly_false)]
+        permissions.set_readonly(false);
+        fs::set_permissions(&locked, permissions).unwrap();
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_tab_may_save_over_its_own_file_but_no_other_open_file() {
+        let dir = test_dir("own");
+        let mine = dir.join("mine.json");
+        let theirs = dir.join("theirs.json");
+        let snapshot = dir.join("snapshot.json");
+        for path in [&mine, &theirs, &snapshot] { fs::write(path, b"{}").unwrap(); }
+        let open_doc = |path: &Path| RegisteredDocument {
+            path: canonical_for_compare(path), size: 2, modified: None, temporary: false,
+            display_name: None, origin_path: None,
+        };
+        let snapshot_doc = RegisteredDocument {
+            path: snapshot.clone(), size: 2, modified: None, temporary: true,
+            display_name: None, origin_path: None,
+        };
+        let mut open = HashMap::new();
+        open.insert("mine".to_string(), open_doc(&mine));
+        open.insert("theirs".to_string(), open_doc(&theirs));
+
+        validate_save_destination(&mine, &snapshot_doc, &open, Some("mine")).unwrap();
+        assert!(validate_save_destination(&theirs, &snapshot_doc, &open, Some("mine")).unwrap_err().contains("stay unchanged"));
+        assert!(validate_save_destination(&mine, &snapshot_doc, &open, None).unwrap_err().contains("stay unchanged"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_in_place_save_refuses_a_file_changed_or_removed_since_it_was_opened() {
+        let dir = test_dir("changed");
+        let path = dir.join("opened.txt");
+        fs::write(&path, b"as opened").unwrap();
+        let meta = fs::metadata(&path).unwrap();
+        let own = RegisteredDocument {
+            path: canonical_for_compare(&path), size: meta.len(), modified: meta.modified().ok(),
+            temporary: false, display_name: None, origin_path: None,
+        };
+        unchanged_since_opened(&own).unwrap();
+
+        fs::write(&path, b"edited by another program").unwrap();
+        assert!(unchanged_since_opened(&own).unwrap_err().contains("changed on disk"));
+
+        fs::remove_file(&path).unwrap();
+        assert!(unchanged_since_opened(&own).unwrap_err().contains("moved or deleted"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn replace_arrives_from_the_shell_in_camel_case_and_defaults_to_never() {
+        assert_eq!(serde_json::from_str::<Replace>("\"inPlace\"").unwrap(), Replace::InPlace);
+        assert_eq!(serde_json::from_str::<Replace>("\"confirmed\"").unwrap(), Replace::Confirmed);
+        assert_eq!(Replace::default(), Replace::Never);
     }
 
     #[test]
@@ -1226,7 +1386,7 @@ mod tests {
         let snapshot = state.documents.lock().unwrap().get(&opened.id).unwrap().clone();
         assert_eq!(fs::read(&snapshot.path).unwrap(), text.as_bytes());
         let destination = test_dir("large-snapshot").join("saved.txt");
-        atomic_copy(&snapshot.path, &destination).unwrap();
+        atomic_copy(&snapshot.path, &destination, false).unwrap();
         assert_eq!(fs::read(&destination).unwrap(), text.as_bytes());
         unregister_document(&state, &opened.id).unwrap();
         assert!(!path_entry_exists(&snapshot.path));
