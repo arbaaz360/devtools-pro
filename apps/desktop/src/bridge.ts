@@ -161,8 +161,17 @@ export function createTextDocument(text: string, name?: string, format?: Format)
   return invoke('create_text_document', { text, name, format });
 }
 
-export function saveDocument(documentId: string, outputPath: string): Promise<void> {
-  return invoke('save_document', { documentId, outputPath });
+/**
+ * What a save may do to a file already at the destination. `never` refuses;
+ * `confirmed` means the user picked it in the save dialog, which asked before
+ * replacing; `inPlace` is a Save to the tab's own file, refused by the host if
+ * another program changed that file after it was opened.
+ */
+export type SaveReplace = 'never' | 'confirmed' | 'inPlace';
+
+/** `ownDocument` is the document the tab was opened from: the one open file a save may land on. */
+export function saveDocument(documentId: string, outputPath: string, replace: SaveReplace = 'never', ownDocument?: string): Promise<void> {
+  return invoke('save_document', { documentId, outputPath, replace, ownDocument: ownDocument ?? null });
 }
 
 export function chooseDocumentOutput(name: string): Promise<string | null> {
@@ -241,8 +250,8 @@ export function jobStatus(jobId: string): Promise<JobFinished | null> {
   return invoke('job_status', { jobId });
 }
 
-export function saveResult(resultDocumentId: string, outputPath: string): Promise<void> {
-  return invoke('save_result', { resultDocumentId, outputPath });
+export function saveResult(resultDocumentId: string, outputPath: string, replace: SaveReplace = 'never'): Promise<void> {
+  return invoke('save_result', { resultDocumentId, outputPath, replace });
 }
 
 export async function subscribeJobs(onProgress: (event: JobProgress) => void, onFinished: (event: JobFinished) => void): Promise<UnlistenFn> {
