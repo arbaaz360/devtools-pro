@@ -66,15 +66,51 @@ and take the next packet.
   Node built-in is not reachable from the app.
 - Commit and push only your branch. Never merge.
 
+## Where an expected value comes from
+
+**A fixture's expected value may not be a recording of the tool under test**,
+wherever anything else can supply it. Run the processor, paste its output as the
+expectation, and the test proves the tool is *stable*; it says nothing about
+whether the tool is *right*, and it will keep passing while the tool is wrong.
+
+This is not hypothetical. `plugins/qr` shipped with 27 fixtures pinning the SVG it
+produced and a green suite, while every non-ASCII input produced a QR code that
+scans as nothing: `café` and `日本語のテキスト` both decode to an empty string. The
+fixtures could not have caught it, because they were made of the defect.
+
+So take the expectation from something that does not share the bug:
+
+| Source | What it looks like |
+|---|---|
+| A standard | RFC 4122 gives `cfbff0d1-9375-5685-968c-48ce8b15ae17` for v5 of dns/example.com |
+| A second implementation | encode with `qrcode-generator`, decode with `jsqr`, assert the text comes back |
+| A computed value | `node:crypto` for a digest, `Number.prototype.toString(2)` for a base conversion |
+| The inverse operation | minify then beautify, escape then unescape, and compare with the input |
+| An invariant that can fail | the output re-parses; the byte count matches the reported one; running twice gives the same bytes |
+
+None of these count: the tool echoing back the option you set, an `"executed"`
+line proving only that something ran, the package's own README, or a property the
+tool reports about itself. Ask of every expectation: **if the implementation were
+wrong in the way this row exists to catch, would this fail?** If not, it is
+decoration.
+
+Some outputs have no oracle — the exact whitespace a formatter chooses is a
+decision, not a fact. Record those, and say in the package README that they are
+pinned for stability. Then pair each with something that can fail on its own:
+the formatted output re-parses, a round trip returns the input, the count the
+result reports matches the count in the fixture.
+
 ## Self-review before handoff
 
 Run every command under the packet's **Checks** and keep the output. Then:
 
 1. `git diff --stat origin/main...HEAD` lists only allowed paths.
 2. Every requirement in the packet maps to a test or a fixture you can name.
-3. The README describes what the code does, not what you meant it to do.
-4. `git diff --check` is clean.
-5. Nothing unrelated changed. Any fix outside the packet goes in a `[QUESTION]`.
+3. For each fixture, you can say where its expected value came from, and it is
+   not this tool's own output unless nothing else could supply it.
+4. The README describes what the code does, not what you meant it to do.
+5. `git diff --check` is clean.
+6. Nothing unrelated changed. Any fix outside the packet goes in a `[QUESTION]`.
 
 ## Handoff
 
@@ -154,3 +190,9 @@ The integrator replies with one of:
 
 A packet gets at most two `CHANGES_REQUESTED` rounds. After that the
 integrator either fixes forward or closes the PR and rewrites the packet.
+
+The integrator spot-checks at least one computed value per package against an
+independent source rather than reading the diff alone. A review that only
+confirms shape — files in scope, tests green, fixture counts met — certifies
+the harness, not the tool: every one of `plugins/qr`'s 27 fixtures was in
+scope, passing and made of the defect.
