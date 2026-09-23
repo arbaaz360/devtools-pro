@@ -166,6 +166,14 @@ async function harness(t: TestContext) {
     saveDocument: async (id, path, replace, own) => {
       effects.saveDocument?.();
       saves.push({ id, path, replace, own });
+      // As the host does: the tab's own document is refreshed when it wrote its own
+      // file; any other destination becomes a document of its own.
+      const text = documents.get(id)?.text ?? "";
+      const name = path.split(/[\\/]/).pop()!;
+      const ownEntry = own ? documents.get(own) : undefined;
+      return ownEntry && ownEntry.document.path === path
+        ? register(text, { id: own, path, name })
+        : register(text, { path, name });
     },
     chooseResultOutput: async () => (effects.chooseResult ? effects.chooseResult() : null),
     saveResult: async (id, path, replace) => {
@@ -969,6 +977,42 @@ test("a result save that fails keeps the result, and a chosen path is a confirme
   h.effects.saveResult = undefined;
   await h.controller.saveOutput(id);
   assert.deepEqual(h.resultSaves.map((save) => save.replace), ["confirmed"]);
+});
+
+test("a first save makes the file the tab's document, so the next save guards it", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("first version");
+  h.effects.chooseDocument = () => "C:/work/new.txt";
+  assert.equal(await h.controller.save(id), true);
+  const tab = h.controller.tab(id)!;
+  assert.equal(tab.source?.path, "C:/work/new.txt", "the tab belongs to the file it wrote");
+  assert.equal(tab.pasted, false);
+
+  h.controller.edit(id, "second version");
+  assert.equal(await h.controller.save(id), true);
+  assert.equal(h.saves[1]!.replace, "inPlace");
+  assert.equal(h.saves[1]!.own, tab.source!.id, "so the host checks that file for outside changes");
+});
+
+test("Save As moves the tab to the new file and lets the old one be opened as itself", async (t) => {
+  const h = await harness(t);
+  const { id, document } = await openedFile(h, "contents of A", "a.txt");
+  h.controller.edit(id, "contents for B");
+  h.effects.chooseDocument = () => "/mock/b.txt";
+  assert.equal(await h.controller.save(id, { as: true }), true);
+  const tab = h.controller.tab(id)!;
+  assert.equal(tab.source?.path, "/mock/b.txt");
+  assert.equal(tab.name, "b.txt");
+  await waitFor(() => h.closed.includes(document.id), "A's document to be released");
+
+  // A is still on disk with its own contents; opening it must show A, not find this tab.
+  h.register("contents of A", { path: "/mock/a.txt", name: "a.txt" });
+  const before = h.controller.state.tabs.length;
+  await h.controller.openPath("/mock/a.txt");
+  assert.equal(h.controller.state.tabs.length, before + 1, "A opens in a tab of its own");
+  const opened = h.controller.tab(h.controller.state.activeId!)!;
+  await waitFor(() => h.controller.tab(opened.id)?.text === "contents of A", "A's own contents");
+  assert.equal(opened.name, "a.txt");
 });
 
 test("a byte tool reads an unedited file's own bytes, and the edited text once it changes", async (t) => {

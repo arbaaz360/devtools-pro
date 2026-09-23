@@ -57,6 +57,8 @@ const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
  * action's.
  */
 const clearStatus = (driver) => driver.page.evaluate(() => { document.querySelector("#status").textContent = ""; });
+/** The next message in the status line, whatever it says. Call clearStatus before acting. */
+const nextStatus = (driver) => driver.until(async () => (await driver.page.locator("#status").innerText()).trim() || null);
 /** The status line once it starts with `prefix`, or null. Call clearStatus before acting. */
 const statusStarting = (driver, prefix) => driver.until(async () => {
   const text = (await driver.page.locator("#status").innerText()).trim();
@@ -429,6 +431,55 @@ export const checks = [
         JSON.stringify(added) === JSON.stringify(names) && /^Opened 3 of 4 files · drop-folder: /.test(status ?? ""),
         `new tabs ${JSON.stringify(added)}; status "${status}"`,
       );
+    },
+  },
+  {
+    // AST-006: a file the tab saved, not opened, is guarded like one it opened. Another
+    // program changes it; the next Ctrl+S must refuse, and that program's text survive.
+    id: "DOC-33",
+    async run({ driver, page }) {
+      const file = freshFile("saved-then-changed.txt");
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("first saved text\n");
+      await driver.presetDialogPaths([file]);
+      await page.locator("#preview").press("Control+s");
+      if (!(await driver.until(() => read(file) === "first saved text\n"))) return verdict(false, `the first save did not land: ${JSON.stringify(read(file))}`);
+      writeFileSync(file, "EXTERNAL EDIT, MUST SURVIVE\n");
+      await driver.setInput("edited inside app\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      return verdict(/changed on disk/.test(status ?? "") && read(file) === "EXTERNAL EDIT, MUST SURVIVE\n",
+        `status "${status}"; the file holds ${JSON.stringify(read(file))}`);
+    },
+  },
+  {
+    // AST-006: after Save As A -> B the tab is B's. B is guarded, and A opens as itself.
+    id: "DOC-34",
+    async run({ driver, page }) {
+      const a = freshFile("save-as-source.txt", "contents of A\n");
+      const b = freshFile("save-as-target.txt");
+      await driver.openPath(a);
+      await driver.setInput("contents for B\n");
+      await driver.presetDialogPaths([b]);
+      await page.locator("#preview").press("Control+Shift+s");
+      if (!(await driver.until(() => read(b) === "contents for B\n"))) return verdict(false, `Save As did not land: ${JSON.stringify(read(b))}`);
+      writeFileSync(b, "EXTERNAL EDIT OF B\n");
+      await driver.setInput("more edits\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      const guarded = /changed on disk/.test(status ?? "") && read(b) === "EXTERNAL EDIT OF B\n";
+      let shown = null;
+      try {
+        await driver.openPath(a);
+        shown = await page.locator("#preview").inputValue();
+      } catch (error) {
+        shown = `(${error.message})`;
+      }
+      return verdict(guarded && shown === "contents of A\n" && read(a) === "contents of A\n",
+        `B: status "${status}", holds ${JSON.stringify(read(b))}; opening A shows ${JSON.stringify(shown)}`);
     },
   },
   {

@@ -181,8 +181,13 @@ export function createTextDocument(text: string, name?: string, format?: Format)
  */
 export type SaveReplace = 'never' | 'confirmed' | 'inPlace';
 
-/** `ownDocument` is the document the tab was opened from: the one open file a save may land on. */
-export function saveDocument(documentId: string, outputPath: string, replace: SaveReplace = 'never', ownDocument?: string): Promise<void> {
+/**
+ * `ownDocument` is the document the tab belongs to: the one open file a save may land
+ * on. Resolves to the document the tab belongs to afterwards — the file just written,
+ * recorded with the size and time it was written, so the next Save can tell whether
+ * anything else has changed it since.
+ */
+export function saveDocument(documentId: string, outputPath: string, replace: SaveReplace = 'never', ownDocument?: string): Promise<FileDocument> {
   return invoke('save_document', { documentId, outputPath, replace, ownDocument: ownDocument ?? null });
 }
 
