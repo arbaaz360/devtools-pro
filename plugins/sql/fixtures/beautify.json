@@ -12,10 +12,21 @@
     "name": "DU-26 screenshot query",
     "dialect": "sql",
     "options": {
-      "keywordCase": "upper"
+      "keywordCase": "upper",
+      "indent": "space-2"
     },
     "input": "select u.id, u.name, count(o.id) as orders from users u left join orders o on o.user_id = u.id where u.active = 1 and o.created_at > '2024-01-01' group by u.id, u.name having count(o.id) > 3 order by orders desc limit 10;",
     "output": "SELECT\n  u.id,\n  u.name,\n  count(o.id) AS orders\nFROM users u\nLEFT JOIN orders o\nON o.user_id = u.id\nWHERE u.active = 1\n  AND o.created_at > '2024-01-01'\nGROUP BY u.id, u.name\nHAVING count(o.id) > 3\nORDER BY orders DESC\nLIMIT 10;"
+  },
+  {
+    "name": "DU-26 screenshot query space-4",
+    "dialect": "sql",
+    "options": {
+      "keywordCase": "upper",
+      "indent": "space-4"
+    },
+    "input": "select u.id, u.name, count(o.id) as orders from users u left join orders o on o.user_id = u.id where u.active = 1 and o.created_at > '2024-01-01' group by u.id, u.name having count(o.id) > 3 order by orders desc limit 10;",
+    "output": "SELECT\n    u.id,\n    u.name,\n    count(o.id) AS orders\nFROM users u\nLEFT JOIN orders o\nON o.user_id = u.id\nWHERE u.active = 1\n    AND o.created_at > '2024-01-01'\nGROUP BY u.id, u.name\nHAVING count(o.id) > 3\nORDER BY orders DESC\nLIMIT 10;"
   },
   {
     "name": "joins with ON conditions",
@@ -249,7 +260,7 @@
       "indent": "space-4"
     },
     "input": "select a from b where c = 1;",
-    "output": "SELECT\n  a\nFROM b\nWHERE c = 1;"
+    "output": "SELECT\n    a\nFROM b\nWHERE c = 1;"
   },
   {
     "name": "indent tab",
