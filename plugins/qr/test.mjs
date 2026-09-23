@@ -110,6 +110,19 @@ test("2,953 UTF-8 bytes fits at level L and decodes back to the same text; 2,954
   await rejects(OPERATION_ID, { "error-correction": "L" }, "a".repeat(2954), "qr.capacity");
 });
 
+test("the capacity boundary is counted in UTF-8 bytes, not characters: 2,953 multi-byte bytes fits, 2,954 does not", async () => {
+  // "é" is 2 UTF-8 bytes; 1,476 of them plus one ASCII byte lands exactly on 2,953 bytes
+  // across 1,477 characters — a char-counting regression would accept this (1,477 < 2,953).
+  const fits = "é".repeat(1476) + "a";
+  assert.equal(encoder.encode(fits).byteLength, 2953);
+  const result = await assertDecodesTo(fits, { "error-correction": "L" });
+  assert.equal(result.inputBytes, 2953);
+
+  const doesNotFit = "é".repeat(1477);
+  assert.equal(encoder.encode(doesNotFit).byteLength, 2954);
+  await rejects(OPERATION_ID, { "error-correction": "L" }, doesNotFit, "qr.capacity");
+});
+
 class ChunkedReader {
   constructor(bytes, chunk, { cancellation, withSize = true } = {}) { this.bytes = bytes; this.chunk = chunk; this.cancellation = cancellation; this.calls = 0; if (!withSize) this.size = undefined; }
   read() { throw new Error("streaming processors must not read the whole input"); }
