@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-1a2b3c4d",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<img src=https://example.com/a.png>"
+  },
+  "output": {
+    "output": "<>\n  <img src=\"https://example.com/a.png\" />\n</>"
+  },
+  "diagnostics": []
+}

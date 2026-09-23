@@ -1,0 +1,12 @@
+{
+  "id": "DU-24-2b3c4d5e",
+  "operationId": "convert.jsx",
+  "options": {},
+  "input": {
+    "input": "<div style=\"--brand-color: red; color: var(--brand-color)\"></div>"
+  },
+  "output": {
+    "output": "<>\n  <div style={{ \"--brand-color\": \"red\", color: \"var(--brand-color)\" }} />\n</>"
+  },
+  "diagnostics": []
+}
