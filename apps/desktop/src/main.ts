@@ -207,6 +207,26 @@ function promptClose(tab: TabState): Promise<"save" | "discard" | "cancel"> {
     };
   });
 }
+/**
+ * The tab after (or before) `from`, wrapping — or the first or last. The tab strip is
+ * a WAI-ARIA tablist with a roving tabIndex: only the active tab is in the Tab order,
+ * so without arrow keys the others could not be reached from the keyboard at all.
+ */
+function neighbourTab(from: string, key: string): string | undefined {
+  const order = state.tabs.map((tab) => tab.id);
+  const at = order.indexOf(from);
+  if (at < 0 || !order.length) return undefined;
+  if (key === "ArrowRight" || key === "next") return order[(at + 1) % order.length];
+  if (key === "ArrowLeft" || key === "previous") return order[(at - 1 + order.length) % order.length];
+  if (key === "Home") return order[0];
+  if (key === "End") return order[order.length - 1];
+  return undefined;
+}
+/** Show a tab and put keyboard focus on its button, as the tabs pattern expects. */
+function selectTabFromKeyboard(id: string, focusButton: boolean) {
+  controller.activate(id);
+  if (focusButton) document.querySelector<HTMLButtonElement>(`#tabs .tab[data-tab-id="${CSS.escape(id)}"]`)?.focus();
+}
 function renderTabs() {
   const root = $("#tabs");
   root.innerHTML = "";
@@ -226,12 +246,18 @@ function renderTabs() {
     const tabName = displayTabName(tab);
     button.title = tab.source?.path ?? tabName;
     button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty || tab.rightDirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
+    button.dataset.tabId = tab.id;
     button.onclick = () => controller.activate(tab.id);
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         controller.activate(tab.id);
+        return;
       }
+      const target = neighbourTab(tab.id, event.key);
+      if (!target) return;
+      event.preventDefault();
+      selectTabFromKeyboard(target, true);
     };
     const close = document.createElement("button");
     close.className = "tab-close";
@@ -1660,6 +1686,22 @@ document.addEventListener("keydown", (event) => {
   ) {
     event.preventDefault();
     void controller.close(state.activeId);
+    return;
+  }
+  // Next and previous tab from anywhere, as editors do: Ctrl+Tab / Ctrl+Shift+Tab and
+  // Ctrl+PageDown / Ctrl+PageUp. Focus stays where the user was working.
+  if (
+    event.ctrlKey &&
+    state.activeId &&
+    !palette.open &&
+    (event.key === "Tab" || event.key === "PageDown" || event.key === "PageUp")
+  ) {
+    const backwards = event.key === "PageUp" || (event.key === "Tab" && event.shiftKey);
+    const target = neighbourTab(state.activeId, backwards ? "previous" : "next");
+    if (target && target !== state.activeId) {
+      event.preventDefault();
+      selectTabFromKeyboard(target, false);
+    }
     return;
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "n") {
