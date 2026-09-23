@@ -7,7 +7,7 @@
 // duration of the run.
 
 import { spawn, execSync } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,44 @@ export const artifacts = resolve(desktop, "test-results");
 export const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const previewPort = 1420;
+
+/**
+ * Free the preview port. A server left behind by an interrupted run answers happily
+ * and serves its own idea of the build, so the suite would report on a window that is
+ * not the one just built — plausible, green, and about the wrong code.
+ */
+function releasePort(port) {
+  try {
+    const rows = execSync(`netstat -ano | findstr :${port}`, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+    const owners = new Set();
+    for (const row of rows.split(String.fromCharCode(10))) {
+      const match = /LISTENING\s+(\d+)/.exec(row);
+      if (match) owners.add(match[1]);
+    }
+    for (const pid of owners) {
+      execSync(`taskkill /pid ${pid} /t /f`, { stdio: "ignore" });
+      console.log(`native suite: stopped process ${pid}, which was holding port ${port}`);
+    }
+  } catch { /* nothing was listening, which is the normal case */ }
+}
+
+/**
+ * Start from a clean webview profile. Two reasons, and the second is the one that
+ * cost an afternoon: leftover state makes a run depend on what ran before it, and
+ * the webview's HTTP cache can serve a previous build of the bundle — every check
+ * then passes against code that is not the code under test.
+ */
+function freshProfile() {
+  const identifier = "com.thedevtoolspro.workbench";
+  const profile = process.env.LOCALAPPDATA ? resolve(process.env.LOCALAPPDATA, identifier) : null;
+  if (!profile || !existsSync(profile)) return;
+  try {
+    rmSync(profile, { recursive: true, force: true });
+    console.log(`native suite: cleared the webview profile at ${profile}`);
+  } catch (error) {
+    console.warn(`native suite: could not clear ${profile} (${String(error.message).split(String.fromCharCode(10))[0]})`);
+  }
+}
 
 /** Say what the machine had, so a missing runtime reads differently from a slow start. */
 function diagnose(port, browserLog, appLog, connectBudgetMs, app) {
@@ -58,6 +96,8 @@ export async function startApp() {
   if (!existsSync(exe)) throw new Error(`${exe} is missing; run cargo build -p devtools-desktop first`);
   if (!existsSync(resolve(desktop, "dist", "index.html"))) throw new Error("apps/desktop/dist is missing; run the desktop build first");
 
+  releasePort(previewPort);
+  freshProfile();
   const preview = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(previewPort), "--strictPort"], { cwd: desktop, stdio: "ignore", shell: true });
   children.push(preview);
   let served = false;
@@ -133,6 +173,18 @@ export async function startApp() {
   await page.locator("#status").filter({ hasText: "Engine connected" }).waitFor({ timeout: 20_000 });
   const hooks = await page.evaluate(() => Boolean(globalThis.devtoolsTest));
   if (!hooks) throw new Error("the window did not expose its test hooks; is this a debug build?");
+
+  // The webview caches the dev URL, so a window can render a previous build while
+  // every check passes against it. Compare the script the page loaded with the one
+  // on disk, and reload past the cache once before giving up.
+  const builtScript = /<script[^>]+src="([^"]+)"/.exec(readFileSync(resolve(desktop, "dist", "index.html"), "utf8"))?.[1];
+  const loadedScript = async () => page.evaluate(() => document.querySelector("script[src]")?.getAttribute("src") ?? "");
+  // A navigation with a cache-busting query would drop Tauri's injected IPC, so the
+  // cache is defeated at the server (vite.config.ts sets Cache-Control: no-store) and
+  // this only checks that it worked.
+  const loaded = await loadedScript();
+  if (builtScript && !loaded.endsWith(builtScript.replace(/^[.]?[/]/, "")))
+    throw new Error(`the window is running ${loaded}, but the build on disk is ${builtScript}: it served a cached page`);
 
   return {
     page,

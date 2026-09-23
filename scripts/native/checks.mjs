@@ -306,6 +306,39 @@ export const checks = [
     },
   },
   {
+    // A JSON result can be walked as a tree and queried with a path. RES-14 in the
+    // plan: a structured result has to be readable, not one unwrapped line.
+    id: "RES-14",
+    async run({ driver, page }) {
+      await driver.tool("JSON", { text: "{\"store\":{\"book\":[{\"title\":\"Sayings\",\"price\":8.95},{\"title\":\"Moby Dick\",\"price\":8.99}],\"bicycle\":{\"color\":\"red\"}}}", operation: "Format" });
+      const toggle = page.locator("#view-tree");
+      if (await toggle.isHidden()) return { status: "fail", note: "a JSON result offered no tree view" };
+      await toggle.click();
+      await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 1);
+      const rows = await page.locator("#tree-body .tree-node").count();
+
+      // Query it. node finds the same two prices, so the count is not the app's opinion.
+      const expected = [...JSON.stringify(JSON.parse("{\"store\":{\"book\":[{\"title\":\"Sayings\",\"price\":8.95},{\"title\":\"Moby Dick\",\"price\":8.99}],\"bicycle\":{\"color\":\"red\"}}}")).matchAll(/"price":/g)].length;
+      await page.locator("#tree-path").fill("$..price");
+      const matched = await driver.until(async () => {
+        const status = (await page.locator("#tree-path-status").innerText()).trim();
+        return /match/.test(status) ? status : null;
+      });
+      const shown = (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ");
+
+      // Syntax the evaluator does not implement is refused by name: an empty list
+      // would read as "nothing matched", which is a different fact.
+      await page.locator("#tree-path").fill("$.store.book[?(@.price<9)]");
+      const refused = await driver.until(async () => {
+        const status = (await page.locator("#tree-path-status").innerText()).trim();
+        return /not supported/i.test(status) ? status : null;
+      });
+
+      const ok = rows > 1 && matched === `${expected} matches` && shown.includes("8.95") && Boolean(refused);
+      return verdict(ok, `${rows} rows; node counts ${expected} prices and the pane says "${matched}"; a filter expression is refused with "${(refused ?? "").slice(0, 48)}"`);
+    },
+  },
+  {
     id: "RES-21",
     async run({ driver, page }) {
       const text = "2024-02-29 and 1999-12-31";

@@ -23,6 +23,12 @@ node scripts/native-suite.mjs --smoke     # start-up subset
 node scripts/native-suite.mjs --only TL-  # by id
 ```
 
+The suite clears the webview profile and takes port 1420 before it starts, then checks
+that the window loaded the script the build wrote. Both exist because a run that tests
+a *previous* build passes just as happily as one that tests this build: a preview server
+left behind by an interrupted run keeps answering, and the webview caches the dev URL.
+`vite preview` now sends `Cache-Control: no-store` for the same reason.
+
 The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
 then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
 things a script cannot do for itself: open a path directly, and name the file a dialog

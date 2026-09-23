@@ -265,8 +265,26 @@
                     <div class="result-preview-heading">
                       <span class="section-label">OUTPUT</span
                       ><span id="result-output-meta"></span>
+                      <div id="result-views" class="result-views" role="group" aria-label="Result view" hidden>
+                        <button id="view-text" type="button" class="view-tab" aria-pressed="true">Text</button
+                        ><button id="view-tree" type="button" class="view-tab" aria-pressed="false">Tree</button>
+                      </div>
                     </div>
                     <div id="result-status-message" class="result-status-message" hidden></div>
+                    <div id="tree-panel" class="tree-panel" hidden>
+                      <div class="tree-query">
+                        <label class="sr-only" for="tree-path">JSONPath</label>
+                        <input
+                          id="tree-path"
+                          type="search"
+                          spellcheck="false"
+                          autocomplete="off"
+                          placeholder="$.store.book[0].title  ·  $..price"
+                        />
+                        <span id="tree-path-status" class="tree-path-status" role="status"></span>
+                      </div>
+                      <div id="tree-body" class="tree-body" tabindex="0" aria-label="Result tree"></div>
+                    </div>
                     <div class="result-code">
                       <pre
                         id="result-highlight"

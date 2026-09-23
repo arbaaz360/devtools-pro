@@ -278,7 +278,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-11 | Chain three tools with Open result (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
 | RES-12 (suite) | Press **Hide result**, then **Show result** | The result pane collapses and returns, with the result intact |
 | RES-13 | Collapse the result with the ›/‹ button in the pane header | Same behaviour; the button's tooltip flips |
-| RES-14 | Run a tool whose output is JSON-ish data (**URL Parser**, **JWT**, **Validate**) | The structured view is readable — keys and values laid out, not a single unwrapped line |
+| RES-14 (suite) | Run a tool whose output is JSON (**JSON Format**, **URL Parser**, **YAML to JSON**) and press **Tree** | The result is walkable: expandable nodes with type and size, and each row's path can be copied |
+| RES-14b | In Tree view type `$..price`, then `$.store.book[0]`, then a filter like `$.a[?(@.b==1)]` | The first two report a match count and list the matches with their paths; the filter is **refused by name** ("Filter expressions are not supported") rather than showing an empty list, which would read as "nothing matched" |
 | RES-15 **[P1]** | Run **Markdown Preview** on `sample.md` | The preview renders as a formatted document (heading, bold, list, code block) inside the result pane |
 | RES-16 **[P1]** | In the Markdown/HTML preview, click the `https://example.com` link | Nothing navigates the app away; at most it opens your browser. The app window must never become a web page |
 | RES-17 **[P1]** | Preview HTML containing `<script>alert(1)</script>` and `<img src=x onerror=alert(1)>` | No alert dialog appears. Record whether the content is stripped or just inert |
@@ -362,7 +363,7 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 ### TL-INSPECT — Text inspector · `text.inspect` · Rust · **known parity gap**
 | # | Input | Expected |
 |---|---|---|
-| 01 | `Hello ✓` | Character count 7, byte count 9 (UTF-8), one line |
+| 01 (suite) | `Hello ✓` | Character count 7, byte count 9 (UTF-8), one line |
 | 02 | `astral.txt` | Counts distinguish code points from UTF-16 units; the emoji with a ZWJ is counted consistently and the rule is stated |
 | 03 | `crlf.txt` | Line count 3 regardless of CRLF |
 | 04 | — | Compare every reported field against the DU-22 screenshot; list what is missing. This tool is known to be unaudited for parity |
@@ -389,7 +390,7 @@ Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-di
 | 03 | `1700000000000` | Interpreted as milliseconds (auto, by digit count) |
 | 04 | `2023-11-14T22:13:20Z` | Parsed as ISO and converted back to epoch |
 | 05 | `0`, `-1`, `2147483648` | Epoch, pre-epoch and post-2038 all handled |
-| 06 | `abc` | Readable error |
+| 06 (suite) | `abc` | Readable error |
 | 07 | — | Compare the displayed time zone handling with the DU-01 card |
 
 ### TL-UUID — UUID Generator · `identity.uuid` · package · generator
@@ -397,7 +398,7 @@ Options: mode (generate, decode), version (v1, v3, v4, v5), namespace, name, cou
 
 | # | Steps | Expected |
 |---|---|---|
-| 01 | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
+| 01 (suite) | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
 | 02 (suite) | Generate, count 100 | 100 UUIDs, all distinct |
 | 03 | Run v4 generation twice | Different values each time (not seeded/repeating) |
 | 04 (suite) | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
@@ -425,7 +426,7 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 | 01 (suite) | `https://example.com/search?q=hello world` | encode | Space becomes `%20` |
 | 02 (suite) | same | encode, form encoding (if offered) | Space becomes `+` |
 | 03 | `%E2%9C%93` | decode | `✓` |
-| 04 | `%ZZ` | decode | Readable error, not a silent pass-through |
+| 04 (suite) | `%ZZ` | decode | Readable error, not a silent pass-through |
 | 05 | `a+b` | decode in both modes | Record the difference between rfc3986 and form |
 
 ### TL-URLPARSE — URL Parser · `web.url-parser` · package · auto
@@ -434,7 +435,7 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 | # | Input | Expected |
 |---|---|---|
 | 01 (suite) | `https://user:pw@example.com:8443/a/b?x=1&y=two&x=3#frag` | Scheme, credentials, host, port, path, query pairs (including the repeated `x`) and fragment all listed |
-| 02 | same | The tree view is readable and the indent option changes the code view |
+| 02 (suite) | same | The tree view is readable and the indent option changes the code view |
 | 03 | `not a url` | Readable error |
 | 04 | `https://例え.jp/パス` | IDN host and percent-decoded path shown correctly |
 | 05 | query with `a=%20%2B&b=` | Decoded values shown, empty value preserved |
@@ -443,7 +444,7 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 | # | Input | Action | Expected |
 |---|---|---|---|
 | 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;…&amp;…` |
-| 02 | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
+| 02 (suite) | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
 | 03 | `&#x2713;` and `&#10003;` | unescape | Both give `✓` |
 | 04 | `&nosuchentity;` | unescape | Left as-is or flagged; not silently deleted |
 | 05 | `✓👩‍🚀` | escape then unescape | Round trip identical |
@@ -451,7 +452,7 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 ### TL-JSONSTR — JSON String Escape / Unescape · `text.json-string` · Rust
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 | `{"name":"Sample","items":[1,2,3]}` | escape | Quotes escaped, result is a valid JSON string literal |
+| 01 (suite) | `{"name":"Sample","items":[1,2,3]}` | escape | Quotes escaped, result is a valid JSON string literal |
 | 02 | result of 01 | unescape | Back to the original, byte-identical |
 | 03 | text with a tab, newline and backslash | escape | `\t`, `\n`, `\\` |
 | 04 | `"\u00e9"` | unescape | `é` |
@@ -461,7 +462,7 @@ Options: mode, quotes (both, double, single, none), non-ascii (keep, unicode, ut
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `a"b'c\d` with quotes=both | Both quote styles escaped |
+| 01 (suite) | `a"b'c\d` with quotes=both | Both quote styles escaped |
 | 02 | same with quotes=none | Neither escaped |
 | 03 | `é` with non-ascii=unicode vs utf16 | `\u00e9` vs the UTF-16 form; keep leaves it alone |
 | 04 | `\n\t` literal text | escape then unescape round-trips |
@@ -501,7 +502,7 @@ Options: query, replacement, mode (find, replace, replaceAll), case-sensitive, w
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `Sample text\nReplace this text`, query `text` | Find reports 2 matches with positions |
+| 01 (suite) | `Sample text\nReplace this text`, query `text` | Find reports 2 matches with positions |
 | 02 | query `TEXT`, case-sensitive on / off | 0 matches vs 2 |
 | 03 | whole-word on with query `ext` | 0 matches |
 | 04 | replace `text`→`word`, mode replace vs replaceAll | First-only vs all |
@@ -644,7 +645,7 @@ Operations: Preview Markdown, Preview HTML. Markdown options: gfm, breaks, theme
 | 05 **[P1]** | Markdown containing `<script>alert(1)</script>` and `[x](javascript:alert(1))` | No alert; the javascript: link does not execute |
 | 06 | `sample.html` with Preview HTML | Renders as a page |
 | 07 | Very long document (2 MB of markdown) | Renders or reports the limit; UI stays responsive |
-| 08 | Switch to the code representation | The generated HTML source is available and copyable |
+| 08 (suite) | Switch to the code representation | The generated HTML source is available and copyable |
 
 ### TL-QR — QR Code · `media.qr` · package · auto
 Options: error-correction (L, M, Q, H), cell-size (1–40), margin (0–16), version (0–40). Input limit 2953 bytes.
@@ -684,7 +685,7 @@ Options: from-base (2–36), to-base (2–36), digits (lower, upper). Limit 64 K
 | 02 | `ff`, 16 → 2 | `11111111` |
 | 03 | `zz`, 36 → 10 | `1295` |
 | 04 | Very long number (200 digits) | Exact, no floating-point rounding |
-| 05 | `2`, from-base 2 | Readable error (invalid digit for the base) |
+| 05 (suite) | `2`, from-base 2 | Readable error (invalid digit for the base) |
 | 06 | Negative and `+` prefixed values | Documented behaviour |
 | 07 | from-base 1 or 37 | Rejected by the control's range |
 
@@ -705,7 +706,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | 02 | same | Python requests output is valid Python with the same semantics |
 | 03 | `curl` with `-u user:pass` and cookies | Credentials appear in the generated code (and are not silently dropped) |
 | 04 | Multiline `curl` with `\` continuations | Parsed as one command |
-| 05 | Not a curl command | Readable error |
+| 05 (suite) | Not a curl command | Readable error |
 
 ### TL-EDITOR — Text editor · `editor.text`
 | # | Steps | Expected |
