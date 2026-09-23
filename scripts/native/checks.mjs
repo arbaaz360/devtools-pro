@@ -7,6 +7,9 @@
 // right; see the plan's section 7 for the distinction.
 
 import crypto from "node:crypto";
+import { execFileSync } from "node:child_process";
+import zlib from "node:zlib";
+import jsQR from "../../packages/vendor/jsqr/jsqr.mjs";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { root, sleep } from "./harness.mjs";
@@ -59,6 +62,59 @@ const statusStarting = (driver, prefix) => driver.until(async () => {
   const text = (await driver.page.locator("#status").innerText()).trim();
   return text.startsWith(prefix) ? text : null;
 });
+
+/** Windows PowerShell runs STA, which the clipboard needs; pwsh does not by default. */
+const clipboardShell = (script) =>
+  execFileSync("powershell.exe", ["-NoProfile", "-STA", "-NonInteractive", "-Command", `Add-Type -AssemblyName System.Windows.Forms, System.Drawing; ${script}`], { encoding: "utf8" }).trim();
+/** Empty the clipboard, so an image found after a copy is that copy's. */
+const clearClipboard = () => clipboardShell("[System.Windows.Forms.Clipboard]::Clear()");
+/**
+ * The clipboard's image as RGBA pixels, read by .NET: a path through neither the app
+ * nor Chromium, so what it finds is what another program pasting would get.
+ */
+function clipboardImage() {
+  const out = scratchFile("clipboard.bgra");
+  const answer = clipboardShell([
+    "$image = [System.Windows.Forms.Clipboard]::GetImage()",
+    "if (-not $image) { 'none'; exit }",
+    "$bitmap = New-Object System.Drawing.Bitmap $image",
+    "$rect = New-Object System.Drawing.Rectangle 0, 0, $bitmap.Width, $bitmap.Height",
+    "$data = $bitmap.LockBits($rect, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)",
+    "$bytes = New-Object byte[] ($data.Stride * $bitmap.Height)",
+    "[System.Runtime.InteropServices.Marshal]::Copy($data.Scan0, $bytes, 0, $bytes.Length)",
+    `[IO.File]::WriteAllBytes('${out}', $bytes)`,
+    "'{0} {1} {2}' -f $bitmap.Width, $bitmap.Height, $data.Stride",
+  ].join("; "));
+  if (answer === "none") return null;
+  const [width, height, stride] = answer.split(" ").map(Number);
+  const bgra = readFileSync(out);
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) {
+      const from = y * stride + x * 4, to = (y * width + x) * 4;
+      rgba[to] = bgra[from + 2]; rgba[to + 1] = bgra[from + 1]; rgba[to + 2] = bgra[from]; rgba[to + 3] = bgra[from + 3];
+    }
+  return { width, height, rgba };
+}
+
+/** A PNG of the given opaque RGBA pixels, encoded here: the check knows every pixel it should get back. */
+function pngOf(width, height, pixel) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (bytes) => { let c = 0xffffffff; for (const byte of bytes) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const sum = Buffer.alloc(4); sum.writeUInt32BE(crc(body));
+    return Buffer.concat([length, body, sum]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
+  header[8] = 8; header[9] = 6; // 8-bit RGBA
+  const rows = Buffer.alloc(height * (1 + width * 4));
+  for (let y = 0; y < height; y += 1)
+    for (let x = 0; x < width; x += 1) Buffer.from(pixel(x, y)).copy(rows, y * (1 + width * 4) + 1 + x * 4);
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", header), chunk("IDAT", zlib.deflateSync(rows)), chunk("IEND", Buffer.alloc(0))]);
+}
 
 /**
  * Ids the native host serves itself. The engine lets a native id win over a package of
@@ -721,6 +777,48 @@ export const checks = [
     async run({ driver }) {
       const result = await driver.tool("QR Code", { text: "https://example.com" });
       return verdict(result.mediaTag === "IMG" && /svg/i.test(result.mediaSrc), `result media is ${result.mediaTag || "absent"}`);
+    },
+  },
+  {
+    // Copy image puts a picture on the clipboard that another program can use: .NET
+    // reads the pixels back and jsQR, outside the app, decodes the text from them.
+    id: "RES-32",
+    async run({ driver, page }) {
+      const text = `https://example.com/copied-${Date.now()}`;
+      await driver.tool("QR Code", { text });
+      const button = page.locator("#copy-image");
+      if (await button.isHidden()) return verdict(false, "Copy image is not offered for a QR code");
+      clearClipboard();
+      await button.click();
+      const image = await driver.until(async () => clipboardImage(), { timeout: 8000, step: 400 });
+      if (!image) return verdict(false, "no image reached the clipboard");
+      const decoded = jsQR(image.rgba, image.width, image.height);
+      return verdict(decoded?.data === text, `${image.width}x${image.height} on the clipboard; jsQR reads ${JSON.stringify(decoded?.data ?? null)}`);
+    },
+  },
+  {
+    // A PNG result is copied as the same picture: every pixel the check encoded comes back.
+    id: "RES-33",
+    async run({ driver, page }) {
+      const width = 24, height = 16;
+      const pixel = (x, y) => [x * 10, y * 15, (x * y) % 256, 255];
+      const png = pngOf(width, height, pixel);
+      const uri = `data:image/png;base64,${png.toString("base64")}`;
+      await driver.tool("Base64 to Image", { text: uri });
+      const button = page.locator("#copy-image");
+      if (await button.isHidden()) return verdict(false, "Copy image is not offered for an image result");
+      clearClipboard();
+      await button.click();
+      const image = await driver.until(async () => clipboardImage(), { timeout: 8000, step: 400 });
+      if (!image) return verdict(false, "no image reached the clipboard");
+      let wrong = 0;
+      for (let y = 0; y < height && image.width === width && image.height === height; y += 1)
+        for (let x = 0; x < width; x += 1) {
+          const at = (y * width + x) * 4, want = pixel(x, y);
+          if (image.rgba[at] !== want[0] || image.rgba[at + 1] !== want[1] || image.rgba[at + 2] !== want[2]) wrong += 1;
+        }
+      return verdict(image.width === width && image.height === height && wrong === 0,
+        `${image.width}x${image.height} on the clipboard (encoded ${width}x${height}); ${wrong} of ${width * height} pixels differ`);
     },
   },
   {

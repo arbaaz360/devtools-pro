@@ -138,26 +138,38 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 const segment = (key: string | number): string =>
   typeof key === "number" ? `[${key}]` : PLAIN_NAME.test(key) ? `.${key}` : `['${key.replace(/'/g, "\\'")}']`;
 
+/**
+ * Every descendant of `match`, in document order, that `name` selects (or all of
+ * them for `..*`). Iterative, with its own stack: the depth of a document is the
+ * document's choice, and a recursive walk would fail on a deep one at whatever depth
+ * the engine's native stack happens to run out — which differs by machine and JIT
+ * tier, so a test at one depth can pass on one runner and fail on the next.
+ */
 function descend(match: PathMatch, name: string | null, into: PathMatch[], budget: { left: number }): void {
-  const walk = (current: PathMatch): void => {
-    if (budget.left <= 0) return;
-    const { value, path } = current;
+  type Pending = { path: string; value: unknown; key: string | number };
+  const pending: Pending[] = [];
+  // Children go on in reverse so they come off in order: a pre-order walk, the
+  // same order the recursive version produced.
+  const pushChildren = (path: string, value: unknown): void => {
     const entries: [string | number, unknown][] = Array.isArray(value)
       ? value.map((item, index) => [index, item])
       : isObject(value)
         ? Object.entries(value)
         : [];
-    for (const [key, child] of entries) {
-      if (budget.left <= 0) return;
-      const childPath = `${path}${segment(key)}`;
-      if (name === null || key === name) {
-        into.push({ path: childPath, value: child });
-        budget.left -= 1;
-      }
-      walk({ path: childPath, value: child });
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const [key, child] = entries[index]!;
+      pending.push({ path: `${path}${segment(key)}`, value: child, key });
     }
   };
-  walk(match);
+  pushChildren(match.path, match.value);
+  while (pending.length && budget.left > 0) {
+    const node = pending.pop()!;
+    if (name === null || node.key === name) {
+      into.push({ path: node.path, value: node.value });
+      budget.left -= 1;
+    }
+    pushChildren(node.path, node.value);
+  }
 }
 
 /**

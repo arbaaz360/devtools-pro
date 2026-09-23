@@ -46,6 +46,7 @@ import { JsonPathError, evaluateJsonPath } from "./ui/jsonPath";
 import type { OptionSpec } from "../../../packages/plugin-contract/ts/generated.ts";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
+import { imageAsPng, type ImageSource } from "./ui/imageClipboard";
 import {
   SIDE_TITLES,
   byteLength,
@@ -966,6 +967,7 @@ function renderResult(tab: TabState) {
     renderedResult = null;
     renderedStaleNote = "";
     $("#copy-result").hidden = true;
+    $("#copy-image").hidden = true;
     $("#open-result").hidden = true;
     $("#save-result").hidden = true;
     $("#result-highlight").hidden = true;
@@ -1162,7 +1164,10 @@ function renderResult(tab: TabState) {
         : "No result");
   $("#copy-result").hidden =
     tab.resultStale || !event.ok || !!result.image || !result.text;
-  $("#copy-result").textContent = "Copy complete result";
+  $("#copy-result").textContent = event.renderer === "svg" ? "Copy SVG" : "Copy complete result";
+  // A picture copies as a picture: a binary image, or an SVG drawn to PNG.
+  $("#copy-image").hidden =
+    tab.resultStale || !event.ok || !(result.image || (event.renderer === "svg" && result.text && !result.truncated));
   $("#open-result").hidden =
     tab.resultStale || !event.ok || !!result.image || !event.resultDocumentId;
   $("#save-result").hidden =
@@ -1480,6 +1485,22 @@ async function copyCompleteResult(id: string) {
 }
 $("#copy-result").onclick = () => {
   if (state.activeId) void copyCompleteResult(state.activeId);
+};
+$("#copy-image").onclick = () => {
+  const tab = activeTab(state);
+  const result = tab?.result;
+  if (!tab || !result || tab.resultStale) return;
+  const source: ImageSource = result.image
+    ? { kind: "bytes", mime: result.image.mime, dataUri: result.image.data }
+    : { kind: "svg", markup: result.text };
+  // The item takes the PNG as a promise, so the write starts inside the click and
+  // keeps its user activation while the image is drawn.
+  navigator.clipboard
+    .write([new ClipboardItem({ "image/png": imageAsPng(source) })])
+    .then(
+      () => notify("Copied image to clipboard"),
+      (error: unknown) => notify(`Image not copied: ${error instanceof Error ? error.message : String(error)}`),
+    );
 };
 // A preview is never a complete payload. Intercept Select All + Copy so the
 // natural clipboard shortcut has the same semantics as Copy complete result.
