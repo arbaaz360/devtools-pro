@@ -821,6 +821,19 @@ export const checks = [
       }, { timeout: 2500 });
       if (disturbed) return verdict(false, `typing beside Generate changed the result to "${disturbed.state}" (error "${disturbed.error}")`);
       if (!(await page.locator("#copy-result").isVisible())) return verdict(false, "typing beside Generate hid Copy on the value it generated");
+      // AST-013: a visible button is not a working one. Press it, and read what reached
+      // the system clipboard through .NET; then open the value as a tab.
+      clearClipboard();
+      await clearStatus(driver);
+      await page.locator("#copy-result").click();
+      const copied = await driver.until(() => clipboardShell("[System.Windows.Forms.Clipboard]::GetText()") || null, { timeout: 6000, step: 300 });
+      if (copied?.trim() !== first) return verdict(false, `Copy after typing put ${JSON.stringify(copied)} on the clipboard (status "${(await page.locator("#status").innerText()).trim()}"); the value was ${first}`);
+      const tabs = await page.locator(".tab-wrap").count();
+      await page.locator("#open-result").click();
+      const opened = await driver.until(async () => (await page.locator(".tab-wrap").count()) > tabs);
+      const openedText = opened ? (await page.locator("#preview").inputValue()).trim() : null;
+      if (openedText !== first) return verdict(false, `Open as tab after typing gave ${JSON.stringify(openedText)}; the value was ${first}`);
+      await page.locator(".tab-wrap").nth(tabs - 1).locator(".tab-button, button").first().click();
       await driver.runOperation("Generate");
       const next = await driver.settle(undefined, { changedFrom: generated.signature });
       const value = next.output.trim();

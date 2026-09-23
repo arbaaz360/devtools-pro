@@ -684,9 +684,24 @@ export class WorkbenchController {
       this.hooks.changed(this.state);
       return;
     }
+    if (this.editLeavesResult(id)) {
+      this.dispatch({ type: "edit", id, text, keepsResult: true });
+      return;
+    }
     this.invalidate(id);
     this.dispatch({ type: "edit", id, text });
     this.schedule(id);
+  }
+  /**
+   * An edit to a document the active operation never reads (Generate has no input)
+   * changes nothing about its result: the value, its host handle and any run in
+   * flight all stay, so Copy, Save and Open as tab keep working. Anything else that
+   * reads the document is invalidated as usual.
+   */
+  private editLeavesResult(id: string): boolean {
+    const tab = this.tab(id);
+    const tool = tab && this.toolDefinition(tab.toolId);
+    return !!tab && !!tool && !readsDocument(tool, tab.operation);
   }
   /** Paste is an explicit input transaction. Large input goes straight to an
    * immutable host snapshot, with only a bounded preview retained by the tab. */
@@ -772,6 +787,10 @@ export class WorkbenchController {
     }
   }
   history(id: string, type: "undo" | "redo") {
+    if (this.editLeavesResult(id)) {
+      this.dispatch({ type, id, keepsResult: true });
+      return;
+    }
     this.invalidate(id);
     this.dispatch({ type, id });
     this.schedule(id);
