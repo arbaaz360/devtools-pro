@@ -162,12 +162,12 @@ function isoFromSeconds(seconds) {
 }
 
 function computeClaims(payload, clock, toleranceSeconds) {
-  const nowSeconds = Math.floor(new Date(clock.now()).getTime() / 1000);
+  const nowSeconds = new Date(clock.now()).getTime() / 1000;
   const exp = numericClaim(payload, "exp");
   const nbf = numericClaim(payload, "nbf");
   const iat = numericClaim(payload, "iat");
   return {
-    expired: exp !== undefined && nowSeconds > exp + toleranceSeconds,
+    expired: exp !== undefined && nowSeconds >= exp + toleranceSeconds,
     notYetValid: nbf !== undefined && nowSeconds < nbf - toleranceSeconds,
     expiresAt: exp !== undefined ? isoFromSeconds(exp) : null,
     notBefore: nbf !== undefined ? isoFromSeconds(nbf) : null,
