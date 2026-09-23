@@ -182,6 +182,7 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
       options: operation.options,
       autoOnInput: autoOnInput(operation),
       autoOnOption: autoOnOption(operation),
+      readsDocument: operation.inputs.length > 0,
     }));
     const family = tool.id.split(".")[0] ?? "";
     tools.push({

@@ -55,8 +55,18 @@ export interface TabState {
   jobIdentity: ExecutionIdentity | null;
   progress: JobProgress | null;
   result: ResultView | null;
-  /** Existing output is retained while a same-tool edit is recomputing. */
+  /**
+   * The retained result no longer answers what the tab now asks: an edit, an
+   * option change or a cancel came after it. It stays visible rather than
+   * collapsing the pane.
+   */
   resultStale: boolean;
+  /**
+   * A stale result that nothing is about to replace: the operation waits for its
+   * button, the change emptied the document, or the run was cancelled. Without
+   * this, a stale result can only say it is updating, and for these it is not.
+   */
+  resultOutdated: boolean;
   findQuery: string;
   findReplacement: string;
   findCaseSensitive: boolean;
@@ -120,6 +130,7 @@ export function makeTab(
     progress: null,
     result: null,
     resultStale: false,
+    resultOutdated: false,
     findQuery: "",
     findReplacement: "",
     findCaseSensitive: true,
@@ -139,6 +150,7 @@ function reset(tab: TabState, preserveResult = true): TabState {
     progress: null,
     result: preserveResult ? tab.result : null,
     resultStale: preserveResult && !!tab.result,
+    resultOutdated: false,
     error: null,
   };
 }
@@ -200,6 +212,11 @@ export type Action =
   | { type: "queue" | "cancel"; id: string }
   /** A compare side became empty: nothing is sent to the host and the previous result no longer describes the inputs. */
   | { type: "gated"; id: string }
+  /**
+   * The controller decided no run follows the change just made. `current` when
+   * the change was an edit to a document the operation never reads.
+   */
+  | { type: "idle"; id: string; current: boolean }
   | { type: "error"; id: string; message: string }
   | { type: "started"; token: RunToken; jobId: string; identity?: ExecutionIdentity }
   | { type: "progress"; token: RunToken; progress: JobProgress }
@@ -319,7 +336,12 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
         case "cancel":
           // Keep the last result visible and mark it stale while the cancelled
           // job is retired; collapsing the result pane changes the workspace.
-          return { ...reset(tab, true), phase: "cancelled" };
+          return { ...reset(tab, true), phase: "cancelled", resultOutdated: !!tab.result };
+        case "idle":
+          if (!tab.resultStale) return tab;
+          return action.current
+            ? { ...tab, resultStale: false }
+            : { ...tab, resultOutdated: true };
         case "error":
           return {
             ...reset(tab, false),
@@ -349,6 +371,7 @@ export function reduce(state: WorkspaceState, action: Action): WorkspaceState {
             jobIdentity: null,
             result: action.result,
             resultStale: false,
+            resultOutdated: false,
             error: action.result.event.error ?? null,
           };
         case "failed":

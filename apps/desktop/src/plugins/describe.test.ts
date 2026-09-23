@@ -134,3 +134,10 @@ test("a port declaring image content makes the tool take bytes, not text", () =>
   assert.equal(inputContentKind(reader!.operations[0]!.inputs[0]), "image");
   assert.deepEqual(reader!.manifest.inputKinds, ["bytes"]);
 });
+
+test("an operation with no document input says it does not read the document", () => {
+  const [tool] = describePackage(load("uuid"), "uuid");
+  assert.ok(tool);
+  const reads = Object.fromEntries(tool.manifest.operations.map((operation) => [operation.id, operation.readsDocument]));
+  assert.deepEqual(reads, { "identity.uuid.generate": false, "identity.uuid.decode": true });
+});

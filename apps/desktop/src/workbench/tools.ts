@@ -23,6 +23,8 @@ export interface ToolOperationDefinition {
   options?: readonly OptionSpec[];
   autoOnInput?: boolean;
   autoOnOption?: boolean;
+  /** False when the operation has no document input (a generator). */
+  readsDocument?: boolean;
 }
 /** Why the shell wants to run: a press always runs, the rest ask the manifest. */
 export type RunReason = "explicit" | "input" | "option" | "select";
@@ -54,6 +56,9 @@ export function runsAutomatically(
   // shows its first value, a document tool waits unless it follows the document.
   return operation.autoOnOption ?? operation.autoOnInput;
 }
+/** Whether the document is an input to this operation. Every bundled tool reads it. */
+export const readsDocument = (tool: ToolDefinition, operationId: string | undefined): boolean =>
+  operationOf(tool, operationId)?.readsDocument ?? true;
 const op = (id: string, label: string) => ({ id, label });
 const define = (
   id: string,
@@ -193,6 +198,7 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
     ...(operation.autoOnInput === undefined
       ? {}
       : { autoOnInput: operation.autoOnInput, autoOnOption: operation.autoOnOption ?? operation.autoOnInput }),
+    ...(operation.readsDocument === undefined ? {} : { readsDocument: operation.readsDocument }),
   }));
   return {
     id: manifest.id,

@@ -296,6 +296,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-28 | Produce a result larger than the result limit | A message naming the limit appears. Copy/Save either work on the complete payload or are clearly disabled |
 | RES-29 | Run a tool that produces no output for empty input | A neutral empty state, not a success claim and not an error, unless the tool documents empty as an error (QR does) |
 | RES-30 | Switch tabs while a result is displayed | Each tab shows its own result immediately; no flash of another tab's result |
+| RES-31 (suite) | Run **CSS → Beautify**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
 
 ---
 
@@ -394,7 +395,7 @@ Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-di
 | 07 | — | Compare the displayed time zone handling with the DU-01 card |
 
 ### TL-UUID — UUID Generator · `identity.uuid` · package · generator
-Options: mode (generate, decode), version (v1, v3, v4, v5), namespace, name, count (1–100), case, uuid.
+Operations: **Generate** (version v1/v3/v4/v5, namespace, name, count 1–100, case) and **Decode** (case; the UUID is whatever is in the editor).
 
 | # | Steps | Expected |
 |---|---|---|
@@ -404,8 +405,10 @@ Options: mode (generate, decode), version (v1, v3, v4, v5), namespace, name, cou
 | 04 (suite) | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
 | 05 | v1 | Time-based, values increase across successive runs |
 | 06 | case upper/lower | Output case follows the option |
-| 07 | Decode mode with a v1 UUID | Timestamp, variant and version reported |
-| 08 | Decode mode with `not-a-uuid` | Readable error |
+| 07 | Put a v1 UUID in the editor and press **Decode** | Timestamp, variant and version reported |
+| 08 | Press **Decode** with `not-a-uuid` in the editor | Readable error |
+| 09 (suite) **[P1]** | With **Generate** selected, type anything in the editor; then press **Generate** | Typing does nothing: the generated value stays, with no error, no "Updating…", and Copy still works. The press gives a new value |
+| 10 (suite) | Put the v5 value from 04 in the editor and press **Decode**; then replace it with `f47ac10b-58cc-4372-a567-0e02b2c3d479` | Version 5 reported; after the edit it decodes again on its own and reports version 4 |
 
 ### TL-B64TEXT — Base64 Text · `encoding.base64-text` · package · auto
 Options: mode (encode, decode), variant (standard, url), padding (required, omit, optional), error-policy (strict, tolerant, replace). Limit 2 MiB.

@@ -166,3 +166,39 @@ test("the right side tracks its own baseline and unsaved state", () => {
   assert.equal(tab().rightDirty, false, "a cleared side has nothing to lose");
   assert.equal(tab().rightBaseline, null);
 });
+
+test("a stale result says whether a run is coming to replace it", () => {
+  let state = workspaceWith("one");
+  state = reduce(state, { type: "result", token: tokenFor(state.tabs[0]), result: result("job-1") });
+  state = reduce(state, { type: "edit", id: "one", text: "changed" });
+  assert.equal(state.tabs[0].resultStale, true);
+  assert.equal(state.tabs[0].resultOutdated, false, "an edit alone does not know whether a run follows");
+
+  // The controller says none will: the operation waits for its button.
+  state = reduce(state, { type: "idle", id: "one", current: false });
+  assert.equal(state.tabs[0].resultStale, true);
+  assert.equal(state.tabs[0].resultOutdated, true);
+
+  // Pressing it queues a run, which is what "updating" means.
+  state = reduce(state, { type: "queue", id: "one" });
+  assert.equal(state.tabs[0].resultOutdated, false);
+
+  // Cancelling that run leaves the old result with nothing coming.
+  state = reduce(state, { type: "cancel", id: "one" });
+  assert.equal(state.tabs[0].resultStale, true);
+  assert.equal(state.tabs[0].resultOutdated, true);
+});
+
+test("an edit to a document the operation never reads leaves its result current", () => {
+  let state = workspaceWith("one");
+  state = reduce(state, { type: "result", token: tokenFor(state.tabs[0]), result: result("job-1") });
+  state = reduce(state, { type: "edit", id: "one", text: "typed beside a generator" });
+  state = reduce(state, { type: "idle", id: "one", current: true });
+  assert.equal(state.tabs[0].result?.event.jobId, "job-1");
+  assert.equal(state.tabs[0].resultStale, false);
+  assert.equal(state.tabs[0].resultOutdated, false);
+
+  // With no result to keep, the report changes nothing.
+  const empty = workspaceWith("two");
+  assert.equal(reduce(empty, { type: "idle", id: "two", current: false }).tabs[0], empty.tabs[0]);
+});
