@@ -4,6 +4,7 @@ import { readFile, readdir } from "node:fs/promises";
 import {
   CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorCancelled, ProcessorContext, SeededRandom,
 } from "../../packages/plugin-sdk/src/context.ts";
+import jsQR from "../../packages/vendor/jsqr/jsqr.mjs";
 import { QrError, execute, OPERATION_ID } from "./processor.mjs";
 
 const encoder = new TextEncoder();
@@ -58,6 +59,55 @@ test("fixtures produce the expected SVG output or error", async () => {
       }
     }
   }
+});
+
+/**
+ * Rasterizes the dark modules drawn in a generated SVG's `<path>` into an RGBA pixel
+ * buffer, the same layout plugins/qr-reader/test.mjs builds from a module matrix — except
+ * these squares are parsed out of the actual SVG the processor produced, not recomputed
+ * independently, so this decodes the real generator output rather than a re-encoding of it.
+ */
+function svgToPixels(svg, size) {
+  const pixels = new Uint8Array(size * size * 4).fill(255);
+  const rectRe = /M(\d+),(\d+)l(\d+),0/g;
+  let match;
+  while ((match = rectRe.exec(svg))) {
+    const x0 = Number(match[1]);
+    const y0 = Number(match[2]);
+    const cell = Number(match[3]);
+    for (let dy = 0; dy < cell; dy++) {
+      for (let dx = 0; dx < cell; dx++) {
+        const idx = ((y0 + dy) * size + (x0 + dx)) * 4;
+        pixels[idx] = 0; pixels[idx + 1] = 0; pixels[idx + 2] = 0; pixels[idx + 3] = 255;
+      }
+    }
+  }
+  return pixels;
+}
+
+async function assertDecodesTo(text, options = {}) {
+  const { result, text: svg } = await run(OPERATION_ID, options, text);
+  const pixels = svgToPixels(svg, result.widthPx);
+  const decoded = jsQR(pixels, result.widthPx, result.widthPx, { inversionAttempts: "dontInvert" });
+  assert.ok(decoded, `expected an independently decodable QR code for ${JSON.stringify(text)}`);
+  assert.equal(decoded.data, text, `decoded text must equal the input for ${JSON.stringify(text)}`);
+  return result;
+}
+
+test("UTF-8 round trip, verified by independently decoding the generated SVG with jsQR", async () => {
+  await assertDecodesTo("https://example.com");
+  await assertDecodesTo("café");
+  await assertDecodesTo("日本語のテキスト");
+  await assertDecodesTo("family: 👨‍👩‍👧‍👦"); // emoji built from a zero-width joiner sequence
+  await assertDecodesTo("mixed scripts: Hello Привет 你好 مرحبا"); // Latin, Cyrillic, Han, Arabic in one string
+});
+
+test("2,953 UTF-8 bytes fits at level L and decodes back to the same text; 2,954 does not fit", async () => {
+  const fits = "a".repeat(2953);
+  const result = await assertDecodesTo(fits, { "error-correction": "L" });
+  assert.equal(result.inputBytes, 2953);
+
+  await rejects(OPERATION_ID, { "error-correction": "L" }, "a".repeat(2954), "qr.capacity");
 });
 
 class ChunkedReader {
