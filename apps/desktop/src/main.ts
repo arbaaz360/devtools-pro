@@ -40,6 +40,8 @@ import {
 } from "./workbench/tools";
 import { WorkerEngine } from "./plugins/engine";
 import { annotationMarkup } from "./ui/annotations";
+import { renderJsonTree, renderMatches } from "./ui/jsonTree";
+import { JsonPathError, evaluateJsonPath } from "./ui/jsonPath";
 import type { OptionSpec } from "../../../packages/plugin-contract/ts/generated.ts";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
@@ -88,6 +90,8 @@ let controller: WorkbenchController;
 let paletteOpener: HTMLElement | null = null;
 let renderedResult: object | null = null;
 let renderedResultStale = false;
+/** The view a result was last drawn in; switching it has to redraw the pane. */
+let renderedView = "";
 let renderedOptionsKey = "";
 let renderedToolsKey = "";
 let renderedActionsKey = "";
@@ -899,6 +903,57 @@ function friendlyError(tab: TabState, event: NonNullable<TabState["result"]>["ev
     return "CSV inspection failed. Check that every row has the same number of columns and that quoted values are balanced.";
   return error;
 }
+/** Which view each tab is reading its result in, and the path it last typed. */
+const treeState = new Map<string, { view: "text" | "tree"; query: string }>();
+const treeFor = (id: string) => {
+  let state = treeState.get(id);
+  if (!state) { state = { view: "text", query: "" }; treeState.set(id, state); }
+  return state;
+};
+
+/**
+ * Parse a result as JSON, or say it is not. A result that does not parse has no
+ * tree: the toggle is hidden rather than offering a view that cannot be built.
+ */
+function parsedResult(text: string): { ok: true; value: unknown } | { ok: false } {
+  const trimmed = text.trim();
+  if (!trimmed || !"{[\"-0123456789tfn".includes(trimmed[0]!)) return { ok: false };
+  try { return { ok: true, value: JSON.parse(trimmed) }; } catch { return { ok: false }; }
+}
+
+/** Draw the tree for the active tab, applying its query if it has one. */
+function renderTree(tabId: string, value: unknown): void {
+  const state = treeFor(tabId);
+  const body = $("#tree-body");
+  const status = $("#tree-path-status");
+  status.classList.remove("tree-path-error");
+  const copyPath = (path: string) => {
+    void navigator.clipboard.writeText(path).then(
+      () => notify(`Copied ${path}`),
+      (error: unknown) => notify(errorText(error)),
+    );
+  };
+  if (!state.query.trim()) {
+    const top = renderJsonTree(body, value, { onCopyPath: copyPath });
+    status.textContent = top === 1 ? "1 entry" : `${top} entries`;
+    return;
+  }
+  try {
+    const { matches, truncated } = evaluateJsonPath(value, state.query);
+    renderMatches(body, matches, { onCopyPath: copyPath });
+    status.textContent = matches.length === 0
+      ? "no matches"
+      : `${matches.length}${truncated ? "+" : ""} match${matches.length === 1 ? "" : "es"}`;
+    if (!matches.length) status.classList.add("tree-path-error");
+  } catch (error) {
+    // A path the evaluator does not implement is reported as such: an empty list
+    // would read as "nothing matched", which is a different fact entirely.
+    body.replaceChildren();
+    status.textContent = error instanceof JsonPathError ? error.message : errorText(error);
+    status.classList.add("tree-path-error");
+  }
+}
+
 function renderResult(tab: TabState) {
   const result = tab.result;
   const empty = $("#result-empty");
@@ -951,10 +1006,13 @@ function renderResult(tab: TabState) {
     }
     return;
   }
-  if (result === renderedResult && tab.resultStale === renderedResultStale)
+  const view = treeFor(tab.id);
+  const viewKey = `${tab.id}:${view.view}:${view.query}`;
+  if (result === renderedResult && tab.resultStale === renderedResultStale && viewKey === renderedView)
     return;
   renderedResult = result;
   renderedResultStale = tab.resultStale;
+  renderedView = viewKey;
   empty.hidden = true;
   content.hidden = false;
   const event = result.event;
@@ -1064,9 +1122,24 @@ function renderResult(tab: TabState) {
     highlight.hidden = true;
     highlight.replaceChildren();
   }
+  // A result that parses as JSON can also be walked as a tree. The toggle appears
+  // only then, so it never offers a view that cannot be built.
+  const parsed = !binary && !diff && event.ok ? parsedResult(result.text) : { ok: false as const };
+  const treeable = parsed.ok && !result.truncated;
+  const views = $("#result-views");
+  views.hidden = !treeable;
+  if (!treeable && view.view === "tree") view.view = "text";
+  const showTree = treeable && view.view === "tree";
+  $("#view-text").setAttribute("aria-pressed", String(!showTree));
+  $("#view-tree").setAttribute("aria-pressed", String(showTree));
+  ($("#tree-path") as HTMLInputElement).value = view.query;
+  $("#tree-panel").hidden = !showTree;
+  if (showTree && parsed.ok) renderTree(tab.id, parsed.value);
+  else $("#tree-body").replaceChildren();
+
   const noOutput =
     event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
-  $(".result-code").hidden = !readable || binary || diff || noOutput;
+  $(".result-code").hidden = !readable || binary || diff || noOutput || showTree;
   statusMessage.hidden = !noOutput;
   statusMessage.textContent = noOutput
     ? event.operationId === "inspect"
@@ -1413,6 +1486,30 @@ $("#open-result").onclick = () => {
 $("#save-result").onclick = () => {
   if (state.activeId) void controller.saveOutput(state.activeId);
 };
+// The view toggle and the path box belong to the active tab, so switching tabs
+// shows that tab's view and its own query rather than the last one typed.
+$("#view-text").onclick = () => {
+  const id = state.activeId;
+  if (!id) return;
+  treeFor(id).view = "text";
+  render();
+};
+$("#view-tree").onclick = () => {
+  const id = state.activeId;
+  if (!id) return;
+  treeFor(id).view = "tree";
+  render();
+  $("#tree-path").focus();
+};
+$("#tree-path").oninput = () => {
+  const id = state.activeId;
+  const tab = activeTab(state);
+  if (!id || !tab?.result) return;
+  treeFor(id).query = ($("#tree-path") as HTMLInputElement).value;
+  const parsed = parsedResult(tab.result.text);
+  if (parsed.ok) renderTree(id, parsed.value);
+};
+
 $("#tool-search").oninput = () => renderTools();
 $("#sidebar-collapse").onclick = () => {
   $(".sidebar").classList.toggle("collapsed");

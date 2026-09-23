@@ -212,7 +212,7 @@ body.resizing, body.resizing * { cursor: col-resize !important; user-select: non
 #result-summary { max-height: 90px; padding: 6px 8px; overflow: auto; border-top: 1px solid var(--border); }
 .result-preview-block { display: flex; min-height: 0; flex: 1; flex-direction: column; }
 .result-preview-block.binary-output .result-code { display: none; }
-.result-preview-heading { display: flex; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--faint); font-size: 9px; letter-spacing: .08em; }
+.result-preview-heading { display: flex; align-items: center; gap: 8px; justify-content: space-between; padding: 4px 8px; border-bottom: 1px solid var(--border); color: var(--faint); font-size: 9px; letter-spacing: .08em; }
 .result-code { position: relative; min-height: 0; flex: 1; overflow: hidden; border: 0; background: var(--well); }
 #result-output, #result-highlight { position: absolute; inset: 0; padding: 8px 10px; overflow: auto; white-space: pre; }
 #result-output { z-index: 1; }
@@ -276,3 +276,37 @@ dialog::backdrop { background: #00000099; }
   .results-pane { min-height: 220px; }
   .status-context { gap: 7px; }
 }
+
+/* ---------------------------------------------------------- Tree result view */
+/* A JSON result can be read as text or walked as a tree; the toggle sits in the
+   output heading so it is where the reader already is. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.result-views { display: inline-flex; margin-left: auto; border: 1px solid var(--border); }
+.view-tab { min-height: 20px; padding: 0 9px; border: 0; background: var(--surface); color: var(--muted); font-size: 11px; cursor: pointer; }
+.view-tab + .view-tab { border-left: 1px solid var(--border); }
+.view-tab:hover { color: var(--text); background: var(--surface-2); }
+.view-tab[aria-pressed="true"] { color: var(--bg); background: var(--accent); font-weight: 600; }
+
+.tree-panel { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; border: 1px solid var(--border); background: var(--well); }
+.tree-query { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.tree-query input { flex: 1 1 auto; min-width: 0; min-height: 22px; padding: 0 6px; border: 1px solid var(--border-strong); background: var(--well); color: var(--text); font-family: var(--mono); font-size: 11px; }
+.tree-query input:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+.tree-path-status { flex: 0 0 auto; color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tree-path-status.tree-path-error { color: var(--red); }
+.tree-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 4px 0; font-family: var(--mono); font-size: 11.5px; line-height: 1.55; }
+
+.tree-line { display: flex; align-items: center; gap: 6px; padding: 0 8px 0 2px; white-space: nowrap; }
+.tree-line:hover { background: var(--hi); }
+.tree-node.tree-match > .tree-line { background: rgba(159, 190, 223, 0.13); box-shadow: inset 2px 0 0 var(--accent); }
+.tree-twisty { flex: 0 0 auto; width: 14px; min-height: 16px; padding: 0; border: 0; background: none; color: var(--faint); font-size: 9px; cursor: pointer; }
+.tree-twisty:disabled { cursor: default; opacity: 0; }
+.tree-key { color: var(--accent); }
+.tree-type { flex: 0 0 auto; color: var(--faint); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; }
+.tree-type-string { color: var(--green); }
+.tree-type-number { color: var(--yellow); }
+.tree-type-boolean, .tree-type-null { color: var(--red); }
+.tree-summary { overflow: hidden; color: var(--text); text-overflow: ellipsis; }
+.tree-copy { flex: 0 0 auto; margin-left: auto; padding: 0 5px; border: 1px solid transparent; background: none; color: var(--faint); font-size: 10px; cursor: pointer; opacity: 0; }
+.tree-line:hover .tree-copy, .tree-copy:focus-visible { opacity: 1; border-color: var(--border-strong); color: var(--text); }
+.tree-more { margin: 2px 0 2px 16px; padding: 1px 8px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--muted); font-size: 10.5px; cursor: pointer; }
+.tree-more:hover { color: var(--text); }
