@@ -178,6 +178,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-29 (suite) | Drag a folder onto the window, alone and among files | Refused by name (*Choose a regular file*); the files beside it still open; no crash |
 | DOC-30 | Drag a file over the window and drag it back out without dropping | The drop highlight appears and then clears; no tab is created |
 | DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
+| DOC-33 (suite) **[P1]** | New tab, type, Ctrl+S to a new file; change that file in Notepad; edit in the app and Ctrl+S | Refused: *changed on disk*. Notepad's version survives — a file the tab *saved* is guarded exactly like one it opened |
+| DOC-34 (suite) **[P1]** | Open A, edit, Ctrl+Shift+S to B; change B in Notepad; Ctrl+S; then open A | The save to B is refused and B keeps Notepad's text. Opening A shows A's own contents in its own tab, not the tab that now holds B |
 | DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
@@ -449,14 +451,17 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 | 04 | `https://例え.jp/パス` | IDN host and percent-decoded path shown correctly |
 | 05 | query with `a=%20%2B&b=` | Decoded values shown, empty value preserved |
 
-### TL-HTMLESC — HTML Escape / Unescape · `text.html` · Rust
+### TL-HTMLESC — HTML Escape / Unescape · `text.html` · package (the escaping package since 2026-09-24)
+Operation: one, with a **Mode** option (escape, unescape) and numeric style, prefer-named, strict and attribute-context options.
+
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;…&amp;…` |
-| 02 (suite) | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
+| 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;Hello &amp; bye&lt;/p&gt;` |
+| 02 | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
 | 03 | `&#x2713;` and `&#10003;` | unescape | Both give `✓` |
 | 04 | `&nosuchentity;` | unescape | Left as-is or flagged; not silently deleted |
 | 05 | `✓👩‍🚀` | escape then unescape | Round trip identical |
+| 06 (suite) **[P1]** | `&copy; &eacute; &amp; &#x1F642; &lt;b&gt;` | unescape | `© é & 🙂 <b>` — every HTML5 named reference, not only the five XML ones |
 
 ### TL-JSONSTR — JSON String Escape / Unescape · `text.json-string` · Rust
 | # | Input | Action | Expected |
@@ -799,6 +804,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | A11Y-06 | Windows high-contrast mode | The app remains legible; no invisible text |
 | A11Y-07 | Text scaling at 125%/150% (Windows setting) | No clipped labels or overlapping controls |
 | A11Y-08 | Row D small window (640×520) | Every control is reachable, possibly via scrolling; nothing is unreachable |
+| A11Y-10 (suite) **[P1]** | Open three documents. Focus the active tab and press Left, Left, End, Home, Right; then, from the editor, press Ctrl+Tab and Ctrl+Shift+Tab (Ctrl+PageDown/PageUp too) | Arrows step through the tabs and Home/End jump, each showing the tab and moving focus onto it; Ctrl+Tab switches documents from anywhere and leaves focus in the editor |
 | A11Y-09 | Ultrawide (row C) | The layout does not stretch controls absurdly; the result pane stays usable |
 | A11Y-10 | Colour check on the result state line | Success/failure is distinguishable without relying on colour alone (icon or words) |
 | A11Y-11 | Mouse wheel and trackpad scrolling in editor, result and rail | All scroll smoothly; the wheel does not zoom accidentally |

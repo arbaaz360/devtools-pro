@@ -57,6 +57,8 @@ const read = (file) => (existsSync(file) ? readFileSync(file, "utf8") : null);
  * action's.
  */
 const clearStatus = (driver) => driver.page.evaluate(() => { document.querySelector("#status").textContent = ""; });
+/** The next message in the status line, whatever it says. Call clearStatus before acting. */
+const nextStatus = (driver) => driver.until(async () => (await driver.page.locator("#status").innerText()).trim() || null);
 /** The status line once it starts with `prefix`, or null. Call clearStatus before acting. */
 const statusStarting = (driver, prefix) => driver.until(async () => {
   const text = (await driver.page.locator("#status").innerText()).trim();
@@ -122,7 +124,7 @@ function pngOf(width, height, pixel) {
  * describes something the user never sees. Listed in PLUGIN_HOST_IMPLEMENTATION.md.
  */
 const NATIVE_IDS = new Set([
-  "structured.json", "text.compare", "text.url", "text.html",
+  "structured.json", "text.compare", "text.url",
   "text.json-string", "encoding.hash", "text.find-replace",
 ]);
 
@@ -432,6 +434,55 @@ export const checks = [
     },
   },
   {
+    // AST-006: a file the tab saved, not opened, is guarded like one it opened. Another
+    // program changes it; the next Ctrl+S must refuse, and that program's text survive.
+    id: "DOC-33",
+    async run({ driver, page }) {
+      const file = freshFile("saved-then-changed.txt");
+      await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("first saved text\n");
+      await driver.presetDialogPaths([file]);
+      await page.locator("#preview").press("Control+s");
+      if (!(await driver.until(() => read(file) === "first saved text\n"))) return verdict(false, `the first save did not land: ${JSON.stringify(read(file))}`);
+      writeFileSync(file, "EXTERNAL EDIT, MUST SURVIVE\n");
+      await driver.setInput("edited inside app\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      return verdict(/changed on disk/.test(status ?? "") && read(file) === "EXTERNAL EDIT, MUST SURVIVE\n",
+        `status "${status}"; the file holds ${JSON.stringify(read(file))}`);
+    },
+  },
+  {
+    // AST-006: after Save As A -> B the tab is B's. B is guarded, and A opens as itself.
+    id: "DOC-34",
+    async run({ driver, page }) {
+      const a = freshFile("save-as-source.txt", "contents of A\n");
+      const b = freshFile("save-as-target.txt");
+      await driver.openPath(a);
+      await driver.setInput("contents for B\n");
+      await driver.presetDialogPaths([b]);
+      await page.locator("#preview").press("Control+Shift+s");
+      if (!(await driver.until(() => read(b) === "contents for B\n"))) return verdict(false, `Save As did not land: ${JSON.stringify(read(b))}`);
+      writeFileSync(b, "EXTERNAL EDIT OF B\n");
+      await driver.setInput("more edits\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await nextStatus(driver);
+      const guarded = /changed on disk/.test(status ?? "") && read(b) === "EXTERNAL EDIT OF B\n";
+      let shown = null;
+      try {
+        await driver.openPath(a);
+        shown = await page.locator("#preview").inputValue();
+      } catch (error) {
+        shown = `(${error.message})`;
+      }
+      return verdict(guarded && shown === "contents of A\n" && read(a) === "contents of A\n",
+        `B: status "${status}", holds ${JSON.stringify(read(b))}; opening A shows ${JSON.stringify(shown)}`);
+    },
+  },
+  {
     // A saved result keeps the extension its type implies, and the whole payload.
     id: "RES-08",
     async run({ driver, page }) {
@@ -646,6 +697,42 @@ export const checks = [
       const edited = (second.output || second.structured).toLowerCase().includes(sha256("hello, edited")) && (await readRow()) === "the text, as UTF-8";
       return verdict(unedited && edited,
         `unedited: expected ${fileDigest.slice(0, 16)}…, shows ${(first.output || first.structured).replace(/\s+/g, " ").slice(0, 70)} (input ${first.inputBytes} B); edited: ${edited ? "text digest, labelled" : (second.output || second.structured).slice(0, 60)}`);
+    },
+  },
+  {
+    // AST-020: every document tab is reachable from the keyboard. Real key presses; the
+    // expectation is the WAI-ARIA tabs pattern, not whatever the strip happens to do.
+    id: "A11Y-10",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      // Three documents at least, whatever the run started with.
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const state = () => page.evaluate(() => {
+        const tabs = [...document.querySelectorAll("#tabs .tab")];
+        return {
+          active: tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
+          focused: tabs.indexOf(document.activeElement),
+          count: tabs.length,
+        };
+      });
+      const start = await state();
+      await page.locator("#tabs .tab[aria-selected=true]").focus();
+      const steps = [];
+      for (const key of ["ArrowLeft", "ArrowLeft", "End", "Home", "ArrowRight"]) {
+        await page.keyboard.press(key);
+        steps.push([key, await state()]);
+      }
+      // From the editor: Ctrl+Tab moves to the next tab and leaves focus in the editor.
+      await page.locator("#preview").focus();
+      const before = (await state()).active;
+      await page.keyboard.press("Control+Tab");
+      const after = await state();
+      const n = start.count, last = n - 1;
+      const expected = [last - 1, last - 2, last, 0, 1];
+      const moved = steps.every(([, s], i) => s.active === expected[i] && s.focused === expected[i]);
+      const ctrlTab = after.active === (before + 1) % n && after.focused === -1;
+      return verdict(n >= 3 && start.active === last && moved && ctrlTab,
+        `${n} tabs; ${steps.map(([k, s]) => `${k}->${s.active}${s.focused === s.active ? "" : `(focus ${s.focused})`}`).join(", ")}; Ctrl+Tab ${before}->${after.active}`);
     },
   },
   {
@@ -988,6 +1075,26 @@ export const checks = [
     async run({ driver }) {
       const result = await driver.tool("HTML/SVG to JSX", { text: '<div class="a"><p>Hello</p><!-- note --></div>' });
       return verdict(result.output.includes("className") && result.output.includes("{/*"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    // The plan marked 01 and 02 as automated; no check existed until now. The expected
+    // text is written from the HTML specification, not recorded from the tool.
+    id: "TL-HTMLESC-01",
+    async run({ driver }) {
+      const result = await driver.tool("HTML Escape / Unescape", { text: '<p class="sample">Hello & bye</p>', options: { Mode: "escape" } });
+      const expected = "&lt;p class=&quot;sample&quot;&gt;Hello &amp; bye&lt;/p&gt;";
+      return verdict(result.output.trim() === expected, `escape gave ${JSON.stringify(result.output.trim().slice(0, 70))}`);
+    },
+  },
+  {
+    // AST-019: named references beyond the five XML ones. © is U+00A9 and é U+00E9 in
+    // the HTML specification's named character reference table.
+    id: "TL-HTMLESC-06",
+    async run({ driver }) {
+      const result = await driver.tool("HTML Escape / Unescape", { text: "&copy; &eacute; &amp; &#x1F642; &lt;b&gt;", options: { Mode: "unescape" } });
+      const expected = "\u00A9 \u00E9 & \u{1F642} <b>";
+      return verdict(!result.error && result.output.trim() === expected, `unescape gave ${JSON.stringify(result.output.trim())} (error "${result.error}")`);
     },
   },
   {

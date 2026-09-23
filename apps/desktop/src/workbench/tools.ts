@@ -146,14 +146,7 @@ export const bundledTools: readonly ToolDefinition[] = [
     op("encode", "Encode"),
     op("decode", "Decode"),
   ]),
-  define(
-    "text.html",
-    "HTML escape / unescape",
-    "TEXT & ENCODING",
-    "&",
-    "text",
-    [op("escape", "Escape"), op("unescape", "Unescape")],
-  ),
+
   define(
     "text.unicode",
     "Unicode escape / unescape",

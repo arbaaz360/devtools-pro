@@ -601,8 +601,8 @@ fn execute_registered_tool(
 ) -> Result<devtools_core::ToolResult, ToolError> {
     if token.is_cancelled() { return Err(ToolError::Cancelled); }
     match tool_id {
-        "text.url" | "text.html" | "text.unicode" | "text.json-string" => {
-            let kind = match tool_id { "text.url" => TextUtilityKind::Url, "text.html" => TextUtilityKind::Html, "text.unicode" => TextUtilityKind::Unicode, _ => TextUtilityKind::JsonString };
+        "text.url" | "text.unicode" | "text.json-string" => {
+            let kind = match tool_id { "text.url" => TextUtilityKind::Url, "text.unicode" => TextUtilityKind::Unicode, _ => TextUtilityKind::JsonString };
             let opts: TextUtilityOptions = serde_json::from_value(options.clone()).map_err(|error| ToolError::InvalidOptions { message: error.to_string() })?;
             progress(Progress { bytes_processed: 0, total_bytes: input.len() as u64, phase: "transforming".into() });
             let result = transform_text(input, kind, operation_id, &opts)?;
@@ -978,7 +978,12 @@ fn save_result(
 /// Save an open document or generated snapshot. Publication is atomic. An existing
 /// file is replaced only when `replace` says the user asked for it: confirmed in the
 /// save dialog, or a Save to the tab's own file (`own_document` names the file the
-/// tab was opened from, which is the one open file a save may land on).
+/// tab belongs to, which is the one open file a save may land on).
+///
+/// Returns the document the tab belongs to afterwards: the file it just wrote,
+/// recorded with the size and time it wrote. That record is what the next in-place
+/// save compares against, so every file a tab has saved is guarded, not only the one
+/// it was first opened from.
 #[tauri::command]
 fn save_document(
     document_id: String,
@@ -986,7 +991,7 @@ fn save_document(
     replace: Option<Replace>,
     own_document: Option<String>,
     state: tauri::State<'_, Arc<HostState>>,
-) -> Result<(), String> {
+) -> Result<OpenedDocument, String> {
     let replace = replace.unwrap_or_default();
     let document = state.documents.lock().map_err(|e| e.to_string())?
         .get(&document_id).cloned().ok_or("Document is no longer available.")?;
@@ -1002,17 +1007,42 @@ fn save_document(
         unchanged_since_opened(own)?;
     }
     atomic_copy(&document.path, &destination, replace != Replace::Never)?;
-    // The tab's own file now holds what was just written. Record that, or the next
-    // read of it (or the next in-place save) would report a change nobody else made.
-    if let (Some(id), Some(_)) = (own_document, own) {
-        if let Ok(meta) = fs::metadata(&destination) {
-            if let Some(entry) = state.documents.lock().map_err(|e| e.to_string())?.get_mut(&id) {
-                entry.size = meta.len();
-                entry.modified = meta.modified().ok();
-            }
+    let (id, entry) = {
+        let mut documents = state.documents.lock().map_err(|e| e.to_string())?;
+        bind_saved(&mut documents, own.as_ref().and(own_document.as_deref()), &destination, || state.next_id("doc"))?
+    };
+    preview_document(id, &entry, 0)
+}
+
+/// The document a tab belongs to after it saved to `destination`. If it wrote its own
+/// file, that entry is refreshed; otherwise the destination becomes a document of its
+/// own. Either way the entry records the size and time just written — without that,
+/// the next read or in-place save would take the app's own write for someone else's,
+/// and a file the tab saved to (rather than opened) would have no record to guard it.
+fn bind_saved(
+    documents: &mut HashMap<String, RegisteredDocument>,
+    own: Option<&str>,
+    destination: &Path,
+    next_id: impl FnOnce() -> String,
+) -> Result<(String, RegisteredDocument), String> {
+    let path = canonical_for_compare(destination);
+    let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+    if let Some(id) = own {
+        if let Some(entry) = documents.get_mut(id).filter(|entry| entry.path == path) {
+            entry.size = meta.len();
+            entry.modified = meta.modified().ok();
+            return Ok((id.to_string(), entry.clone()));
         }
     }
-    Ok(())
+    // Not bounded by MAX_DOCUMENTS: the save has already happened, and the shell
+    // retires the tab's previous document as soon as it adopts this one.
+    let id = next_id();
+    let entry = RegisteredDocument {
+        path, size: meta.len(), modified: meta.modified().ok(), temporary: false,
+        display_name: None, origin_path: None,
+    };
+    documents.insert(id.clone(), entry.clone());
+    Ok((id, entry))
 }
 
 /// A silent save must not replace edits another program made to the file after
@@ -1269,6 +1299,36 @@ mod tests {
 
         fs::remove_file(&path).unwrap();
         assert!(unchanged_since_opened(&own).unwrap_err().contains("moved or deleted"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_saved_file_becomes_the_tabs_document_and_its_own_write_is_recorded() {
+        let dir = test_dir("bind");
+        let opened = dir.join("opened.txt");
+        let copy = dir.join("copy.txt");
+        fs::write(&opened, b"as opened").unwrap();
+        let mut documents = HashMap::new();
+        documents.insert("own".to_string(), RegisteredDocument {
+            path: canonical_for_compare(&opened), size: 1, modified: None, temporary: false,
+            display_name: None, origin_path: None,
+        });
+
+        // Writing its own file refreshes that entry: same id, the size just written.
+        fs::write(&opened, b"saved in place").unwrap();
+        let (id, entry) = bind_saved(&mut documents, Some("own"), &opened, || unreachable!()).unwrap();
+        assert_eq!(id, "own");
+        assert_eq!(entry.size, 14);
+        unchanged_since_opened(&entry).unwrap();
+
+        // Saving elsewhere registers the destination, which is then guarded like any opened file.
+        fs::write(&copy, b"saved as").unwrap();
+        let (id, entry) = bind_saved(&mut documents, Some("own"), &copy, || "new".to_string()).unwrap();
+        assert_eq!(id, "new");
+        assert_eq!(entry.path, canonical_for_compare(&copy));
+        assert!(!entry.temporary);
+        fs::write(&copy, b"edited by another program").unwrap();
+        assert!(unchanged_since_opened(&entry).unwrap_err().contains("changed on disk"));
         fs::remove_dir_all(dir).unwrap();
     }
 
