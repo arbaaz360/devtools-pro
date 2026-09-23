@@ -296,6 +296,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-28 | Produce a result larger than the result limit | A message naming the limit appears. Copy/Save either work on the complete payload or are clearly disabled |
 | RES-29 | Run a tool that produces no output for empty input | A neutral empty state, not a success claim and not an error, unless the tool documents empty as an error (QR does) |
 | RES-30 | Switch tabs while a result is displayed | Each tab shows its own result immediately; no flash of another tab's result |
+| RES-32 (suite) **[P1]** | Run **QR Code**, press **Copy image**, paste into Paint or a chat box, and scan the pasted code with a phone | A sharp QR picture pastes (not SVG text), and it scans to the input. **Copy SVG** still copies the markup |
+| RES-33 (suite) | Run **Base64 to Image** on a PNG, press **Copy image**, paste into Paint | The same picture, same size, same colours |
 | RES-31 (suite) | Run **CSS → Beautify**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
 
 ---
