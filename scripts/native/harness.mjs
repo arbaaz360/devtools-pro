@@ -86,9 +86,14 @@ function diagnose(port, browserLog, appLog, connectBudgetMs, app) {
  * Starts the preview server and the executable, and resolves once the webview's page
  * is reachable. Throws with diagnostics printed when it is not.
  */
-export async function startApp() {
+/**
+ * With `release`, the executable is a release build with the `custom-protocol` and
+ * `smoke-hooks` features: it serves its embedded bundle over the custom protocol with
+ * the shipped CSP, so no preview server is started, and it must expose no test hooks.
+ */
+export async function startApp({ release = false } = {}) {
   const { chromium } = createRequire(resolve(desktop, "package.json"))("@playwright/test");
-  const exe = resolve(root, "target", process.env.NATIVE_PROFILE ?? "debug", "devtools-desktop.exe");
+  const exe = resolve(root, "target", release ? "release" : process.env.NATIVE_PROFILE ?? "debug", "devtools-desktop.exe");
   const port = Number(process.env.NATIVE_CDP_PORT ?? 9333);
   const children = [];
   const stopChild = (child) => {
@@ -101,16 +106,18 @@ export async function startApp() {
   if (!existsSync(exe)) throw new Error(`${exe} is missing; run cargo build -p devtools-desktop first`);
   if (!existsSync(resolve(desktop, "dist", "index.html"))) throw new Error("apps/desktop/dist is missing; run the desktop build first");
 
-  releasePort(previewPort);
   freshProfile();
-  const preview = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(previewPort), "--strictPort"], { cwd: desktop, stdio: "ignore", shell: true });
-  children.push(preview);
-  let served = false;
-  for (let attempt = 0; attempt < 60 && !served; attempt += 1) {
-    await sleep(500);
-    try { served = (await fetch(`http://127.0.0.1:${previewPort}/`)).ok; } catch { /* not yet */ }
+  if (!release) {
+    releasePort(previewPort);
+    const preview = spawn("pnpm", ["exec", "vite", "preview", "--host", "127.0.0.1", "--port", String(previewPort), "--strictPort"], { cwd: desktop, stdio: "ignore", shell: true });
+    children.push(preview);
+    let served = false;
+    for (let attempt = 0; attempt < 60 && !served; attempt += 1) {
+      await sleep(500);
+      try { served = (await fetch(`http://127.0.0.1:${previewPort}/`)).ok; } catch { /* not yet */ }
+    }
+    if (!served) { stop(); throw new Error(`vite preview did not answer on ${previewPort}`); }
   }
-  if (!served) { stop(); throw new Error(`vite preview did not answer on ${previewPort}`); }
 
   // A CI runner has no usable GPU and runs the process under a service-like session;
   // WebView2's browser process then stalls at start-up unless told to skip both.
@@ -128,8 +135,9 @@ export async function startApp() {
       ...process.env,
       DEVTOOLS_SMOKE_BROWSER_ARGS: browserArguments,
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArguments,
-      // Lets a check name the file a dialog would have returned. A debug build only.
-      DEVTOOLS_TEST_HOOKS: "1",
+      // Lets a check name the file a dialog would have returned. A debug build only,
+      // and never asked of a release window, which is checked for having none.
+      ...(release ? {} : { DEVTOOLS_TEST_HOOKS: "1" }),
       DEVTOOLS_TEST_PROFILE: profile,
     },
     stdio: ["ignore", appOut, appOut],
@@ -178,7 +186,7 @@ export async function startApp() {
   await page.waitForSelector("#tabs", { timeout: 20_000 });
   await page.locator("#status").filter({ hasText: "Engine connected" }).waitFor({ timeout: 20_000 });
   const hooks = await page.evaluate(() => Boolean(globalThis.devtoolsTest));
-  if (!hooks) throw new Error("the window did not expose its test hooks; is this a debug build?");
+  if (!release && !hooks) throw new Error("the window did not expose its test hooks; is this a debug build?");
 
   // The webview caches the dev URL, so a window can render a previous build while
   // every check passes against it. Compare the script the page loaded with the one
@@ -196,6 +204,7 @@ export async function startApp() {
     page,
     errors,
     dialogs,
+    hooks,
     async close() {
       await browser.close().catch(() => undefined);
       stop();

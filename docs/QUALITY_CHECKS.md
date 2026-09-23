@@ -34,6 +34,35 @@ a debug host as `DEVTOOLS_TEST_PROFILE`. The debug build shares its identifier w
 installed app, so the default folder, `%LOCALAPPDATA%\com.thedevtoolspro.workbench`, is
 the installed copy's profile; the suite used to clear it, and no longer touches it.
 
+## The release smoke
+
+The native suite drives a **debug** build: it loads its bundle from a dev server, with
+no CSP, and exposes test hooks. What only a release build has — the embedded bundle,
+the custom protocol, the CSP from `tauri.conf.json` — is checked separately, in a
+release window, by `scripts/release-smoke.mjs` (the `release-smoke` job, beside
+`verify`):
+
+| Check | Asserts |
+|---|---|
+| REL-01 | the page is served from `http://tauri.localhost`, and no test hook exists |
+| REL-02 | the CSP refuses a page `fetch` to the network before it is sent |
+| REL-03 | the preview frame has every sandbox permission withheld: a document's image and script reach nothing |
+| REL-04 | a tool runs end to end from the embedded bundle |
+
+A loopback server stands in for the network and records every request, so "nothing
+left the page" is observed from outside the app. Loosening `connect-src` to allow
+loopback makes REL-02 fail with the server's log in the message; the debug suite
+cannot see that change at all.
+
+```text
+pnpm --dir apps/desktop build
+cargo build -p devtools-desktop --release --features custom-protocol,smoke-hooks
+node scripts/release-smoke.mjs
+```
+
+`smoke-hooks` compiles in the debugging port and the isolated profile a debug build
+has; nothing else. `tauri build` never enables it, so an installer has neither.
+
 The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
 then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
 things a script cannot do for itself: open a path directly, and name the file a dialog
