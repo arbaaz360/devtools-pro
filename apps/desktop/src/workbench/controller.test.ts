@@ -58,6 +58,8 @@ async function harness(t: TestContext) {
   const effects: {
     create?: WorkbenchApi["createTextDocument"];
     read?: WorkbenchApi["readPreview"];
+    /** What Open's multi-select returns. */
+    chooseFiles?: () => string[];
     /** What the save dialog returns; null is Cancel. */
     chooseDocument?: (name: string) => string | null;
     chooseResult?: () => string | null;
@@ -94,6 +96,7 @@ async function harness(t: TestContext) {
   const api: WorkbenchApi = {
     native: true,
     chooseFile: async () => null,
+    chooseFiles: async () => effects.chooseFiles?.() ?? [],
     openDocument: async (path) => {
       const document = paths.get(path);
       assert.ok(document, `Missing mock path ${path}`);
@@ -796,6 +799,72 @@ test("a tool that follows the document is updating after an edit, until the docu
   await setImmediate();
   assert.equal(h.runs.length, 2);
   assert.equal(h.controller.tab(id)!.resultOutdated, true);
+});
+
+const tabNames = (h: Awaited<ReturnType<typeof harness>>) => h.controller.state.tabs.map((tab) => tab.name);
+
+test("several dropped files open in their own tabs, in order, with one notice", async (t) => {
+  const h = await harness(t);
+  const files = ["a.txt", "b.json", "c.md"].map((name) => h.register(`contents of ${name}`, { path: `/mock/${name}`, name }));
+  const before = h.controller.state.tabs.length;
+  const notices = h.notices.length;
+  await h.controller.openPaths(files.map((file) => file.path));
+  assert.deepEqual(tabNames(h).slice(before), ["a.txt", "b.json", "c.md"]);
+  assert.deepEqual(h.notices.slice(notices), ["Opened 3 files"], "one notice for the drop, not one per file");
+});
+
+test("a file that cannot open is named in the one notice, and the rest still open", async (t) => {
+  const h = await harness(t);
+  const good = h.register("fine", { path: "/mock/good.txt", name: "good.txt" });
+  const also = h.register("also fine", { path: "/mock/also.txt", name: "also.txt" });
+  const notices = h.notices.length;
+  await h.controller.openPaths([good.path, "/mock/missing.txt", also.path]);
+  assert.ok(tabNames(h).includes("good.txt") && tabNames(h).includes("also.txt"));
+  const added = h.notices.slice(notices);
+  assert.equal(added.length, 1);
+  assert.match(added[0]!, /^Opened 2 of 3 files · missing\.txt: /);
+});
+
+test("a drop past the tab limit opens what fits and says how many did not", async (t) => {
+  const h = await harness(t);
+  while (h.controller.state.tabs.length < 14) h.newTab();
+  const files = [1, 2, 3, 4, 5].map((n) => h.register(`file ${n}`, { path: `/mock/f${n}.txt`, name: `f${n}.txt` }));
+  const notices = h.notices.length;
+  await h.controller.openPaths(files.map((file) => file.path));
+  assert.equal(h.controller.state.tabs.length, 16);
+  assert.deepEqual(tabNames(h).slice(14), ["f1.txt", "f2.txt"]);
+  assert.deepEqual(h.notices.slice(notices), ["Opened 2 of 5 files · 3 more would pass the 16-tab limit"]);
+});
+
+test("the same file twice in one drop opens once, and one file keeps the single-file notice", async (t) => {
+  const h = await harness(t);
+  const file = h.register("once", { path: "/mock/once.txt", name: "once.txt" });
+  const before = h.controller.state.tabs.length;
+  await h.controller.openPaths([file.path, file.path]);
+  assert.equal(h.controller.state.tabs.length, before + 1);
+
+  const notices = h.notices.length;
+  await h.controller.openPaths(["/mock/nowhere.txt"]);
+  assert.equal(h.notices.length, notices + 1);
+  assert.doesNotMatch(h.notices.at(-1)!, /^Opened/, "a lone failure reads as it always has");
+});
+
+test("Open takes several files at once", async (t) => {
+  const h = await harness(t);
+  const files = ["x.txt", "y.txt"].map((name) => h.register(name, { path: `/mock/${name}`, name }));
+  h.effects.chooseFiles = () => files.map((file) => file.path);
+  const before = h.controller.state.tabs.length;
+  await h.controller.chooseFile();
+  assert.deepEqual(tabNames(h).slice(before), ["x.txt", "y.txt"]);
+});
+
+test("a browser drop of several files opens each", async (t) => {
+  const h = await harness(t);
+  const file = (name: string, text: string) => ({ name, size: text.length, type: "text/plain", text: async () => text }) as unknown as File;
+  const before = h.controller.state.tabs.length;
+  await h.controller.openBrowserFiles([file("one.txt", "1"), file("two.txt", "2")]);
+  assert.deepEqual(tabNames(h).slice(before), ["one.txt", "two.txt"]);
+  assert.equal(h.notices.at(-1), "Opened 2 files");
 });
 
 /** Open a mock file the way Open does, and return its tab. */
