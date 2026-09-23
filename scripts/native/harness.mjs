@@ -15,6 +15,9 @@ import { fileURLToPath } from "node:url";
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 export const desktop = resolve(root, "apps", "desktop");
 export const artifacts = resolve(desktop, "test-results");
+// The suite's own WebView2 profile. The debug build shares the installed app's
+// identifier, so the default profile folder is the user's; the suite never touches it.
+const profile = resolve(artifacts, "webview-profile");
 export const sleep = (ms) => new Promise((done) => setTimeout(done, ms));
 
 const previewPort = 1420;
@@ -44,11 +47,13 @@ function releasePort(port) {
  * cost an afternoon: leftover state makes a run depend on what ran before it, and
  * the webview's HTTP cache can serve a previous build of the bundle — every check
  * then passes against code that is not the code under test.
+ *
+ * The profile is the suite's own, handed to the host as DEVTOOLS_TEST_PROFILE. The
+ * default folder belongs to whatever copy of the app is installed on this machine,
+ * and a test run has no business deleting it.
  */
 function freshProfile() {
-  const identifier = "com.thedevtoolspro.workbench";
-  const profile = process.env.LOCALAPPDATA ? resolve(process.env.LOCALAPPDATA, identifier) : null;
-  if (!profile || !existsSync(profile)) return;
+  if (!existsSync(profile)) return;
   try {
     rmSync(profile, { recursive: true, force: true });
     console.log(`native suite: cleared the webview profile at ${profile}`);
@@ -125,6 +130,7 @@ export async function startApp() {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: browserArguments,
       // Lets a check name the file a dialog would have returned. A debug build only.
       DEVTOOLS_TEST_HOOKS: "1",
+      DEVTOOLS_TEST_PROFILE: profile,
     },
     stdio: ["ignore", appOut, appOut],
   });
