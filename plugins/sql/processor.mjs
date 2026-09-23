@@ -230,7 +230,7 @@ function tokenize(text, dialect, context) {
 }
 
 function processTokens(tokens, options, isMinify, context) {
-  let indentStr = options.indent === 'tab' ? '\t' : (options.indent === '4' ? '    ' : '  ');
+  let indentStr = options.indent === 'tab' ? '\t' : (options.indent === 'space-4' || options.indent === '4' ? '    ' : '  ');
 
   let statements = 0;
   let hasTokensThisStatement = false;

@@ -12,7 +12,7 @@
     "title":"Encode or decode Base64 text",
     "executor":{"kind":"javascriptWorker","id":"encoding.base64-text.processor","version":"0.2.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
     "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
-    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain","application/octet-stream"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain","application/octet-stream"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
     "options":[
       {"id":"mode","type":"enum","label":"Mode","default":"encode","choices":[{"id":"encode","label":"Encode"},{"id":"decode","label":"Decode"}],"persistence":"instance","sensitive":false},
       {"id":"variant","type":"enum","label":"Alphabet","default":"standard","choices":[{"id":"standard","label":"Standard (+/)"},{"id":"url","label":"URL-safe (-_)"}],"persistence":"instance","sensitive":false},
