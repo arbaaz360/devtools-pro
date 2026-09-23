@@ -1014,3 +1014,30 @@ test("Save As moves the tab to the new file and lets the old one be opened as it
   await waitFor(() => h.controller.tab(opened.id)?.text === "contents of A", "A's own contents");
   assert.equal(opened.name, "a.txt");
 });
+
+test("a byte tool reads an unedited file's own bytes, and the edited text once it changes", async (t) => {
+  const h = await harness(t);
+  const document = h.register("hello", { path: "/mock/bom.txt", name: "bom.txt" });
+  await h.controller.openPath(document.path, "encoding.hash");
+  const id = h.controller.state.activeId!;
+  await waitFor(() => h.runs.length === 1, "the hash to run");
+  assert.equal(h.runs[0]!.id, document.id, "the file itself, not a snapshot of what the editor shows");
+  h.complete(h.runs[0]!.jobId, h.register("digest"));
+  await waitFor(() => h.controller.tab(id)?.phase === "success", "the result");
+  assert.equal(h.controller.tab(id)!.result!.inputFrom, "file");
+
+  h.controller.edit(id, "hello, edited");
+  await waitFor(() => h.runs.length === 2, "the edit's run");
+  assert.notEqual(h.runs[1]!.id, document.id, "an edited document is hashed as its text");
+  assert.equal(h.creates.at(-1)!.text, "hello, edited");
+  h.complete(h.runs[1]!.jobId, h.register("digest 2"));
+  await waitFor(() => h.controller.tab(id)?.result?.inputFrom === "text", "the result to say it read the text");
+});
+
+test("a text tool still reads the editor's text", async (t) => {
+  const h = await harness(t);
+  const document = h.register("a b", { path: "/mock/plain.txt", name: "plain.txt" });
+  await h.controller.openPath(document.path, "format.live");
+  await waitFor(() => h.runs.length === 1, "the run");
+  assert.notEqual(h.runs[0]!.id, document.id);
+});

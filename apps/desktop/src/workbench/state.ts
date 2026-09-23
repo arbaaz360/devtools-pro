@@ -20,6 +20,11 @@ export interface ResultView {
   truncated: boolean;
   image?: BinaryPreview;
   previewError?: string;
+  /**
+   * What a byte tool read: the file's own bytes, or the editor's text encoded as
+   * UTF-8. Absent for tools that read text, where the two are the same thing.
+   */
+  inputFrom?: "file" | "text";
 }
 export interface TabState {
   id: string;

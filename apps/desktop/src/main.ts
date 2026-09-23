@@ -1037,6 +1037,10 @@ function renderResult(tab: TabState) {
   $("#result-metrics").innerHTML = [
     ["Elapsed", `${event.elapsedMs} ms`],
     ["Input", bytes(event.inputBytes)],
+    // For a byte tool the two readings differ (a BOM, CRLF), so say which one it was.
+    ...(result.inputFrom
+      ? [["Read", result.inputFrom === "file" ? "the file's bytes" : "the text, as UTF-8"]]
+      : []),
     ["Output", bytes(event.outputBytes)],
     ["Status", event.ok ? "Ready to review" : "No output"],
   ]
