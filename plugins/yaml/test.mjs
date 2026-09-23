@@ -58,9 +58,13 @@ for (const name of validNames) {
     assert.equal(result.text, expectedJson, name);
     assert.equal(result.value.documents, 1);
     assert.equal(result.value.bytes, result.bytes.byteLength);
+    // Every successful output must be valid JSON (AG-130): this class of defect cannot
+    // return without failing here, on every fixture, at both indent settings.
+    JSON.parse(result.text);
     // Minified output parses to the same JSON.parse-independent structure (byte check via re-run).
     const minified = await expectOk("convert.yaml-json", yamlText, { options: { indent: "minified" } });
     assert.equal(minified.text.endsWith("\n"), false, "minified output has no trailing newline");
+    JSON.parse(minified.text);
   });
 }
 
@@ -119,6 +123,9 @@ for (const name of jsonNames) {
     const yaml = await expectOk("convert.json-yaml", source, { options: { indent: "space2" } });
     const back = await expectOk("convert.yaml-json", yaml.text, { options: { indent: "minified" } });
     assert.equal(back.text, minified, `round trip mismatch for ${name}\nyaml:\n${yaml.text}`);
+    // AG-130: the round trip's own output, and the minified source it is compared against, must
+    // both be valid JSON.
+    assert.deepEqual(JSON.parse(back.text), JSON.parse(minified), name);
   });
 }
 
@@ -155,6 +162,42 @@ test("classifyPlainScalar covers the YAML 1.2 core schema", async () => {
   assert.deepEqual(classifyPlainScalar("hello"), { t: "str", v: "hello" });
   assert.equal(classifyPlainScalar("99999999999999999999").unsafe, true);
   assert.equal(classifyPlainScalar("42").unsafe, false);
+});
+
+// AG-130: every plain scalar the YAML 1.2 core schema resolves as a number must become a
+// JSON number that JSON.parse accepts, with every significant digit preserved. Int pattern
+// from the schema: `[-+]?[0-9]+` (plus 0x/0o forms); float pattern:
+// `[-+]?(\.[0-9]+|[0-9]+(\.[0-9]*)?)([eE][-+]?[0-9]+)?`. JSON's own number grammar forbids a
+// leading zero before another digit in the integer part, which the core schema's patterns do
+// not forbid, so the emitter must strip what the grammar rejects and nothing more.
+// [lexeme, expected classifyPlainScalar type, exact JSON emitted for `a: <lexeme>` at minified indent]
+const AG_130_NUMBER_LEXEMES = [
+  ["0", "int", '{"a":0}'],
+  ["-0", "int", '{"a":0}'],
+  ["00", "int", '{"a":0}'],
+  ["+1", "int", '{"a":1}'],
+  ["0.0", "float", '{"a":0.0}'],
+  ["1_000", "str", '{"a":"1_000"}'], // underscores are not part of the YAML 1.2 core schema number patterns
+  ["0x1F", "int", '{"a":31}'],
+  ["0o17", "int", '{"a":15}'],
+  ["123456789012345678901234567890", "int", '{"a":"123456789012345678901234567890"}'], // 30 digits, unsafe range
+  ["01.2", "float", '{"a":1.2}'],
+  ["00e2", "float", '{"a":0e2}'],
+  ["-00.3", "float", '{"a":-0.3}'],
+];
+
+test("classifyPlainScalar strips leading zeros a JSON number cannot carry, keeping every significant digit", async () => {
+  for (const [lexeme, kind] of AG_130_NUMBER_LEXEMES) {
+    assert.equal(classifyPlainScalar(lexeme).t, kind, lexeme);
+  }
+});
+
+test("every AG-130 number lexeme round-trips through the full pipeline as exact, valid JSON", async () => {
+  for (const [lexeme, , expectedJson] of AG_130_NUMBER_LEXEMES) {
+    const result = await expectOk("convert.yaml-json", `a: ${lexeme}\n`, { options: { indent: "minified" } });
+    assert.equal(result.text, expectedJson, lexeme);
+    JSON.parse(result.text); // throws, and so fails the test, if the output is not valid JSON
+  }
 });
 
 // ---------------------------------------------------------------------------
