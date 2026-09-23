@@ -31,11 +31,6 @@ function parseCase(value) {
   if (value === "upper") return true;
   throw new Error("case must be lower or upper");
 }
-function parseMode(value) {
-  const mode = value ?? "generate";
-  if (mode !== "generate" && mode !== "decode") throw new Error("mode must be generate or decode");
-  return mode;
-}
 function parseVersion(value) {
   const key = value === undefined || value === null ? "v4" : `v${String(value).replace(/^v/i, "")}`;
   const version = VERSIONS.get(key.toLowerCase());
@@ -135,13 +130,13 @@ async function readInput(context) {
   catch (error) { if (error instanceof Error && error.message.includes("named input")) return undefined; throw error; }
 }
 
-async function decode(source, origin, upper, context) {
+async function decode(source, upper, context) {
   if (typeof source !== "string") throw new Error("UUID must be canonical xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx");
   const parsed = parseUuid(source.trim());
   let special = null;
   if (parsed.every(b => b === 0)) special = "nil";
   else if (parsed.every(b => b === 0xff)) special = "max";
-  const value = { mode: "decode", origin, source, case: upper ? "upper" : "lower", ...describe(parsed, upper), special, complete: true };
+  const value = { mode: "decode", source, case: upper ? "upper" : "lower", ...describe(parsed, upper), special, complete: true };
   await context.write("uuid", utf8.encode(`${value.uuid}\n`));
   await context.writeValue("uuid", value);
   return value;
@@ -177,13 +172,12 @@ async function generate(options, upper, context) {
 export async function execute(request, context) {
   const options = request?.options ?? {};
   check(context);
-  const mode = parseMode(options.mode), upper = parseCase(options.case);
-  const input = await readInput(context);
-  // Text on the optional `uuid` port always decodes; explicit decode mode may take the UUID from the `uuid` option instead.
-  if (input !== undefined && input.trim() !== "") return decode(input, "input", upper, context);
-  if (mode === "decode") {
-    if (options.uuid === undefined || options.uuid === null || options.uuid === "") throw new Error("decode mode requires a UUID input");
-    return decode(options.uuid, "option", upper, context);
+  const upper = parseCase(options.case);
+  // The `identity.uuid.decode` operation owns the `uuid` document port; generate never reads it.
+  if (request?.operationId === "identity.uuid.decode") {
+    const input = await readInput(context);
+    if (input === undefined || input.trim() === "") throw new Error("decode requires a UUID input");
+    return decode(input, upper, context);
   }
   return generate(options, upper, context);
 }
