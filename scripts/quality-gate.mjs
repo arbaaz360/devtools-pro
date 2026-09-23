@@ -21,6 +21,8 @@ function run(command, args) {
 }
 
 run('node', ['scripts/generate-fixtures.mjs']);
+// The manual plan's "(suite)" marks and the native checks name each other; cheap, so first.
+run('node', ['scripts/check-plan-coverage.mjs']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'check:generated']);
 run('pnpm', ['--dir', 'packages/plugin-contract', 'test']);
 run('pnpm', ['--dir', 'packages/plugin-sdk', 'test']);

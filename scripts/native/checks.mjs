@@ -9,6 +9,7 @@
 import crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import zlib from "node:zlib";
+import { DatabaseSync } from "node:sqlite";
 import jsQR from "../../packages/vendor/jsqr/jsqr.mjs";
 import { chmodSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -1003,9 +1004,19 @@ export const checks = [
   },
   {
     id: "TL-CSS-01",
-    async run({ driver }) {
-      const result = await driver.tool("CSS", { text: ".a{color:red;background:#fff}  .b , .c{margin:0 auto}", operation: "Beautify" });
-      return verdict(result.output.includes("\n") && result.output.includes("color"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    async run({ driver, page }) {
+      // AST-017: "has a newline and says color" passed broken output. The webview's own CSS
+      // parser (CSSOM) reads input and output; beautifying must leave the same rules.
+      const css = ".a{color:red;background:#fff}  .b , .c{margin:0 auto}";
+      const result = await driver.tool("CSS", { text: css, operation: "Beautify" });
+      const rules = (text) => page.evaluate((source) => {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(source);
+        return [...sheet.cssRules].map((rule) => rule.cssText);
+      }, text);
+      const before = await rules(css), after = await rules(result.output);
+      const same = before.length === 2 && JSON.stringify(before) === JSON.stringify(after);
+      return verdict(result.output.includes("\n") && same, `CSSOM: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
     },
   },
   {
@@ -1066,8 +1077,17 @@ export const checks = [
   {
     id: "TL-SQL-01",
     async run({ driver }) {
-      const result = await driver.tool("SQL Formatter", { text: "select a.id, b.name from users a join orders b on b.user_id=a.id where a.active=1", operation: "Beautify SQL" });
-      return verdict(/SELECT/.test(result.output) && result.output.includes("\n"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+      // AST-017: "contains SELECT and a newline" passed broken output. SQLite runs both the
+      // query and its formatted version over the same rows; the answers must match.
+      const query = "select a.id, b.name from users a join orders b on b.user_id=a.id where a.active=1";
+      const result = await driver.tool("SQL Formatter", { text: query, operation: "Beautify SQL" });
+      const db = new DatabaseSync(":memory:");
+      db.exec("create table users(id integer, active integer); create table orders(user_id integer, name text);"
+        + "insert into users values (1,1),(2,0),(3,1); insert into orders values (1,'a'),(2,'b'),(3,'c'),(3,'d');");
+      const rows = (text) => { try { return JSON.stringify(db.prepare(text).all()); } catch (error) { return `error: ${error.message}`; } };
+      const before = rows(query), after = rows(result.output);
+      return verdict(/SELECT/.test(result.output) && result.output.includes("\n") && before === after && !before.startsWith("error"),
+        `SQLite: ${before} -> ${after}`);
     },
   },
   {
@@ -1099,9 +1119,20 @@ export const checks = [
   },
   {
     id: "TL-HTMLFMT-01",
-    async run({ driver }) {
-      const result = await driver.tool("HTML Beautify/Minify", { text: "<div><p>Hello <b>world</b></p></div>", operation: "Beautify" });
-      return verdict(result.output.includes("\n"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    async run({ driver, page }) {
+      // AST-017: "contains a newline" passed a lone newline. The webview's DOMParser reads
+      // both; the elements and attributes must match, and the text too once whitespace
+      // runs are collapsed (so "Hello <b>" losing its space would still fail).
+      const html = "<div><p>Hello <b>world</b></p></div>";
+      const result = await driver.tool("HTML Beautify/Minify", { text: html, operation: "Beautify" });
+      const shape = (text) => page.evaluate((source) => {
+        const body = new DOMParser().parseFromString(source, "text/html").body;
+        const elements = [...body.querySelectorAll("*")].map((node) => `${node.tagName}[${[...node.attributes].map((a) => `${a.name}=${a.value}`).sort()}]`);
+        return { elements, text: body.textContent.replace(/\s+/g, " ").trim() };
+      }, text);
+      const before = await shape(html), after = await shape(result.output);
+      const same = JSON.stringify(before) === JSON.stringify(after) && before.text === "Hello world";
+      return verdict(result.output.includes("\n") && same, `DOM: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
     },
   },
   {

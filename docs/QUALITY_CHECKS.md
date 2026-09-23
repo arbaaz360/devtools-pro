@@ -34,6 +34,45 @@ a debug host as `DEVTOOLS_TEST_PROFILE`. The debug build shares its identifier w
 installed app, so the default folder, `%LOCALAPPDATA%\com.thedevtoolspro.workbench`, is
 the installed copy's profile; the suite used to clear it, and no longer touches it.
 
+The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
+then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
+things a script cannot do for itself: open a path directly, and name the file a dialog
+would have returned. Everything after that point is the code a person drives, so the
+suite can check that opening a real file leaves it byte-identical, and that saving a
+document or a result writes what it should. A release build never sets the variable and
+never injects the flag.
+
+Check ids match [MANUAL_TEST_PLAN.md](MANUAL_TEST_PLAN.md), so a failure names the case
+a human would otherwise run by hand. Expected values are computed independently — node's
+crypto, an RFC constant, a second parse — never recorded from the app's own output: a
+golden taken from the thing under test proves it is stable, not that it is right.
+`apps/desktop/test-results/native-suite.json` holds the run; on CI the workflow keeps it
+with the executable's log and a screenshot when the suite fails.
+
+`scripts/check-plan-coverage.mjs` runs first in the gate and keeps the manual plan honest
+about the suite: every case marked `(suite)` in `docs/MANUAL_TEST_PLAN.md` has a native
+check of that id, every check names a case, and a case with a check is marked. The
+independent review found 31 of 85 marks with nothing behind them.
+
+The gate also runs every plugin package's own tests (`plugins/*/test.mjs`, JavaScript processors on the plugin SDK) one package at a time, so a merged package cannot regress unnoticed. To run them standalone, optionally against another plugins root:
+
+```powershell
+node scripts/test-plugins.mjs
+node scripts/test-plugins.mjs <plugins root>
+```
+
+The layout check protects the native Tauri window from rendering as an unstyled document. It requires `.app-shell`, `.app-body`, `.sidebar`, and `.workspace` to retain their built flex declarations; checking the built output catches asset pipeline and packaging regressions as well as stylesheet edits.
+
+The current Rust baseline has not been reformatted as a dedicated change. The gate reports whether `rustfmt` is installed but does not treat formatting as passing or failing until that baseline work is completed, so it does not hide existing formatting debt or add unrelated formatting churn to worker changes.
+
+To inspect the native package locally after dependencies are installed:
+
+```powershell
+pnpm --dir apps/desktop tauri build --debug --no-bundle
+```
+
+The Cargo workspace executable is produced at `target/debug/devtools-desktop.exe` on Windows. For an iterative native preview, run `pnpm tauri dev` from `apps/desktop`.
+
 ## The release smoke
 
 The native suite drives a **debug** build: it loads its bundle from a dev server, with
@@ -62,40 +101,6 @@ node scripts/release-smoke.mjs
 
 `smoke-hooks` compiles in the debugging port and the isolated profile a debug build
 has; nothing else. `tauri build` never enables it, so an installer has neither.
-
-The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
-then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
-things a script cannot do for itself: open a path directly, and name the file a dialog
-would have returned. Everything after that point is the code a person drives, so the
-suite can check that opening a real file leaves it byte-identical, and that saving a
-document or a result writes what it should. A release build never sets the variable and
-never injects the flag.
-
-Check ids match [MANUAL_TEST_PLAN.md](MANUAL_TEST_PLAN.md), so a failure names the case
-a human would otherwise run by hand. Expected values are computed independently — node's
-crypto, an RFC constant, a second parse — never recorded from the app's own output: a
-golden taken from the thing under test proves it is stable, not that it is right.
-`apps/desktop/test-results/native-suite.json` holds the run; on CI the workflow keeps it
-with the executable's log and a screenshot when the suite fails.
-
-The gate also runs every plugin package's own tests (`plugins/*/test.mjs`, JavaScript processors on the plugin SDK) one package at a time, so a merged package cannot regress unnoticed. To run them standalone, optionally against another plugins root:
-
-```powershell
-node scripts/test-plugins.mjs
-node scripts/test-plugins.mjs <plugins root>
-```
-
-The layout check protects the native Tauri window from rendering as an unstyled document. It requires `.app-shell`, `.app-body`, `.sidebar`, and `.workspace` to retain their built flex declarations; checking the built output catches asset pipeline and packaging regressions as well as stylesheet edits.
-
-The current Rust baseline has not been reformatted as a dedicated change. The gate reports whether `rustfmt` is installed but does not treat formatting as passing or failing until that baseline work is completed, so it does not hide existing formatting debt or add unrelated formatting churn to worker changes.
-
-To inspect the native package locally after dependencies are installed:
-
-```powershell
-pnpm --dir apps/desktop tauri build --debug --no-bundle
-```
-
-The Cargo workspace executable is produced at `target/debug/devtools-desktop.exe` on Windows. For an iterative native preview, run `pnpm tauri dev` from `apps/desktop`.
 
 ## Performance baseline
 

@@ -175,7 +175,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-26 | Drag a file from Explorer onto the window | A new tab opens with that file |
 | DOC-27 **[P1]** | Type in a tab so it is dirty, then drag a file onto the window | The dirty tab is **not** replaced; the dropped file opens in its own tab |
 | DOC-28 (suite) | Drag several files at once; also pick several in **Open** (Ctrl+O) | Each opens in its own tab, in order. One status line says *Opened N files*; anything that did not open is named there, once, with its reason. Past 16 tabs, it opens what fits and says how many more did not |
-| DOC-29 (suite) | Drag a folder onto the window, alone and among files | Refused by name (*Choose a regular file*); the files beside it still open; no crash |
+| DOC-29 | Drag a folder onto the window, alone and among files | Refused by name (*Choose a regular file*); the files beside it still open; no crash |
 | DOC-30 | Drag a file over the window and drag it back out without dropping | The drop highlight appears and then clears; no tab is created |
 | DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
 | DOC-33 (suite) **[P1]** | New tab, type, Ctrl+S to a new file; change that file in Notepad; edit in the app and Ctrl+S | Refused: *changed on disk*. Notepad's version survives — a file the tab *saved* is guarded exactly like one it opened |
@@ -364,7 +364,7 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 ### TL-CSV — CSV inspector · `structured.csv` · Rust
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `a,b\n1,2\n3,4` | Row and column counts correct |
+| 01 | `a,b\n1,2\n3,4` | Row and column counts correct |
 | 02 | Quoted field with an embedded comma and newline | Parsed as one field |
 | 03 | Ragged rows (3 columns then 2) | Reported, not silently padded |
 | 04 | Semicolon-delimited data | Either detected or reported as one column — record the behaviour |
@@ -372,7 +372,7 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 ### TL-INSPECT — Text inspector · `text.inspect` · Rust · **known parity gap**
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `Hello ✓` | Character count 7, byte count 9 (UTF-8), one line |
+| 01 | `Hello ✓` | Character count 7, byte count 9 (UTF-8), one line |
 | 02 | `astral.txt` | Counts distinguish code points from UTF-16 units; the emoji with a ZWJ is counted consistently and the rule is stated |
 | 03 | `crlf.txt` | Line count 3 regardless of CRLF |
 | 04 | — | Compare every reported field against the DU-22 screenshot; list what is missing. This tool is known to be unaudited for parity |
@@ -387,19 +387,19 @@ Options: target (camel, pascal, snake, kebab, screaming-kebab, constant), acrony
 | 03 | `my URL parser` | preserve-acronyms on vs off | `URL` is kept as a unit when on |
 | 04 | custom acronym list `AWS,GCP` with `myAWSBucket` | snake | `AWS` treated as an acronym |
 | 05 | `déjà vu` | snake | Accents preserved, not stripped |
-| 06 (suite) | `   ` | any | Neutral empty result |
+| 06 | `   ` | any | Neutral empty result |
 
 ### TL-TIME — Unix Timestamp Converter · `time.unix` · package · generator
 Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-digits (1–20, default 12). Limit 4 KiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | empty | Runs with no input and shows the current time |
+| 01 | empty | Runs with no input and shows the current time |
 | 02 (suite) | `1700000000` | Interpreted as seconds → 14 Nov 2023 UTC; local time also shown |
 | 03 | `1700000000000` | Interpreted as milliseconds (auto, by digit count) |
 | 04 | `2023-11-14T22:13:20Z` | Parsed as ISO and converted back to epoch |
 | 05 | `0`, `-1`, `2147483648` | Epoch, pre-epoch and post-2038 all handled |
-| 06 (suite) | `abc` | Readable error |
+| 06 | `abc` | Readable error |
 | 07 | — | Compare the displayed time zone handling with the DU-01 card |
 
 ### TL-UUID — UUID Generator · `identity.uuid` · package · generator
@@ -407,8 +407,8 @@ Operations: **Generate** (version v1/v3/v4/v5, namespace, name, count 1–100, c
 
 | # | Steps | Expected |
 |---|---|---|
-| 01 (suite) | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
-| 02 (suite) | Generate, count 100 | 100 UUIDs, all distinct |
+| 01 | Generate, v4, count 1 | A syntactically valid v4 UUID; version nibble is `4` |
+| 02 | Generate, count 100 | 100 UUIDs, all distinct |
 | 03 | Run v4 generation twice | Different values each time (not seeded/repeating) |
 | 04 (suite) | v5 with namespace `dns`, name `example.com` | Stable across runs and equal to `cfbff0d1-9375-5685-968c-48ce8b15ae17` (RFC 4122; computed independently of this app). v3 of the same pair is also stable across runs |
 | 05 | v1 | Time-based, values increase across successive runs |
@@ -426,7 +426,7 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 | 01 (suite) | `hello` | encode | `aGVsbG8=` |
 | 02 (suite) | `aGVsbG8=` | decode | `hello` |
 | 03 | `~~~?>>` | encode, variant url | Uses `-` and `_`, never `+` or `/` |
-| 04 (suite) | `aGVsbG8` (no padding) | decode, padding required | Error; with padding optional, decodes |
+| 04 | `aGVsbG8` (no padding) | decode, padding required | Error; with padding optional, decodes |
 | 05 | `aGVsbG8=!!` | decode, strict vs tolerant | Strict errors; tolerant/replace documents what it does |
 | 06 | `👩‍🚀` | encode then decode | Round trip is byte-identical |
 | 07 | 2 MiB text | encode | Completes or reports the limit |
@@ -435,9 +435,9 @@ Options: mode (encode, decode), variant (standard, url), padding (required, omit
 | # | Input | Options | Expected |
 |---|---|---|---|
 | 01 (suite) | `https://example.com/search?q=hello world` | encode | Space becomes `%20` |
-| 02 (suite) | same | encode, form encoding (if offered) | Space becomes `+` |
+| 02 | same | encode, form encoding (if offered) | Space becomes `+` |
 | 03 | `%E2%9C%93` | decode | `✓` |
-| 04 (suite) | `%ZZ` | decode | Readable error, not a silent pass-through |
+| 04 | `%ZZ` | decode | Readable error, not a silent pass-through |
 | 05 | `a+b` | decode in both modes | Record the difference between rfc3986 and form |
 
 ### TL-URLPARSE — URL Parser · `web.url-parser` · package · auto
@@ -445,8 +445,8 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `https://user:pw@example.com:8443/a/b?x=1&y=two&x=3#frag` | Scheme, credentials, host, port, path, query pairs (including the repeated `x`) and fragment all listed |
-| 02 (suite) | same | The tree view is readable and the indent option changes the code view |
+| 01 | `https://user:pw@example.com:8443/a/b?x=1&y=two&x=3#frag` | Scheme, credentials, host, port, path, query pairs (including the repeated `x`) and fragment all listed |
+| 02 | same | The tree view is readable and the indent option changes the code view |
 | 03 | `not a url` | Readable error |
 | 04 | `https://例え.jp/パス` | IDN host and percent-decoded path shown correctly |
 | 05 | query with `a=%20%2B&b=` | Decoded values shown, empty value preserved |
@@ -466,7 +466,7 @@ Operation: one, with a **Mode** option (escape, unescape) and numeric style, pre
 ### TL-JSONSTR — JSON String Escape / Unescape · `text.json-string` · Rust
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 (suite) | `{"name":"Sample","items":[1,2,3]}` | escape | Quotes escaped, result is a valid JSON string literal |
+| 01 | `{"name":"Sample","items":[1,2,3]}` | escape | Quotes escaped, result is a valid JSON string literal |
 | 02 | result of 01 | unescape | Back to the original, byte-identical |
 | 03 | text with a tab, newline and backslash | escape | `\t`, `\n`, `\\` |
 | 04 | `"\u00e9"` | unescape | `é` |
@@ -476,7 +476,7 @@ Options: mode, quotes (both, double, single, none), non-ascii (keep, unicode, ut
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `a"b'c\d` with quotes=both | Both quote styles escaped |
+| 01 | `a"b'c\d` with quotes=both | Both quote styles escaped |
 | 02 | same with quotes=none | Neither escaped |
 | 03 | `é` with non-ascii=unicode vs utf16 | `\u00e9` vs the UTF-16 form; keep leaves it alone |
 | 04 | `\n\t` literal text | escape then unescape round-trips |
@@ -505,7 +505,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 ### TL-BASE64IMG — Image to Base64 / Base64 to Image · `encoding.image-base64`, `encoding.base64-image` · Rust
 | # | Steps | Expected |
 |---|---|---|
-| 01 (suite) | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
+| 01 | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
 | 02 | Copy complete result → decode it | The same image comes back; visually identical |
 | 03 | Decode an invalid Base64 string | Readable error, no broken-image placeholder claiming success |
 | 04 | Decode a data URI with the wrong MIME | Either honoured or reported; not a silent mismatch |
@@ -517,7 +517,7 @@ Options: query, replacement, mode (find, replace, replaceAll), case-sensitive, w
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `Sample text\nReplace this text`, query `text` | Find reports 2 matches with positions |
+| 01 | `Sample text\nReplace this text`, query `text` | Find reports 2 matches with positions |
 | 02 | query `TEXT`, case-sensitive on / off | 0 matches vs 2 |
 | 03 | whole-word on with query `ext` | 0 matches |
 | 04 | replace `text`→`word`, mode replace vs replaceAll | First-only vs all |
@@ -554,7 +554,7 @@ Options: key (**masked**), secret-encoding (utf8, base64, base64url), clock-tole
 | 05 | Token with `alg: none` | Not treated as verified |
 | 06 | Malformed token (two segments) | Readable error |
 | 07 | Token with a base64 secret and secret-encoding=base64 | Verifies; with utf8 it does not |
-| 08 **[P1]** | Take a screenshot with the key filled in | The secret is masked in the screenshot |
+| 08 (suite) **[P1]** | Take a screenshot with the key filled in | The secret is masked in the screenshot |
 
 ### TL-YAML — YAML ↔ JSON · `convert.yaml` · package · auto
 Operations: YAML to JSON, JSON to YAML. Options: indent, sort-keys (YAML→JSON). Limit 16 MiB.
@@ -568,7 +568,7 @@ Operations: YAML to JSON, JSON to YAML. Options: indent, sort-keys (YAML→JSON)
 | 05 | YAML with an anchor/alias (`&a`, `*a`) | Documented error (`yaml.alias-unsupported`), readable in the UI |
 | 06 | YAML with a duplicate key | Documented error, not a silent last-wins |
 | 07 | YAML with bad indentation | Error names the line |
-| 08 (suite) | YAML `.inf`, `.nan`, `~`, `null` | Handled per the README; record what each becomes |
+| 08 | YAML `.inf`, `.nan`, `~`, `null` | Handled per the README; record what each becomes |
 | 09 | JSON with a very deep nesting (200 levels) | Either converts or reports a depth limit; no stack crash |
 
 ### TL-XML — XML · `format.xml` · package · explicit
@@ -613,14 +613,14 @@ Options (beautify): indent (space-2, space-4, tab), brace-style, preserve-newlin
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `sample.js` | Beautify produces conventionally formatted JS |
+| 01 | `sample.js` | Beautify produces conventionally formatted JS |
 | 02 | brace-style collapse / expand / end-expand | Brace placement follows the option |
 | 03 | max-preserve-newlines 0 vs 10 | Blank-line runs collapse or survive |
 | 04 | Minify with `/*! license */` and `// note` | License comment kept (preserve-comments=license), others dropped; with `none`, all dropped |
-| 05 **[P1]** | Minify `a = b / c / d; x = /b[/]c/g; s = "/*";` | Division stays division, the regex literal survives, the string is untouched |
+| 05 (suite) **[P1]** | Minify `a = b / c / d; x = /b[/]c/g; s = "/*";` | Division stays division, the regex literal survives, the string is untouched |
 | 06 **[P1]** | Minify `function f(){ return\nvalue }` and `y\n++z` | The newlines that ASI depends on are preserved |
 | 07 | Nested template literals `` `a${`b${c}`}` `` | Preserved exactly |
-| 08 (suite) | Minify then Beautify (chain with Open result) | Semantically the same code; record any difference |
+| 08 | Minify then Beautify (chain with Open result) | Semantically the same code; record any difference |
 | 09 | Unterminated string / template / comment | Documented error, readable |
 
 ### TL-SQL — SQL Formatter · `format.sql` · package
@@ -632,7 +632,7 @@ Options: dialect (sql, mysql, mariadb, postgresql, plsql), keyword-case, indent,
 | 02 | keyword-case upper / lower / preserve | `SELECT` vs `select` vs as written |
 | 03 | comma-position end / start | Commas trail / lead |
 | 04 | dialect postgresql with `::text` cast and `$$` block | Not mangled |
-| 05 (suite) | mysql backtick identifiers | Preserved |
+| 05 | mysql backtick identifiers | Preserved |
 | 06 | A string containing `--` or `/*` | Not treated as a comment |
 | 07 | Minify | Single-line statement that still runs |
 
@@ -645,7 +645,7 @@ Options: wrap (none, fragment, component), component-name, indent, svg-attribute
 | 02 | wrap none / fragment / component | Bare markup, `<>…</>`, or a named component using component-name |
 | 03 | An SVG with `stroke-width`, `xlink:href` | camel → `strokeWidth`; keep leaves as written |
 | 04 | `style="color:red;font-size:12px"` | Converted to a style object |
-| 05 (suite) | Inline `<script>` or `<style>` | Handled or explicitly reported |
+| 05 | Inline `<script>` or `<style>` | Handled or explicitly reported |
 | 06 | Malformed markup | Readable error |
 
 ### TL-PREVIEW — Markdown & HTML Preview · `preview.documents` · package · auto
@@ -657,21 +657,21 @@ Operations: Preview Markdown, Preview HTML. Markdown options: gfm, breaks, theme
 | 02 | GFM table and task list, gfm on/off | Rendered as a table / as literal text |
 | 03 | breaks on/off | Single newlines become `<br>` or not |
 | 04 | theme light/dark | The preview's own background and text change |
-| 05 **[P1]** | Markdown containing `<script>alert(1)</script>` and `[x](javascript:alert(1))` | No alert; the javascript: link does not execute |
+| 05 (suite) **[P1]** | Markdown containing `<script>alert(1)</script>` and `[x](javascript:alert(1))` | No alert; the javascript: link does not execute |
 | 06 | `sample.html` with Preview HTML | Renders as a page |
 | 07 | Very long document (2 MB of markdown) | Renders or reports the limit; UI stays responsive |
-| 08 (suite) | Switch to the code representation | The generated HTML source is available and copyable |
+| 08 | Switch to the code representation | The generated HTML source is available and copyable |
 
 ### TL-QR — QR Code · `media.qr` · package · auto
 Options: error-correction (L, M, Q, H), cell-size (1–40), margin (0–16), version (0–40). Input limit 2953 bytes.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 **[P1]** | `https://example.com` | A scannable QR; a phone resolves it to that URL |
+| 01 (suite) **[P1]** | `https://example.com` | A scannable QR; a phone resolves it to that URL |
 | 02 | Same at error-correction L, M, Q, H | All scannable; the module count grows with the level |
 | 03 | cell-size 1 and 40 | Image size changes; at 40 it is large but still correct |
 | 04 | margin 0 and 16 | The white quiet zone disappears / grows. At margin 0 a scanner may fail — that is expected, but the border must visibly change |
-| 05 (suite) | version 1 with a long input | Documented capacity error |
+| 05 | version 1 with a long input | Documented capacity error |
 | 06 | version 40 with `hello` | Large, sparse, still scannable |
 | 07 | 2953 bytes at level L | Encodes; 2954 bytes is a capacity error |
 | 08 | Empty input | Documented `qr.empty` error |
@@ -687,7 +687,7 @@ Options: newline (preserve, lf, crlf, ignore), context-lines (0–64).
 | 02 | Identical texts | "No differences" stated plainly |
 | 03 | context-lines 0 vs 10 | Surrounding context shrinks/grows |
 | 04 | One side CRLF, other LF, newline=ignore vs preserve | Ignore reports no difference; preserve reports every line changed |
-| 05 (suite) | `big.json` on each side, one side edited | Completes; record the time |
+| 05 | `big.json` on each side, one side edited | Completes; record the time |
 | 06 | Left empty, right filled | The footer explains the empty side; no red error |
 | 07 | Files opened into both sides | Neither file is modified (check hashes) |
 
@@ -700,7 +700,7 @@ Options: from-base (2–36), to-base (2–36), digits (lower, upper). Limit 64 K
 | 02 | `ff`, 16 → 2 | `11111111` |
 | 03 | `zz`, 36 → 10 | `1295` |
 | 04 | Very long number (200 digits) | Exact, no floating-point rounding |
-| 05 (suite) | `2`, from-base 2 | Readable error (invalid digit for the base) |
+| 05 | `2`, from-base 2 | Readable error (invalid digit for the base) |
 | 06 | Negative and `+` prefixed values | Documented behaviour |
 | 07 | from-base 1 or 37 | Rejected by the control's range |
 
@@ -717,16 +717,16 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 ### TL-CURL — cURL to Code · `web.curl-code` · Rust
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `curl.txt` | JavaScript fetch output is valid JS with method, URL, headers and body |
+| 01 | `curl.txt` | JavaScript fetch output is valid JS with method, URL, headers and body |
 | 02 | same | Python requests output is valid Python with the same semantics |
 | 03 | `curl` with `-u user:pass` and cookies | Credentials appear in the generated code (and are not silently dropped) |
 | 04 | Multiline `curl` with `\` continuations | Parsed as one command |
-| 05 (suite) | Not a curl command | Readable error |
+| 05 | Not a curl command | Readable error |
 
 ### TL-EDITOR — Text editor · `editor.text`
 | # | Steps | Expected |
 |---|---|---|
-| 01 (suite) | Select the editor tool | Single-pane layout, no result pane demanded |
+| 01 | Select the editor tool | Single-pane layout, no result pane demanded |
 | 02 | Type, save, reopen | Content round-trips |
 
 ---
