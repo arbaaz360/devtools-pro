@@ -26,6 +26,7 @@ import {
 } from "./bridge";
 import {
   WorkbenchController,
+  displayPath,
   errorText,
   type WorkbenchApi,
 } from "./workbench/controller";
@@ -230,6 +231,12 @@ function selectTabFromKeyboard(id: string, focusButton: boolean) {
 }
 function renderTabs() {
   const root = $("#tabs");
+  // One panel shows whichever document is selected (WAI-ARIA tabs), so it is labelled by
+  // that tab and each tab controls it; a screen reader then names what the panel holds.
+  const panel = $("#document-panel");
+  const selected = state.tabs.find((tab) => tab.id === state.activeId);
+  if (selected) panel.setAttribute("aria-labelledby", `document-tab-${selected.id}`);
+  else panel.removeAttribute("aria-labelledby");
   root.innerHTML = "";
   if (!state.tabs.length) {
     root.innerHTML = '<span class="empty-tab">Your workspace</span>';
@@ -245,9 +252,11 @@ function renderTabs() {
     button.ariaSelected = String(tab.id === state.activeId);
     button.tabIndex = tab.id === state.activeId ? 0 : -1;
     const tabName = displayTabName(tab);
-    button.title = tab.source?.path ?? tabName;
+    button.title = tab.source?.path ? displayPath(tab.source.path) : tabName;
     button.innerHTML = `<span class="file-dot ${tab.source?.format ?? "text"}" aria-hidden="true"></span><span class="tab-name">${esc(tabName)}</span>${tab.dirty || tab.rightDirty ? '<span class="dirty-indicator" aria-label="Unsaved changes">●</span>' : ""}`;
     button.dataset.tabId = tab.id;
+    button.id = `document-tab-${tab.id}`;
+    button.setAttribute("aria-controls", "document-panel");
     button.onclick = () => controller.activate(tab.id);
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -1658,6 +1667,18 @@ splitter.addEventListener("keydown", (event) => {
 paletteSearch.oninput = commands;
 $("#tab-new").onclick = () => controller.newDocument();
 document.addEventListener("keydown", (event) => {
+  // While "Save your changes?" is open, no global shortcut may act: switching tabs,
+  // saving or opening would change the workspace behind a question that is still about
+  // one tab. The app's chords are swallowed so the WebView's own meaning for them (a new
+  // window, Save page) does not run either; Tab, Enter and Escape stay the dialog's.
+  if (($("#unsaved-dialog") as HTMLDialogElement).open) {
+    const chord =
+      (event.ctrlKey || event.metaKey) &&
+      (["Tab", "PageUp", "PageDown"].includes(event.key) ||
+        ["n", "o", "s", "w", "k"].includes(event.key.toLowerCase()));
+    if (chord) event.preventDefault();
+    return;
+  }
   if (palette.open && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
     event.preventDefault();
     const buttons = [

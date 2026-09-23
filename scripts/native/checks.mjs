@@ -703,7 +703,7 @@ export const checks = [
   {
     // AST-020: every document tab is reachable from the keyboard. Real key presses; the
     // expectation is the WAI-ARIA tabs pattern, not whatever the strip happens to do.
-    id: "A11Y-10",
+    id: "A11Y-16",
     async run({ driver, page }) {
       await driver.closeExtraTabs(1);
       // Three documents at least, whatever the run started with.
@@ -734,6 +734,116 @@ export const checks = [
       const ctrlTab = after.active === (before + 1) % n && after.focused === -1;
       return verdict(n >= 3 && start.active === last && moved && ctrlTab,
         `${n} tabs; ${steps.map(([k, s]) => `${k}->${s.active}${s.focused === s.active ? "" : `(focus ${s.focused})`}`).join(", ")}; Ctrl+Tab ${before}->${after.active}`);
+    },
+  },
+  {
+    // AST-012 (reopened): the tree's own Copy path must select its node again. Keys are
+    // built from char codes so no layer of escaping can hide the backslash.
+    id: "RES-14e",
+    async run({ driver, page }) {
+      const bs = String.fromCharCode(92);
+      // [key, text that finds its row, its value]. The newline key's path is pasted into a
+      // one-line box, which drops a raw newline: only an escaped one survives.
+      const cases = [[`a${bs}b`, `a${bs}b`, "42"], [`it's${bs}x`, `it's${bs}x`, "7"], ["line\nbreak", "break", "9"]];
+      await driver.tool("JSON", { text: JSON.stringify(Object.fromEntries(cases.map(([key, , value]) => [key, Number(value)]))), operation: "Minify" });
+      await page.locator("#view-tree").click();
+      await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 1);
+      const results = [];
+      for (const [, name, value] of cases) {
+        clearClipboard();
+        const row = page.locator("#tree-body .tree-line").filter({ has: page.locator(".tree-key", { hasText: name }) }).first();
+        await row.locator(".tree-copy").click();
+        const copied = await driver.until(() => clipboardShell("[System.Windows.Forms.Clipboard]::GetText()") || null, { timeout: 6000, step: 300 });
+        await page.locator("#tree-path").fill(copied ?? "");
+        const status = await driver.until(async () => {
+          const now = (await page.locator("#tree-path-status").innerText()).trim();
+          return /match/.test(now) ? now : null;
+        });
+        const shown = (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ");
+        results.push({ copied, status, ok: status === "1 match" && shown.includes(value) });
+        // A query shows its matches in place of the tree; the next key's row is in the tree.
+        await page.locator("#tree-path").fill("");
+        await driver.until(async () => /entr/.test(await page.locator("#tree-path-status").innerText()));
+      }
+      await page.locator("#tree-path").fill("");
+      await page.locator("#view-text").click();
+      return verdict(results.every((r) => r.ok), results.map((r) => `${JSON.stringify(r.copied)} -> ${r.status}`).join("; "));
+    },
+  },
+  {
+    // AST-022: a tab's tooltip is the path as a person writes it, not the \\?\ form.
+    id: "DOC-35",
+    async run({ driver, page }) {
+      const file = freshFile("tooltip-path.txt", "tooltip");
+      await driver.openPath(file);
+      const title = await page.locator("#tabs .tab[aria-selected=true]").getAttribute("title");
+      return verdict(/^[A-Za-z]:/.test(title ?? "") && (title ?? "").endsWith("tooltip-path.txt"), `title ${JSON.stringify(title)}`);
+    },
+  },
+  {
+    // AST-023: while "Save your changes?" asks about one tab, no shortcut may change the
+    // workspace behind it. A decoy is the save dialog's answer, so a save shows as a file.
+    id: "DOC-36",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      await driver.selectTool("String Case Converter");
+      await driver.setInput("unsaved words");
+      const decoy = freshFile("behind-the-dialog.txt");
+      await driver.presetDialogPaths([decoy]);
+      const active = () => page.locator("#tabs .tab[aria-selected=true]").getAttribute("data-tab-id");
+      const before = await active();
+      const count = await page.locator("#tabs .tab").count();
+      await page.locator("#preview").press("Control+w");
+      const dialog = page.locator("#unsaved-dialog");
+      await driver.until(async () => dialog.isVisible());
+      for (const keys of ["Control+PageUp", "Control+PageDown", "Control+Tab", "Control+s", "Control+n"]) await page.keyboard.press(keys);
+      await sleep(400);
+      const after = await active();
+      const still = await dialog.isVisible();
+      const tabs = await page.locator("#tabs .tab").count();
+      const saved = existsSync(decoy);
+      await page.locator("#unsaved-cancel").click();
+      await driver.presetDialogPaths([]);
+      // Cancel answers the question it asked: the same tab, still open, still unsaved.
+      await driver.until(async () => !(await dialog.isVisible()));
+      const kept = (await active()) === before && (await page.locator("#tabs .tab[aria-selected=true] .dirty-indicator").count()) === 1;
+      // Leave no unsaved tab behind. When the tab was not kept, closeExtraTabs discards later.
+      if (kept) {
+        await page.locator("#preview").press("Control+w");
+        if (await driver.until(async () => dialog.isVisible(), { timeout: 3000 })) await page.locator("#unsaved-discard").click();
+      }
+      return verdict(after === before && still && tabs === count && !saved && kept,
+        `active ${before} -> ${after}; dialog ${still ? "still open" : "closed"}; tabs ${count} -> ${tabs}; ${saved ? "a save happened" : "nothing saved"}; after Cancel ${kept ? "the same unsaved tab" : "a different state"}`);
+    },
+  },
+  {
+    // AST-024: in the real accessibility tree, every tab controls the document panel and
+    // the panel is labelled by the selected tab — and follows it when the selection moves.
+    id: "A11Y-17",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const relations = async () => {
+        const cdp = await page.context().newCDPSession(page);
+        const { nodes } = await cdp.send("Accessibility.getFullAXTree");
+        await cdp.detach();
+        const related = (node, name) => (node.properties ?? []).find((p) => p.name === name)?.value?.relatedNodes?.map((r) => r.idref) ?? [];
+        const tabs = nodes.filter((n) => n.role?.value === "tab");
+        const panel = nodes.find((n) => n.role?.value === "tabpanel");
+        return { tabs: tabs.map((t) => related(t, "controls")), labelledby: panel ? related(panel, "labelledby") : null, panelName: panel?.name?.value ?? null };
+      };
+      const selectedId = async () => page.locator("#tabs .tab[aria-selected=true]").getAttribute("id");
+      const first = await relations();
+      const firstSelected = await selectedId();
+      await page.locator("#tabs .tab[aria-selected=true]").focus();
+      await page.keyboard.press("ArrowLeft");
+      const second = await relations();
+      const secondSelected = await selectedId();
+      const controlsPanel = (r) => r.tabs.length >= 3 && r.tabs.every((ids) => ids.includes("document-panel"));
+      const ok = controlsPanel(first) && controlsPanel(second)
+        && first.labelledby?.[0] === firstSelected && second.labelledby?.[0] === secondSelected && firstSelected !== secondSelected;
+      return verdict(ok, `tabs control ${JSON.stringify(first.tabs[0])}; panel labelledby ${JSON.stringify(first.labelledby)} (selected ${firstSelected}), after ArrowLeft ${JSON.stringify(second.labelledby)} (selected ${secondSelected}); panel name "${second.panelName}"`);
     },
   },
   {

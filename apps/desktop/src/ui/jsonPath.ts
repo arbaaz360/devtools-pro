@@ -10,7 +10,8 @@
  *
  * Supported:
  *   $                 the whole result
- *   .name  ['name']   a child, by name
+ *   .name  ['name']   a child, by name; a quoted name takes JSON's escapes
+ *                     (`\\` `\'` `\n` `\t` `\u0001` …, RFC 9535 §2.3.1.1)
  *   [0] [-1]          an element, counting from the end when negative
  *   [1:4] [:2] [::2] [::-1]   a slice, with an optional step (RFC 9535 semantics)
  *   [*]  .*           every child of an object or array
@@ -43,6 +44,11 @@ type Step =
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*/;
 /** A key that can be written as `.name`; anything else is emitted in brackets. */
 const PLAIN_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+/** A quoted name's escapes and what each stands for; `\uXXXX` is read separately. */
+const UNESCAPE: Record<string, string> = { b: "\b", f: "\f", n: "\n", r: "\r", t: "\t", "/": "/", "\\": "\\", "'": "'", '"': '"' };
+/** The control characters, which a quoted name can only carry escaped. */
+const CONTROL = /[\u0000-\u001f]/g;
+const SHORT_ESCAPE: Record<string, string> = { "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t" };
 /** A decimal integer as an index or slice bound: no hex, no exponent, no blank. */
 const INTEGER = /^-?\d+$/;
 /** Values the steps before the last may produce before a query stops early. */
@@ -57,13 +63,31 @@ export function parseJsonPath(expression: string): Step[] {
   let at = 1;
   let pendingDescent = false;
 
+  // A quoted name is a string literal with JSON's escapes (RFC 9535 §2.3.1.1). The
+  // escapes are what let a copied path for a key holding a newline or a control
+  // character survive the one-line query box, which drops a raw newline on paste.
   const readQuoted = (quote: string): string => {
     let name = "";
     at += 1;
     while (at < source.length && source[at] !== quote) {
-      if (source[at] === "\\" && at + 1 < source.length) at += 1;
-      name += source[at];
-      at += 1;
+      if (source[at] !== "\\") {
+        name += source[at];
+        at += 1;
+        continue;
+      }
+      const code = source[at + 1];
+      if (code === undefined) throw new JsonPathError(`Unclosed ${quote} in the path`);
+      if (code === "u") {
+        const hex = source.slice(at + 2, at + 6);
+        if (!/^[0-9A-Fa-f]{4}$/.test(hex)) throw new JsonPathError("\\u in a quoted name needs four hex digits");
+        name += String.fromCharCode(Number.parseInt(hex, 16));
+        at += 6;
+      } else if (Object.hasOwn(UNESCAPE, code)) {
+        name += UNESCAPE[code];
+        at += 2;
+      } else {
+        throw new JsonPathError(`Unknown escape \\${code} in a quoted name; write a backslash as \\\\`);
+      }
     }
     if (at >= source.length) throw new JsonPathError(`Unclosed ${quote} in the path`);
     at += 1;
@@ -149,15 +173,19 @@ const isObject = (value: unknown): value is Record<string, unknown> => {
 
 /**
  * A path segment as it is written, so a reader can paste the result back in. The
- * parser treats a backslash in quotes as an escape, so both it and the quote are
- * escaped here; otherwise a key containing `\\` would not select itself again.
+ * parser reads a quoted name as a string literal, so the backslash, the quote and
+ * every control character are escaped here; otherwise a key containing `\\` or a
+ * newline would not select itself again.
  */
 const segment = (key: string | number): string =>
   typeof key === "number"
     ? `[${key}]`
     : PLAIN_NAME.test(key)
       ? `.${key}`
-      : `['${key.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}']`;
+      : `['${key
+          .replace(/\\/g, "\\\\")
+          .replace(/'/g, "\\'")
+          .replace(CONTROL, (char) => SHORT_ESCAPE[char] ?? `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`)}']`;
 
 /** The indices an RFC 9535 slice selects, in selection order. */
 function sliceIndices(size: number, from: number | null, to: number | null, step: number): number[] {
@@ -293,3 +321,10 @@ export function evaluateJsonPath(
   }
   return { matches: current, truncated: truncated || stopped, stopped };
 }
+
+/**
+ * The one serializer for path segments. The tree's Copy path uses it too: a second copy
+ * that escaped quotes but not backslashes made copied paths for keys like `a\\b` select
+ * nothing (the review's AST-012, reopened on the tree after the evaluator was fixed).
+ */
+export { segment as pathSegment };

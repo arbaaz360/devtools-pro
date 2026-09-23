@@ -180,6 +180,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
 | DOC-33 (suite) **[P1]** | New tab, type, Ctrl+S to a new file; change that file in Notepad; edit in the app and Ctrl+S | Refused: *changed on disk*. Notepad's version survives — a file the tab *saved* is guarded exactly like one it opened |
 | DOC-34 (suite) **[P1]** | Open A, edit, Ctrl+Shift+S to B; change B in Notepad; Ctrl+S; then open A | The save to B is refused and B keeps Notepad's text. Opening A shows A's own contents in its own tab, not the tab that now holds B |
+| DOC-35 (suite) | Open a file and hover its tab | The tooltip is the ordinary path (`C:\...\file.txt`), not the `\\?\C:\...` form |
+| DOC-36 (suite) **[P1]** | Type in a tab, press Ctrl+W, and while *Save your changes?* is open press Ctrl+PageUp, Ctrl+PageDown, Ctrl+Tab, Ctrl+S, Ctrl+N | Nothing happens behind the dialog: the same tab stays active, no tab opens, nothing is saved. Cancel then leaves the tab open and unsaved |
 | DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
@@ -286,6 +288,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-14b | In Tree view type `$..price`, then `$.store.book[0]`, then a filter like `$.a[?(@.b==1)]` | The first two report a match count and list the matches with their paths; the filter is **refused by name** ("Filter expressions are not supported") rather than showing an empty list, which would read as "nothing matched" |
 | RES-14c (suite) **[P1]** | Format `{"id":9007199254740993,"overflow":1e400}`, open **Tree**, and query `$.id` | The tree and the query show `9007199254740993` and `1e400` exactly as in the text — never `9007199254740992` or `Infinity` |
 | RES-14d (suite) | Format an array of 5,000 objects `{"id": n}`, open **Tree**, query `$[*].id`; then try `$[0:6:2]`, `$[]`, `$.toString` on small inputs | `5000 matches`. A slice step is honoured; `$[]` is refused; an inherited name like `toString` matches nothing. A search stopped by its size limit says *stopped early*, never *no matches* |
+| RES-14e (suite) | In **Tree**, press the *path* button on a key containing a backslash (`a\b`), one with a quote and one with a line break; paste each into the query box | Each copied path selects exactly its own node (`1 match`) |
 | RES-15 **[P1]** | Run **Markdown Preview** on `sample.md` | The preview renders as a formatted document (heading, bold, list, code block) inside the result pane |
 | RES-16 **[P1]** | In the Markdown/HTML preview, click the `https://example.com` link | Nothing navigates the app away; at most it opens your browser. The app window must never become a web page |
 | RES-17 **[P1]** | Preview HTML containing `<script>alert(1)</script>` and `<img src=x onerror=alert(1)>` | No alert dialog appears. Record whether the content is stripped or just inert |
@@ -804,7 +807,8 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | A11Y-06 | Windows high-contrast mode | The app remains legible; no invisible text |
 | A11Y-07 | Text scaling at 125%/150% (Windows setting) | No clipped labels or overlapping controls |
 | A11Y-08 | Row D small window (640×520) | Every control is reachable, possibly via scrolling; nothing is unreachable |
-| A11Y-10 (suite) **[P1]** | Open three documents. Focus the active tab and press Left, Left, End, Home, Right; then, from the editor, press Ctrl+Tab and Ctrl+Shift+Tab (Ctrl+PageDown/PageUp too) | Arrows step through the tabs and Home/End jump, each showing the tab and moving focus onto it; Ctrl+Tab switches documents from anywhere and leaves focus in the editor |
+| A11Y-16 (suite) **[P1]** | Open three documents. Focus the active tab and press Left, Left, End, Home, Right; then, from the editor, press Ctrl+Tab and Ctrl+Shift+Tab (Ctrl+PageDown/PageUp too) | Arrows step through the tabs and Home/End jump, each showing the tab and moving focus onto it; Ctrl+Tab switches documents from anywhere and leaves focus in the editor |
+| A11Y-17 (suite) | Inspect the accessibility tree (Accessibility Insights, or Narrator) with three tabs; move with the arrows | Every tab *controls* the document panel; the panel is *labelled by* the selected tab and follows the selection |
 | A11Y-09 | Ultrawide (row C) | The layout does not stretch controls absurdly; the result pane stays usable |
 | A11Y-10 | Colour check on the result state line | Success/failure is distinguishable without relying on colour alone (icon or words) |
 | A11Y-11 | Mouse wheel and trackpad scrolling in editor, result and rail | All scroll smoothly; the wheel does not zoom accidentally |
