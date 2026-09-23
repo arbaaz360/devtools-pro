@@ -9,6 +9,8 @@
  * window that is supposed to be showing you a result.
  */
 
+import { JsonNumber } from "./losslessJson.ts";
+
 export interface TreeOptions {
   /** Children rendered per container before a "show more" row. */
   pageSize?: number;
@@ -18,8 +20,12 @@ export interface TreeOptions {
   onCopyPath?: (path: string) => void;
 }
 
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/** A JSON object: plain, from JSON.parse. Not an array, and not a kept number. */
+const isObject = (value: unknown): value is Record<string, unknown> => {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
+};
 
 const PLAIN_NAME = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const segment = (key: string | number): string =>
@@ -28,6 +34,8 @@ const segment = (key: string | number): string =>
 /** What a value is, in one word, for the badge beside a node. */
 export function describeValue(value: unknown): { type: string; summary: string; expandable: boolean } {
   if (value === null) return { type: "null", summary: "null", expandable: false };
+  // The result's own digits, not the double they round to.
+  if (value instanceof JsonNumber) return { type: "number", summary: value.lexeme, expandable: false };
   if (Array.isArray(value))
     return { type: "array", summary: value.length === 1 ? "1 item" : `${value.length} items`, expandable: value.length > 0 };
   if (isObject(value)) {

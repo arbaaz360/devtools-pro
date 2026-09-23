@@ -86,6 +86,7 @@ interface Task {
   token: RunToken;
   tab: TabState;
   snapshots: string[];
+  inputFrom?: ResultView["inputFrom"];
   jobId?: string;
   finishing: boolean;
 }
@@ -950,7 +951,14 @@ export class WorkbenchController {
   private async start(task: Task) {
     try {
       let input = task.tab.source;
-      if (task.tab.text !== null) {
+      // A byte tool reads the file's own bytes while the document is unedited: a BOM,
+      // CRLF or anything else the editor does not show is part of what it hashes.
+      // Once edited, it reads the text as UTF-8, and the result says which.
+      const bytesTool = this.toolDefinition(task.tab.toolId)?.input === "bytes";
+      const fileBacked = !!task.tab.source && !task.tab.pasted;
+      const readsFile = bytesTool && fileBacked && !task.tab.dirty;
+      if (bytesTool) task.inputFrom = readsFile || (task.tab.text === null && fileBacked) ? "file" : "text";
+      if (task.tab.text !== null && !readsFile) {
         input = await this.api.createTextDocument(
           task.tab.text,
           task.tab.name,
@@ -1030,7 +1038,7 @@ export class WorkbenchController {
     void this.complete(task, event);
   }
   private async complete(task: Task, event: JobFinished) {
-    const view: ResultView = { event, text: "", truncated: false };
+    const view: ResultView = { event, text: "", truncated: false, inputFrom: task.inputFrom };
     try {
       if (this.current(task.token) && event.ok && event.resultDocumentId) {
         if (isBinaryResult(event))

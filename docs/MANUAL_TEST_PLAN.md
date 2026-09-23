@@ -282,6 +282,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-13 | Collapse the result with the ›/‹ button in the pane header | Same behaviour; the button's tooltip flips |
 | RES-14 (suite) | Run a tool whose output is JSON (**JSON Format**, **URL Parser**, **YAML to JSON**) and press **Tree** | The result is walkable: expandable nodes with type and size, and each row's path can be copied |
 | RES-14b | In Tree view type `$..price`, then `$.store.book[0]`, then a filter like `$.a[?(@.b==1)]` | The first two report a match count and list the matches with their paths; the filter is **refused by name** ("Filter expressions are not supported") rather than showing an empty list, which would read as "nothing matched" |
+| RES-14c (suite) **[P1]** | Format `{"id":9007199254740993,"overflow":1e400}`, open **Tree**, and query `$.id` | The tree and the query show `9007199254740993` and `1e400` exactly as in the text — never `9007199254740992` or `Infinity` |
+| RES-14d (suite) | Format an array of 5,000 objects `{"id": n}`, open **Tree**, query `$[*].id`; then try `$[0:6:2]`, `$[]`, `$.toString` on small inputs | `5000 matches`. A slice step is honoured; `$[]` is refused; an inherited name like `toString` matches nothing. A search stopped by its size limit says *stopped early*, never *no matches* |
 | RES-15 **[P1]** | Run **Markdown Preview** on `sample.md` | The preview renders as a formatted document (heading, bold, list, code block) inside the result pane |
 | RES-16 **[P1]** | In the Markdown/HTML preview, click the `https://example.com` link | Nothing navigates the app away; at most it opens your browser. The app window must never become a web page |
 | RES-17 **[P1]** | Preview HTML containing `<script>alert(1)</script>` and `<img src=x onerror=alert(1)>` | No alert dialog appears. Record whether the content is stripped or just inert |
@@ -493,6 +495,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 | 04 | the PNG fixture | Matches `certutil -hashfile <png> SHA256` |
 | 05 | case option upper | Hex digits uppercase, same value |
 | 06 | 64 MiB file | Completes within the deadline or reports the limit; record the time |
+| 07 (suite) **[P1]** | Open a file of the bytes `EF BB BF 68 65 6C 6C 6F` (a UTF-8 BOM, then `hello`) without editing; then type in it | Unedited: 8 bytes in, SHA-256 `7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862` (`certutil -hashfile`), and **Read: the file's bytes**. Edited: the digest of the typed text in UTF-8, and **Read: the text, as UTF-8** |
 
 ### TL-BASE64IMG — Image to Base64 / Base64 to Image · `encoding.image-base64`, `encoding.base64-image` · Rust
 | # | Steps | Expected |

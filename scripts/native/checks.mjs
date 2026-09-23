@@ -531,6 +531,48 @@ export const checks = [
     },
   },
   {
+    // AST-008: the tree shows the result's own digits. The oracle is the input text:
+    // 9007199254740993 is not a double, and 1e400 is not Infinity.
+    id: "RES-14c",
+    async run({ driver, page }) {
+      await driver.tool("JSON", { text: '{"id":9007199254740993,"overflow":1e400}', operation: "Format" });
+      const text = await driver.fullResult();
+      await page.locator("#view-tree").click();
+      const shown = await driver.until(async () => {
+        const body = (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ");
+        return /overflow/.test(body) ? body : null;
+      });
+      await page.locator("#tree-path").fill("$.id");
+      const queried = await driver.until(async () => {
+        const status = (await page.locator("#tree-path-status").innerText()).trim();
+        return /match/.test(status) ? (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ") : null;
+      });
+      await page.locator("#tree-path").fill("");
+      await page.locator("#view-text").click();
+      const exact = (body) => /9007199254740993/.test(body ?? "") && !/9007199254740992/.test(body ?? "");
+      return verdict(text.includes("9007199254740993") && exact(shown) && /1e400/.test(shown ?? "") && !/Infinity/.test(shown ?? "") && exact(queried),
+        `tree: ${JSON.stringify((shown ?? "").slice(0, 90))}; $.id: ${JSON.stringify((queried ?? "").slice(0, 60))}`);
+    },
+  },
+  {
+    // AST-009: 5,000 matching ids, by construction, are 5,000 matches — not "no matches".
+    id: "RES-14d",
+    async run({ driver, page }) {
+      const ids = Array.from({ length: 5_000 }, (_, id) => ({ id }));
+      await driver.tool("JSON", { text: JSON.stringify(ids), operation: "Minify" });
+      await page.locator("#view-tree").click();
+      await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 0);
+      await page.locator("#tree-path").fill("$[*].id");
+      const status = await driver.until(async () => {
+        const now = (await page.locator("#tree-path-status").innerText()).trim();
+        return /match|stopped/.test(now) ? now : null;
+      });
+      await page.locator("#tree-path").fill("");
+      await page.locator("#view-text").click();
+      return verdict(status === `${ids.length} matches`, `$[*].id over ${ids.length} objects: the pane says "${status}"`);
+    },
+  },
+  {
     id: "RES-21",
     async run({ driver, page }) {
       const text = "2024-02-29 and 1999-12-31";
@@ -579,6 +621,31 @@ export const checks = [
       const result = await driver.tool("Hash generator", { text: "hello", operation: "SHA-256" });
       const body = result.output || result.structured;
       return verdict(body.toLowerCase().includes(sha256("hello")), `node computes ${sha256("hello").slice(0, 20)}…; the app shows ${body.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    // AST-007: an unedited file is hashed as its bytes, BOM included; once edited, as
+    // its text in UTF-8. The result says which. node:crypto supplies both digests.
+    id: "TL-HASH-07",
+    async run({ driver, page }) {
+      const bytes = Buffer.from([0xef, 0xbb, 0xbf, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+      const file = freshFile("bom-hello.txt");
+      writeFileSync(file, bytes);
+      const readRow = () => page.evaluate(() => {
+        const term = [...document.querySelectorAll("#result-metrics dt")].find((dt) => dt.textContent.trim() === "Read");
+        return term?.nextElementSibling?.textContent.trim() ?? null;
+      });
+      const before = (await driver.readResult()).signature;
+      await driver.openPath(file, "encoding.hash");
+      await driver.runOperation("SHA-256");
+      const first = await driver.settle(bytes.length, { changedFrom: before });
+      const fileDigest = crypto.createHash("sha256").update(bytes).digest("hex");
+      const unedited = (first.output || first.structured).toLowerCase().includes(fileDigest) && (await readRow()) === "the file's bytes";
+      await driver.setInput("hello, edited");
+      const second = await driver.settle(Buffer.byteLength("hello, edited"), { changedFrom: first.signature });
+      const edited = (second.output || second.structured).toLowerCase().includes(sha256("hello, edited")) && (await readRow()) === "the text, as UTF-8";
+      return verdict(unedited && edited,
+        `unedited: expected ${fileDigest.slice(0, 16)}…, shows ${(first.output || first.structured).replace(/\s+/g, " ").slice(0, 70)} (input ${first.inputBytes} B); edited: ${edited ? "text digest, labelled" : (second.output || second.structured).slice(0, 60)}`);
     },
   },
   {

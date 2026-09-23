@@ -42,7 +42,8 @@ import {
 import { WorkerEngine } from "./plugins/engine";
 import { annotationMarkup } from "./ui/annotations";
 import { renderJsonTree, renderMatches } from "./ui/jsonTree";
-import { JsonPathError, evaluateJsonPath } from "./ui/jsonPath";
+import { JsonPathError, WORK_LIMIT, evaluateJsonPath } from "./ui/jsonPath";
+import { parseJsonLossless } from "./ui/losslessJson";
 import type { OptionSpec } from "../../../packages/plugin-contract/ts/generated.ts";
 import { findMatches, nextMatch, replaceAll } from "./workbench/findReplace";
 import { delayedIndicator } from "./ui/delayedIndicator";
@@ -923,7 +924,7 @@ const treeFor = (id: string) => {
 function parsedResult(text: string): { ok: true; value: unknown } | { ok: false } {
   const trimmed = text.trim();
   if (!trimmed || !"{[\"-0123456789tfn".includes(trimmed[0]!)) return { ok: false };
-  try { return { ok: true, value: JSON.parse(trimmed) }; } catch { return { ok: false }; }
+  try { return { ok: true, value: parseJsonLossless(trimmed) }; } catch { return { ok: false }; }
 }
 
 /** Draw the tree for the active tab, applying its query if it has one. */
@@ -944,11 +945,15 @@ function renderTree(tabId: string, value: unknown): void {
     return;
   }
   try {
-    const { matches, truncated } = evaluateJsonPath(value, state.query);
+    const { matches, truncated, stopped } = evaluateJsonPath(value, state.query);
     renderMatches(body, matches, { onCopyPath: copyPath });
-    status.textContent = matches.length === 0
-      ? "no matches"
-      : `${matches.length}${truncated ? "+" : ""} match${matches.length === 1 ? "" : "es"}`;
+    const count = `${matches.length}${truncated ? "+" : ""} match${matches.length === 1 ? "" : "es"}`;
+    // A search cut short is never reported as "no matches": that is a different fact.
+    status.textContent = stopped
+      ? `stopped early — this path visits more than ${WORK_LIMIT.toLocaleString()} values; ${matches.length ? `${count} so far` : "none found so far"}`
+      : matches.length === 0
+        ? "no matches"
+        : count;
     if (!matches.length) status.classList.add("tree-path-error");
   } catch (error) {
     // A path the evaluator does not implement is reported as such: an empty list
@@ -1037,6 +1042,10 @@ function renderResult(tab: TabState) {
   $("#result-metrics").innerHTML = [
     ["Elapsed", `${event.elapsedMs} ms`],
     ["Input", bytes(event.inputBytes)],
+    // For a byte tool the two readings differ (a BOM, CRLF), so say which one it was.
+    ...(result.inputFrom
+      ? [["Read", result.inputFrom === "file" ? "the file's bytes" : "the text, as UTF-8"]]
+      : []),
     ["Output", bytes(event.outputBytes)],
     ["Status", event.ok ? "Ready to review" : "No output"],
   ]
