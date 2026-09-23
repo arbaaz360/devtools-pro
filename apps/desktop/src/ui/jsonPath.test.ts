@@ -118,3 +118,72 @@ test("recursive descent returns matches in document order", () => {
     ["$.id", 5],
   ]);
 });
+
+test("AST-009: intermediate matches do not use up the result limit", () => {
+  // 5,000 ids by construction; the wildcard's 5,000 intermediate objects used to exhaust
+  // a shared budget, so the query reported none.
+  const five = Array.from({ length: 5_000 }, (_, id) => ({ id }));
+  const all = evaluateJsonPath(five, "$[*].id");
+  assert.equal(all.matches.length, 5_000);
+  assert.equal(all.truncated, false);
+  assert.equal(all.stopped, false);
+  assert.deepEqual(all.matches.slice(0, 2).map((match) => [match.path, match.value]), [["$[0].id", 0], ["$[1].id", 1]]);
+
+  const six = Array.from({ length: 6_000 }, (_, id) => ({ id }));
+  const capped = evaluateJsonPath(six, "$[*].id");
+  assert.equal(capped.matches.length, 5_000, "the result cap applies to what is shown");
+  assert.equal(capped.truncated, true);
+  assert.equal(capped.stopped, false);
+});
+
+test("a query whose earlier steps pass the work limit says it stopped, with what it found", () => {
+  // 600 x 400 = 240,000 objects: more than WORK_LIMIT (200,000) in the step before .x.
+  const grid = Array.from({ length: 600 }, () => Array.from({ length: 400 }, (_, x) => ({ x })));
+  const result = evaluateJsonPath(grid, "$[*][*].x");
+  assert.equal(result.stopped, true);
+  assert.equal(result.truncated, true);
+  assert.ok(result.matches.length > 0, "the matches found before stopping are kept");
+});
+
+test("AST-010: slices follow RFC 9535, step included", () => {
+  // RFC 9535 §2.3.4.3, the array slice selector examples, on the same array.
+  const letters = ["a", "b", "c", "d", "e", "f", "g"];
+  const values = (path: string) => evaluateJsonPath(letters, path).matches.map((match) => match.value);
+  assert.deepEqual(values("$[1:3]"), ["b", "c"]);
+  assert.deepEqual(values("$[5:]"), ["f", "g"]);
+  assert.deepEqual(values("$[1:5:2]"), ["b", "d"]);
+  assert.deepEqual(values("$[5:1:-2]"), ["f", "d"]);
+  assert.deepEqual(values("$[::-1]"), ["g", "f", "e", "d", "c", "b", "a"]);
+  // The review's case: a step of 2 over 0..5 selects 0, 2 and 4.
+  assert.deepEqual(evaluateJsonPath([0, 1, 2, 3, 4, 5], "$[0:6:2]").matches.map((match) => match.value), [0, 2, 4]);
+  assert.deepEqual(values("$[::0]"), [], "a zero step selects nothing (RFC 9535)");
+});
+
+test("AST-010: an index or slice that is not decimal whole numbers is refused, not guessed", () => {
+  for (const bad of ["$[]", "$[ ]", "$[0x10]", "$[1e1]", "$[a]", "$[1:2:3:4]", "$[1.5:2]", "$[:x]"]) {
+    assert.throws(() => parseJsonPath(bad), JsonPathError, bad);
+  }
+  assert.deepEqual(evaluateJsonPath([7, 8], "$[ 1 ]").matches.map((match) => match.value), [8]);
+});
+
+test("AST-011: a child is one of the object's own members, never inherited", () => {
+  assert.equal(evaluateJsonPath({ a: 1 }, "$.toString").matches.length, 0);
+  assert.equal(evaluateJsonPath({ a: 1 }, "$.__proto__").matches.length, 0);
+  assert.equal(evaluateJsonPath({ a: 1 }, "$.constructor").matches.length, 0);
+  // Present as real members, they are found, with the document's values.
+  const own = JSON.parse('{"toString": 2, "__proto__": 3}');
+  assert.deepEqual(evaluateJsonPath(own, "$.toString").matches.map((match) => match.value), [2]);
+  assert.deepEqual(evaluateJsonPath(own, "$['__proto__']").matches.map((match) => match.value), [3]);
+});
+
+test("AST-012: every path the evaluator gives back selects its own node again", () => {
+  const backslash = String.fromCharCode(92);
+  const keys = [`a${backslash}b`, "a'b", `it's ${backslash} fine`, 'a"b', "", "line\nbreak", "__proto__", "plain", "with space"];
+  const document = JSON.parse(JSON.stringify(Object.fromEntries(keys.map((key, index) => [key, index]))));
+  const matches = evaluateJsonPath(document, "$.*").matches;
+  assert.equal(matches.length, keys.length);
+  for (const match of matches) {
+    const again = evaluateJsonPath(document, match.path).matches;
+    assert.deepEqual(again.map((found) => found.value), [match.value], `the path ${JSON.stringify(match.path)}`);
+  }
+});

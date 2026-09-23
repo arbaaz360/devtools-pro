@@ -531,6 +531,48 @@ export const checks = [
     },
   },
   {
+    // AST-008: the tree shows the result's own digits. The oracle is the input text:
+    // 9007199254740993 is not a double, and 1e400 is not Infinity.
+    id: "RES-14c",
+    async run({ driver, page }) {
+      await driver.tool("JSON", { text: '{"id":9007199254740993,"overflow":1e400}', operation: "Format" });
+      const text = await driver.fullResult();
+      await page.locator("#view-tree").click();
+      const shown = await driver.until(async () => {
+        const body = (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ");
+        return /overflow/.test(body) ? body : null;
+      });
+      await page.locator("#tree-path").fill("$.id");
+      const queried = await driver.until(async () => {
+        const status = (await page.locator("#tree-path-status").innerText()).trim();
+        return /match/.test(status) ? (await page.locator("#tree-body").innerText()).replace(/\s+/g, " ") : null;
+      });
+      await page.locator("#tree-path").fill("");
+      await page.locator("#view-text").click();
+      const exact = (body) => /9007199254740993/.test(body ?? "") && !/9007199254740992/.test(body ?? "");
+      return verdict(text.includes("9007199254740993") && exact(shown) && /1e400/.test(shown ?? "") && !/Infinity/.test(shown ?? "") && exact(queried),
+        `tree: ${JSON.stringify((shown ?? "").slice(0, 90))}; $.id: ${JSON.stringify((queried ?? "").slice(0, 60))}`);
+    },
+  },
+  {
+    // AST-009: 5,000 matching ids, by construction, are 5,000 matches — not "no matches".
+    id: "RES-14d",
+    async run({ driver, page }) {
+      const ids = Array.from({ length: 5_000 }, (_, id) => ({ id }));
+      await driver.tool("JSON", { text: JSON.stringify(ids), operation: "Minify" });
+      await page.locator("#view-tree").click();
+      await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 0);
+      await page.locator("#tree-path").fill("$[*].id");
+      const status = await driver.until(async () => {
+        const now = (await page.locator("#tree-path-status").innerText()).trim();
+        return /match|stopped/.test(now) ? now : null;
+      });
+      await page.locator("#tree-path").fill("");
+      await page.locator("#view-text").click();
+      return verdict(status === `${ids.length} matches`, `$[*].id over ${ids.length} objects: the pane says "${status}"`);
+    },
+  },
+  {
     id: "RES-21",
     async run({ driver, page }) {
       const text = "2024-02-29 and 1999-12-31";
