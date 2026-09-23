@@ -179,9 +179,15 @@ export function driver(page) {
   }
 
   /** Open a real file the way the Open button does, minus the dialog. */
+  /**
+   * Open a file and wait for its own tab. Waiting for "some document" returns at once
+   * when the previous tab already shows one, and the check then acts on that tab.
+   */
   async function openPath(path, toolId) {
+    const name = path.split(/[\\/]/).pop();
     await page.evaluate(([target, tool]) => globalThis.devtoolsTest.openPath(target, tool), [path.replace(/\\/g, "/"), toolId ?? null]);
-    await until(async () => (await page.locator("#source-name").innerText()).trim() !== "No document open");
+    const shown = await until(async () => (await page.locator("#source-name").innerText()).trim() === name);
+    if (!shown) throw new Error(`${name} did not open in its own tab`);
   }
   /** The path the next dialog returns; one per dialog, in order. */
   const presetDialogPaths = (paths) =>
