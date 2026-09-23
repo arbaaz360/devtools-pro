@@ -122,7 +122,7 @@ function pngOf(width, height, pixel) {
  * describes something the user never sees. Listed in PLUGIN_HOST_IMPLEMENTATION.md.
  */
 const NATIVE_IDS = new Set([
-  "structured.json", "text.compare", "text.url", "text.html",
+  "structured.json", "text.compare", "text.url",
   "text.json-string", "encoding.hash", "text.find-replace",
 ]);
 
@@ -933,6 +933,26 @@ export const checks = [
     async run({ driver }) {
       const result = await driver.tool("HTML/SVG to JSX", { text: '<div class="a"><p>Hello</p><!-- note --></div>' });
       return verdict(result.output.includes("className") && result.output.includes("{/*"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
+    },
+  },
+  {
+    // The plan marked 01 and 02 as automated; no check existed until now. The expected
+    // text is written from the HTML specification, not recorded from the tool.
+    id: "TL-HTMLESC-01",
+    async run({ driver }) {
+      const result = await driver.tool("HTML Escape / Unescape", { text: '<p class="sample">Hello & bye</p>', options: { Mode: "escape" } });
+      const expected = "&lt;p class=&quot;sample&quot;&gt;Hello &amp; bye&lt;/p&gt;";
+      return verdict(result.output.trim() === expected, `escape gave ${JSON.stringify(result.output.trim().slice(0, 70))}`);
+    },
+  },
+  {
+    // AST-019: named references beyond the five XML ones. © is U+00A9 and é U+00E9 in
+    // the HTML specification's named character reference table.
+    id: "TL-HTMLESC-06",
+    async run({ driver }) {
+      const result = await driver.tool("HTML Escape / Unescape", { text: "&copy; &eacute; &amp; &#x1F642; &lt;b&gt;", options: { Mode: "unescape" } });
+      const expected = "\u00A9 \u00E9 & \u{1F642} <b>";
+      return verdict(!result.error && result.output.trim() === expected, `unescape gave ${JSON.stringify(result.output.trim())} (error "${result.error}")`);
     },
   },
   {

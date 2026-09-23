@@ -192,7 +192,8 @@ pub fn builtin_manifests() -> Vec<ToolManifest> {
             operations: vec![operation("inspect", "Inspect")], renderer: RendererKind::Text,
         },
         text_manifest("text.url", "URL Encode / Decode", vec![("encode", "Encode"), ("decode", "Decode")]),
-        text_manifest("text.html", "HTML Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
+        // text.html is the escaping package's since 2026-09-24: its decoder knows every HTML5
+        // named reference; this one knew five (AST-019).
         text_manifest("text.unicode", "Unicode Escape / Unescape", vec![("encode", "Escape"), ("decode", "Unescape")]),
         text_manifest("text.json-string", "JSON String Escape / Unescape", vec![("escape", "Escape"), ("unescape", "Unescape")]),
         crate::compare::compare_manifest(),

@@ -447,14 +447,17 @@ Option: indent (0–8, default 2). Limit 1 MiB.
 | 04 | `https://例え.jp/パス` | IDN host and percent-decoded path shown correctly |
 | 05 | query with `a=%20%2B&b=` | Decoded values shown, empty value preserved |
 
-### TL-HTMLESC — HTML Escape / Unescape · `text.html` · Rust
+### TL-HTMLESC — HTML Escape / Unescape · `text.html` · package (the escaping package since 2026-09-24)
+Operation: one, with a **Mode** option (escape, unescape) and numeric style, prefer-named, strict and attribute-context options.
+
 | # | Input | Action | Expected |
 |---|---|---|---|
-| 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;…&amp;…` |
-| 02 (suite) | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
+| 01 (suite) | `<p class="sample">Hello & bye</p>` | escape | `&lt;p class=&quot;sample&quot;&gt;Hello &amp; bye&lt;/p&gt;` |
+| 02 | `&lt;b&gt;&amp;amp;` | unescape | `<b>&amp;` |
 | 03 | `&#x2713;` and `&#10003;` | unescape | Both give `✓` |
 | 04 | `&nosuchentity;` | unescape | Left as-is or flagged; not silently deleted |
 | 05 | `✓👩‍🚀` | escape then unescape | Round trip identical |
+| 06 (suite) **[P1]** | `&copy; &eacute; &amp; &#x1F642; &lt;b&gt;` | unescape | `© é & 🙂 <b>` — every HTML5 named reference, not only the five XML ones |
 
 ### TL-JSONSTR — JSON String Escape / Unescape · `text.json-string` · Rust
 | # | Input | Action | Expected |

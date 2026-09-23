@@ -47,7 +47,7 @@ exactly like a native one:
   as you type.
 - `engine.ts` merges those tools behind the native `list_tools` result; an id
   the native host serves stays native (`structured.json`, `text.compare`,
-  `text.url`, `text.html`, `text.json-string`, `encoding.hash`,
+  `text.url`, `text.json-string`, `encoding.hash`,
   `text.find-replace` today). For a package tool it reads the complete input
   from the host document, runs the processor in a fresh module Worker, and
   registers the complete output as a host-owned result document, so preview,
