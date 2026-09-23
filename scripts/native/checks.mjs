@@ -700,6 +700,42 @@ export const checks = [
     },
   },
   {
+    // AST-020: every document tab is reachable from the keyboard. Real key presses; the
+    // expectation is the WAI-ARIA tabs pattern, not whatever the strip happens to do.
+    id: "A11Y-10",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      // Three documents at least, whatever the run started with.
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const state = () => page.evaluate(() => {
+        const tabs = [...document.querySelectorAll("#tabs .tab")];
+        return {
+          active: tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
+          focused: tabs.indexOf(document.activeElement),
+          count: tabs.length,
+        };
+      });
+      const start = await state();
+      await page.locator("#tabs .tab[aria-selected=true]").focus();
+      const steps = [];
+      for (const key of ["ArrowLeft", "ArrowLeft", "End", "Home", "ArrowRight"]) {
+        await page.keyboard.press(key);
+        steps.push([key, await state()]);
+      }
+      // From the editor: Ctrl+Tab moves to the next tab and leaves focus in the editor.
+      await page.locator("#preview").focus();
+      const before = (await state()).active;
+      await page.keyboard.press("Control+Tab");
+      const after = await state();
+      const n = start.count, last = n - 1;
+      const expected = [last - 1, last - 2, last, 0, 1];
+      const moved = steps.every(([, s], i) => s.active === expected[i] && s.focused === expected[i]);
+      const ctrlTab = after.active === (before + 1) % n && after.focused === -1;
+      return verdict(n >= 3 && start.active === last && moved && ctrlTab,
+        `${n} tabs; ${steps.map(([k, s]) => `${k}->${s.active}${s.focused === s.active ? "" : `(focus ${s.focused})`}`).join(", ")}; Ctrl+Tab ${before}->${after.active}`);
+    },
+  },
+  {
     id: "TL-NUMBASE-01",
     async run({ driver }) {
       // Exercises the option controls too: the defaults would answer this one by accident.

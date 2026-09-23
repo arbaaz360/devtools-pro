@@ -804,6 +804,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | A11Y-06 | Windows high-contrast mode | The app remains legible; no invisible text |
 | A11Y-07 | Text scaling at 125%/150% (Windows setting) | No clipped labels or overlapping controls |
 | A11Y-08 | Row D small window (640×520) | Every control is reachable, possibly via scrolling; nothing is unreachable |
+| A11Y-10 (suite) **[P1]** | Open three documents. Focus the active tab and press Left, Left, End, Home, Right; then, from the editor, press Ctrl+Tab and Ctrl+Shift+Tab (Ctrl+PageDown/PageUp too) | Arrows step through the tabs and Home/End jump, each showing the tab and moving focus onto it; Ctrl+Tab switches documents from anywhere and leaves focus in the editor |
 | A11Y-09 | Ultrawide (row C) | The layout does not stretch controls absurdly; the result pane stays usable |
 | A11Y-10 | Colour check on the result state line | Success/failure is distinguishable without relying on colour alone (icon or words) |
 | A11Y-11 | Mouse wheel and trackpad scrolling in editor, result and rail | All scroll smoothly; the wheel does not zoom accidentally |
