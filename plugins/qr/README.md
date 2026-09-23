@@ -4,6 +4,8 @@ The `media.qr` plugin generates a QR code (SVG format) from the input text, usin
 
 Note that only byte mode is used for encoding, so numeric and alphanumeric inputs still encode as bytes (this produces a larger but exact representation).
 
+The input text is encoded as its real UTF-8 bytes before it reaches the vendored encoder, so non-ASCII text (accented characters, CJK, emoji, mixed scripts) round-trips correctly; the vendored library's own default byte conversion is not UTF-8 and is bypassed.
+
 ## Options
 
 * **`error-correction`** (enum): The error correction level. Allowed values: `L`, `M`, `Q`, `H`. Default: `M`. Aliases: `errorCorrection`.

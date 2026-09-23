@@ -58,6 +58,17 @@ export function normalizeOptions(raw) {
 const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const encoder = new TextEncoder();
 
+/**
+ * The vendored encoder's default byte mode (packages/vendor/qrcode-generator/qrcode.mjs:737-742,
+ * `bytes.push(c & 0xff)` per UTF-16 code unit) is not UTF-8, so it corrupts any non-ASCII
+ * character. Pre-converting to a string whose characters already hold one UTF-8 byte value
+ * each makes that truncation a no-op, so the encoder — and its byte-length capacity check,
+ * which counts this string's length — carries arbitrary Unicode text correctly.
+ */
+function utf8ByteString(text) {
+  return Array.from(encoder.encode(text), byte => String.fromCharCode(byte)).join("");
+}
+
 async function readText(context) {
   const chunks = [];
   let length = 0;
@@ -92,7 +103,7 @@ export async function execute(request, context) {
   let qr;
   try {
     qr = qrcode(options.version, options.errorCorrection);
-    qr.addData(text, "Byte");
+    qr.addData(utf8ByteString(text), "Byte");
     check(context);
     qr.make();
   } catch (err) {
