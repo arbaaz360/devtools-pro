@@ -5,6 +5,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   native,
   chooseFile,
+  chooseFiles,
   chooseDocumentOutput,
   chooseResultOutput,
   presetDialogPaths,
@@ -1377,6 +1378,7 @@ const remember = (document: FileDocument) => {
 const api: WorkbenchApi = {
   native,
   chooseFile,
+  chooseFiles,
   chooseDocumentOutput,
   chooseResultOutput,
   openDocument: (path) => openDocument(path).then(remember),
@@ -1410,6 +1412,8 @@ controller = new WorkbenchController(engine.wrap(api), hooks);
 if ((globalThis as Record<string, unknown>).__DEVTOOLS_TEST_HOOKS__ === true) {
   (globalThis as Record<string, unknown>).devtoolsTest = {
     openPath: (path: string, toolId?: string) => controller.openPath(path, toolId),
+    // What a native drop hands the shell, minus the drag: the OS gesture cannot be scripted.
+    dropPaths: (paths: string[]) => dropPaths(paths),
     presetDialogPaths,
   };
 }
@@ -1680,6 +1684,15 @@ $("#browser-notice").hidden = native;
 $("#engine-status").textContent = native ? "Local engine" : "Browser preview";
 const dropTarget = $("#editor-host");
 const removeDragOver = () => dropTarget.classList.remove("drag-over");
+/** Everything a native drop carries, opened in order; the drop highlight clears either way. */
+async function dropPaths(paths: readonly string[]) {
+  removeDragOver();
+  try {
+    if (paths.length) await controller.openPaths(paths);
+  } finally {
+    removeDragOver();
+  }
+}
 const addDragOver = () => dropTarget.classList.add("drag-over");
 
 if (native) {
@@ -1721,16 +1734,8 @@ if (native) {
   void listen<{ paths?: string[] } | string[]>(
     "tauri://drag-drop",
     async (event) => {
-      removeDragOver();
       const payload = event.payload;
-      const path = Array.isArray(payload) ? payload[0] : payload.paths?.[0];
-      if (path) {
-        try {
-          await controller.openPath(path);
-        } finally {
-          removeDragOver();
-        }
-      }
+      await dropPaths(Array.isArray(payload) ? payload : payload.paths ?? []);
     },
   );
 }
@@ -1767,10 +1772,10 @@ dropTarget.addEventListener("drop", async (event) => {
   event.preventDefault();
   removeDragOver();
   if (native) return;
-  const file = event.dataTransfer?.files[0];
-  if (!file) return;
+  const files = [...(event.dataTransfer?.files ?? [])];
+  if (!files.length) return;
   try {
-    await controller.openBrowserFile(file);
+    await controller.openBrowserFiles(files);
   } finally {
     removeDragOver();
   }

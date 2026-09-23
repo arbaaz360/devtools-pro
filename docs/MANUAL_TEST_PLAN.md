@@ -174,11 +174,11 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-25 | Open a 200+ MB file (`huge.txt` is ~100 MB — double it) | Either it opens with a preview notice or it is refused with a clear limit message within ~20 s. It must not freeze the UI indefinitely |
 | DOC-26 | Drag a file from Explorer onto the window | A new tab opens with that file |
 | DOC-27 **[P1]** | Type in a tab so it is dirty, then drag a file onto the window | The dirty tab is **not** replaced; the dropped file opens in its own tab |
-| DOC-28 | Drag several files at once | Either all open as tabs or only the first does, with no error dialog spam and no lost tabs |
-| DOC-29 | Drag a folder onto the window | Graceful refusal; no crash |
-| DOC-30 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
-| DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
+| DOC-28 (suite) | Drag several files at once; also pick several in **Open** (Ctrl+O) | Each opens in its own tab, in order. One status line says *Opened N files*; anything that did not open is named there, once, with its reason. Past 16 tabs, it opens what fits and says how many more did not |
+| DOC-29 (suite) | Drag a folder onto the window, alone and among files | Refused by name (*Choose a regular file*); the files beside it still open; no crash |
 | DOC-30 | Drag a file over the window and drag it back out without dropping | The drop highlight appears and then clears; no tab is created |
+| DOC-31 (suite) | New tab, type, Ctrl+S, pick a path; edit, Ctrl+S again | The first save asks; the second writes to the same file without asking |
+| DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
 

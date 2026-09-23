@@ -190,6 +190,17 @@ test('native file-drop events open files without replacing a dirty tab', async (
   await expect(page.locator('#preview')).toHaveValue('Keep these notes');
 });
 
+test('a drop of several files opens each in its own tab and names what did not open, once', async ({ page, host }) => {
+  await newText(page, 'Keep these notes');
+  await host.emit('tauri://drag-drop', { paths: ['fixture.json', 'notes.txt', 'missing.txt'] });
+  await expect(page.getByRole('tab')).toHaveCount(3);
+  await expect(page.getByRole('tab').nth(1)).toContainText('fixture.json');
+  await expect(page.getByRole('tab').nth(2)).toContainText('notes.txt');
+  await expect(page.locator('#status')).toHaveText(/^Opened 2 of 3 files · missing\.txt: /);
+  await page.getByRole('tab').first().click();
+  await expect(page.locator('#preview')).toHaveValue('Keep these notes');
+});
+
 test('image tool has image-only actions; theme stays neutral and controls remain inside panes', async ({ page, host }) => {
   await newText(page, '');
   await chooseTool(page, 'Image to Base64');
