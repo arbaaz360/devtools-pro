@@ -23,11 +23,16 @@ node scripts/native-suite.mjs --smoke     # start-up subset
 node scripts/native-suite.mjs --only TL-  # by id
 ```
 
-The suite clears the webview profile and takes port 1420 before it starts, then checks
+The suite clears its webview profile and takes port 1420 before it starts, then checks
 that the window loaded the script the build wrote. Both exist because a run that tests
 a *previous* build passes just as happily as one that tests this build: a preview server
 left behind by an interrupted run keeps answering, and the webview caches the dev URL.
 `vite preview` now sends `Cache-Control: no-store` for the same reason.
+
+That profile is the suite's own, `apps/desktop/test-results/webview-profile`, passed to
+a debug host as `DEVTOOLS_TEST_PROFILE`. The debug build shares its identifier with the
+installed app, so the default folder, `%LOCALAPPDATA%\com.thedevtoolspro.workbench`, is
+the installed copy's profile; the suite used to clear it, and no longer touches it.
 
 The suite starts the host with `DEVTOOLS_TEST_HOOKS` set. A **debug** build, and only
 then, injects `window.__DEVTOOLS_TEST_HOOKS__`, which lets the shell expose the two
