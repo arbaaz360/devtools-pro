@@ -1,93 +1,79 @@
 [
   {
     "name": "v1-dns-namespace",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     "text": "6ba7b810-9dad-11d1-80b4-00c04fd430c8\n",
-    "value": {"mode": "decode", "origin": "input", "source": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "case": "lower", "uuid": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "version": 1, "variant": "RFC 4122", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 128, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6ba7b8109dad11d180b400c04fd430c8", "timestamp": "1998-02-04T22:13:53.1511824Z", "ticks": "131059232331511824", "clockSequence": 180, "node": "00:c0:4f:d4:30:c8", "multicast": false, "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "case": "lower", "uuid": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "version": 1, "variant": "RFC 4122", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 128, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6ba7b8109dad11d180b400c04fd430c8", "timestamp": "1998-02-04T22:13:53.1511824Z", "ticks": "131059232331511824", "clockSequence": 180, "node": "00:c0:4f:d4:30:c8", "multicast": false, "special": null, "complete": true}
   },
   {
     "name": "v4-uppercase-input-whitespace-preserved-in-source",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "  550E8400-E29B-41D4-A716-446655440000\n",
     "text": "550e8400-e29b-41d4-a716-446655440000\n",
-    "value": {"mode": "decode", "origin": "input", "source": "  550E8400-E29B-41D4-A716-446655440000\n", "case": "lower", "uuid": "550e8400-e29b-41d4-a716-446655440000", "version": 4, "variant": "RFC 4122", "bytes": [85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0], "hexadecimal": "550e8400e29b41d4a716446655440000", "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "  550E8400-E29B-41D4-A716-446655440000\n", "case": "lower", "uuid": "550e8400-e29b-41d4-a716-446655440000", "version": 4, "variant": "RFC 4122", "bytes": [85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0], "hexadecimal": "550e8400e29b41d4a716446655440000", "special": null, "complete": true}
   },
   {
     "name": "v4-upper-presentation",
-    "options": {"mode": "decode", "case": "upper"},
+    "options": {"case": "upper"},
     "input": "  550E8400-E29B-41D4-A716-446655440000\n",
     "text": "550E8400-E29B-41D4-A716-446655440000\n",
-    "value": {"mode": "decode", "origin": "input", "source": "  550E8400-E29B-41D4-A716-446655440000\n", "case": "upper", "uuid": "550E8400-E29B-41D4-A716-446655440000", "version": 4, "variant": "RFC 4122", "bytes": [85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0], "hexadecimal": "550E8400E29B41D4A716446655440000", "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "  550E8400-E29B-41D4-A716-446655440000\n", "case": "upper", "uuid": "550E8400-E29B-41D4-A716-446655440000", "version": 4, "variant": "RFC 4122", "bytes": [85, 14, 132, 0, 226, 155, 65, 212, 167, 22, 68, 102, 85, 68, 0, 0], "hexadecimal": "550E8400E29B41D4A716446655440000", "special": null, "complete": true}
   },
   {
     "name": "v1-upper-presentation-node",
     "options": {"case": "upper"},
     "input": "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     "text": "6BA7B810-9DAD-11D1-80B4-00C04FD430C8\n",
-    "value": {"mode": "decode", "origin": "input", "source": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "case": "upper", "uuid": "6BA7B810-9DAD-11D1-80B4-00C04FD430C8", "version": 1, "variant": "RFC 4122", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 128, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6BA7B8109DAD11D180B400C04FD430C8", "timestamp": "1998-02-04T22:13:53.1511824Z", "ticks": "131059232331511824", "clockSequence": 180, "node": "00:C0:4F:D4:30:C8", "multicast": false, "special": null, "complete": true}
-  },
-  {
-    "name": "input-port-wins-over-generate-mode",
-    "options": {"mode": "generate", "version": "v4", "count": 5},
-    "input": "5df41881-3aed-3515-88a7-2f4a814cf09e",
-    "text": "5df41881-3aed-3515-88a7-2f4a814cf09e\n",
-    "value": {"mode": "decode", "origin": "input", "source": "5df41881-3aed-3515-88a7-2f4a814cf09e", "case": "lower", "uuid": "5df41881-3aed-3515-88a7-2f4a814cf09e", "version": 3, "variant": "RFC 4122", "bytes": [93, 244, 24, 129, 58, 237, 53, 21, 136, 167, 47, 74, 129, 76, 240, 158], "hexadecimal": "5df418813aed351588a72f4a814cf09e", "special": null, "complete": true}
-  },
-  {
-    "name": "v5-from-uuid-option",
-    "options": {"mode": "decode", "uuid": "2ed6657d-e927-568b-95e1-2665a8aea6a2"},
-    "input": null,
-    "text": "2ed6657d-e927-568b-95e1-2665a8aea6a2\n",
-    "value": {"mode": "decode", "origin": "option", "source": "2ed6657d-e927-568b-95e1-2665a8aea6a2", "case": "lower", "uuid": "2ed6657d-e927-568b-95e1-2665a8aea6a2", "version": 5, "variant": "RFC 4122", "bytes": [46, 214, 101, 125, 233, 39, 86, 139, 149, 225, 38, 101, 168, 174, 166, 162], "hexadecimal": "2ed6657de927568b95e12665a8aea6a2", "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "6ba7b810-9dad-11d1-80b4-00c04fd430c8", "case": "upper", "uuid": "6BA7B810-9DAD-11D1-80B4-00C04FD430C8", "version": 1, "variant": "RFC 4122", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 128, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6BA7B8109DAD11D180B400C04FD430C8", "timestamp": "1998-02-04T22:13:53.1511824Z", "ticks": "131059232331511824", "clockSequence": 180, "node": "00:C0:4F:D4:30:C8", "multicast": false, "special": null, "complete": true}
   },
   {
     "name": "nil-uuid",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "00000000-0000-0000-0000-000000000000",
     "text": "00000000-0000-0000-0000-000000000000\n",
-    "value": {"mode": "decode", "origin": "input", "source": "00000000-0000-0000-0000-000000000000", "case": "lower", "uuid": "00000000-0000-0000-0000-000000000000", "version": 0, "variant": "NCS", "bytes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "00000000000000000000000000000000", "special": "nil", "complete": true}
+    "value": {"mode": "decode", "source": "00000000-0000-0000-0000-000000000000", "case": "lower", "uuid": "00000000-0000-0000-0000-000000000000", "version": 0, "variant": "NCS", "bytes": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "00000000000000000000000000000000", "special": "nil", "complete": true}
   },
   {
     "name": "max-uuid",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "ffffffff-ffff-ffff-ffff-ffffffffffff",
     "text": "ffffffff-ffff-ffff-ffff-ffffffffffff\n",
-    "value": {"mode": "decode", "origin": "input", "source": "ffffffff-ffff-ffff-ffff-ffffffffffff", "case": "lower", "uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff", "version": 15, "variant": "future", "bytes": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], "hexadecimal": "ffffffffffffffffffffffffffffffff", "special": "max", "complete": true}
+    "value": {"mode": "decode", "source": "ffffffff-ffff-ffff-ffff-ffffffffffff", "case": "lower", "uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff", "version": 15, "variant": "future", "bytes": [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], "hexadecimal": "ffffffffffffffffffffffffffffffff", "special": "max", "complete": true}
   },
   {
     "name": "microsoft-variant-iunknown",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "00000000-0000-0000-c000-000000000046",
     "text": "00000000-0000-0000-c000-000000000046\n",
-    "value": {"mode": "decode", "origin": "input", "source": "00000000-0000-0000-c000-000000000046", "case": "lower", "uuid": "00000000-0000-0000-c000-000000000046", "version": 0, "variant": "Microsoft", "bytes": [0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 70], "hexadecimal": "0000000000000000c000000000000046", "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "00000000-0000-0000-c000-000000000046", "case": "lower", "uuid": "00000000-0000-0000-c000-000000000046", "version": 0, "variant": "Microsoft", "bytes": [0, 0, 0, 0, 0, 0, 0, 0, 192, 0, 0, 0, 0, 0, 0, 70], "hexadecimal": "0000000000000000c000000000000046", "special": null, "complete": true}
   },
   {
     "name": "version-nibble-1-with-ncs-variant-has-no-time-fields",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "6ba7b810-9dad-11d1-00b4-00c04fd430c8",
     "text": "6ba7b810-9dad-11d1-00b4-00c04fd430c8\n",
-    "value": {"mode": "decode", "origin": "input", "source": "6ba7b810-9dad-11d1-00b4-00c04fd430c8", "case": "lower", "uuid": "6ba7b810-9dad-11d1-00b4-00c04fd430c8", "version": 1, "variant": "NCS", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 0, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6ba7b8109dad11d100b400c04fd430c8", "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "6ba7b810-9dad-11d1-00b4-00c04fd430c8", "case": "lower", "uuid": "6ba7b810-9dad-11d1-00b4-00c04fd430c8", "version": 1, "variant": "NCS", "bytes": [107, 167, 184, 16, 157, 173, 17, 209, 0, 180, 0, 192, 79, 212, 48, 200], "hexadecimal": "6ba7b8109dad11d100b400c04fd430c8", "special": null, "complete": true}
   },
   {
     "name": "v1-earliest-gregorian-timestamp",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "00000000-0000-1000-8000-000000000000",
     "text": "00000000-0000-1000-8000-000000000000\n",
-    "value": {"mode": "decode", "origin": "input", "source": "00000000-0000-1000-8000-000000000000", "case": "lower", "uuid": "00000000-0000-1000-8000-000000000000", "version": 1, "variant": "RFC 4122", "bytes": [0, 0, 0, 0, 0, 0, 16, 0, 128, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "00000000000010008000000000000000", "timestamp": "1582-10-15T00:00:00.0000000Z", "ticks": "0", "clockSequence": 0, "node": "00:00:00:00:00:00", "multicast": false, "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "00000000-0000-1000-8000-000000000000", "case": "lower", "uuid": "00000000-0000-1000-8000-000000000000", "version": 1, "variant": "RFC 4122", "bytes": [0, 0, 0, 0, 0, 0, 16, 0, 128, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "00000000000010008000000000000000", "timestamp": "1582-10-15T00:00:00.0000000Z", "ticks": "0", "clockSequence": 0, "node": "00:00:00:00:00:00", "multicast": false, "special": null, "complete": true}
   },
   {
     "name": "v1-one-tick-before-unix-epoch",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "13813fff-1dd2-11b2-8000-000000000000",
     "text": "13813fff-1dd2-11b2-8000-000000000000\n",
-    "value": {"mode": "decode", "origin": "input", "source": "13813fff-1dd2-11b2-8000-000000000000", "case": "lower", "uuid": "13813fff-1dd2-11b2-8000-000000000000", "version": 1, "variant": "RFC 4122", "bytes": [19, 129, 63, 255, 29, 210, 17, 178, 128, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "13813fff1dd211b28000000000000000", "timestamp": "1969-12-31T23:59:59.9999999Z", "ticks": "122192927999999999", "clockSequence": 0, "node": "00:00:00:00:00:00", "multicast": false, "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "13813fff-1dd2-11b2-8000-000000000000", "case": "lower", "uuid": "13813fff-1dd2-11b2-8000-000000000000", "version": 1, "variant": "RFC 4122", "bytes": [19, 129, 63, 255, 29, 210, 17, 178, 128, 0, 0, 0, 0, 0, 0, 0], "hexadecimal": "13813fff1dd211b28000000000000000", "timestamp": "1969-12-31T23:59:59.9999999Z", "ticks": "122192927999999999", "clockSequence": 0, "node": "00:00:00:00:00:00", "multicast": false, "special": null, "complete": true}
   },
   {
     "name": "v1-maximum-timestamp",
-    "options": {"mode": "decode"},
+    "options": {},
     "input": "ffffffff-ffff-1fff-bfff-ffffffffffff",
     "text": "ffffffff-ffff-1fff-bfff-ffffffffffff\n",
-    "value": {"mode": "decode", "origin": "input", "source": "ffffffff-ffff-1fff-bfff-ffffffffffff", "case": "lower", "uuid": "ffffffff-ffff-1fff-bfff-ffffffffffff", "version": 1, "variant": "RFC 4122", "bytes": [255, 255, 255, 255, 255, 255, 31, 255, 191, 255, 255, 255, 255, 255, 255, 255], "hexadecimal": "ffffffffffff1fffbfffffffffffffff", "timestamp": "5236-03-31T21:21:00.6846975Z", "ticks": "1152921504606846975", "clockSequence": 16383, "node": "ff:ff:ff:ff:ff:ff", "multicast": true, "special": null, "complete": true}
+    "value": {"mode": "decode", "source": "ffffffff-ffff-1fff-bfff-ffffffffffff", "case": "lower", "uuid": "ffffffff-ffff-1fff-bfff-ffffffffffff", "version": 1, "variant": "RFC 4122", "bytes": [255, 255, 255, 255, 255, 255, 31, 255, 191, 255, 255, 255, 255, 255, 255, 255], "hexadecimal": "ffffffffffff1fffbfffffffffffffff", "timestamp": "5236-03-31T21:21:00.6846975Z", "ticks": "1152921504606846975", "clockSequence": 16383, "node": "ff:ff:ff:ff:ff:ff", "multicast": true, "special": null, "complete": true}
   }
 ]
