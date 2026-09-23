@@ -89,7 +89,10 @@ let state: WorkspaceState;
 let controller: WorkbenchController;
 let paletteOpener: HTMLElement | null = null;
 let renderedResult: object | null = null;
-let renderedResultStale = false;
+let renderedStaleNote = "";
+/** What a retained result says about itself: a run is coming to replace it, or none is. */
+const staleNote = (tab: TabState): string =>
+  !tab.resultStale ? "" : tab.resultOutdated ? " · Out of date — run to update" : " · Updating…";
 /** The view a result was last drawn in; switching it has to redraw the pane. */
 let renderedView = "";
 let renderedOptionsKey = "";
@@ -620,7 +623,7 @@ function compareStatus(tab: TabState): { text: string; tone: "" | "compare-gate"
     }
     if (meta.status)
       return {
-        text: `${meta.status}${tab.resultStale ? " · Updating…" : ""}`,
+        text: `${meta.status}${staleNote(tab)}`,
         tone: meta.status.startsWith("No differences") ? "compare-ok" : "",
       };
   }
@@ -960,7 +963,7 @@ function renderResult(tab: TabState) {
   const content = $("#result-content");
   if (!result) {
     renderedResult = null;
-    renderedResultStale = false;
+    renderedStaleNote = "";
     $("#copy-result").hidden = true;
     $("#open-result").hidden = true;
     $("#save-result").hidden = true;
@@ -1008,10 +1011,10 @@ function renderResult(tab: TabState) {
   }
   const view = treeFor(tab.id);
   const viewKey = `${tab.id}:${view.view}:${view.query}`;
-  if (result === renderedResult && tab.resultStale === renderedResultStale && viewKey === renderedView)
+  if (result === renderedResult && staleNote(tab) === renderedStaleNote && viewKey === renderedView)
     return;
   renderedResult = result;
-  renderedResultStale = tab.resultStale;
+  renderedStaleNote = staleNote(tab);
   renderedView = viewKey;
   empty.hidden = true;
   content.hidden = false;
@@ -1026,7 +1029,7 @@ function renderResult(tab: TabState) {
     : event.cancelled
       ? "○ Cancelled"
       : `● ${friendlyError(tab, event)}`;
-  if (tab.resultStale) stateNode.textContent += " · Updating…";
+  stateNode.textContent += staleNote(tab);
   $("#result-summary").textContent = readableSummary(event.summary);
   $("#result-metrics").innerHTML = [
     ["Elapsed", `${event.elapsedMs} ms`],

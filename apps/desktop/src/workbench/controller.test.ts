@@ -135,6 +135,16 @@ async function harness(t: TestContext) {
         auto: true,
         operations: [{ id: "run", label: "Run", defaultOptions: {}, options: [], autoOnInput: true, autoOnOption: true }],
       },
+      {
+        // Shaped like identity.uuid after AG-126: generate reads no document, decode does.
+        ...manifest("gen.value", "generate"),
+        auto: true,
+        emptyInput: true,
+        operations: [
+          { id: "generate", label: "Generate", defaultOptions: {}, options: [], autoOnInput: false, autoOnOption: true, readsDocument: false },
+          { id: "decode", label: "Decode", defaultOptions: {}, options: [], autoOnInput: true, autoOnOption: true, readsDocument: true },
+        ],
+      },
       manifest("text.compare", "compare"),
     ],
     chooseDocumentOutput: async () => null,
@@ -704,4 +714,68 @@ test("switching operation takes the new operation's defaults", async (t) => {
   h.controller.options(id, "minify", { indent: "sp4" }, true);
   assert.deepEqual(h.controller.tab(id)!.options, { comments: "license" },
     "an option the new operation does not declare must not travel with the switch");
+});
+
+/** Run the tab's pending job to a successful result. */
+async function settleRun(h: Awaited<ReturnType<typeof harness>>, id: string, text: string) {
+  await waitFor(() => !!h.controller.tab(id)?.jobId, "a job to start");
+  h.complete(h.controller.tab(id)!.jobId!, h.register(text));
+  await waitFor(() => h.controller.tab(id)?.phase === "success", "the result to arrive");
+}
+
+test("typing beside a generator neither runs it nor stales what it generated", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab();
+  h.controller.selectTool(id, "gen.value");
+  await settleRun(h, id, "48db5802-4b4e-41fe-b9f3-e419ede464ae");
+  h.controller.edit(id, "not a uuid");
+  await setImmediate();
+  await setImmediate();
+  const tab = h.controller.tab(id)!;
+  assert.equal(h.runs.length, 1, "generate declares no inputChange and no document input");
+  assert.equal(tab.resultStale, false, "the value it generated is still the answer");
+  assert.ok(tab.result, "and it stays on screen");
+});
+
+test("an edit an explicit-only operation will not act on leaves its result out of date", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab(".a{color:red}");
+  h.controller.selectTool(id, "format.explicit");
+  h.controller.options(id, "beautify", { indent: "sp2" }, true);
+  await settleRun(h, id, ".a {\n  color: red;\n}");
+
+  h.controller.edit(id, ".a{color:blue}");
+  await setImmediate();
+  assert.equal(h.runs.length, 1);
+  assert.equal(h.controller.tab(id)!.resultStale, true);
+  assert.equal(h.controller.tab(id)!.resultOutdated, true, "nothing is updating it");
+
+  // An option change it will not run on says the same.
+  h.controller.options(id, "beautify", { indent: "sp4" });
+  await setImmediate();
+  assert.equal(h.runs.length, 1);
+  assert.equal(h.controller.tab(id)!.resultOutdated, true);
+
+  // The press is the update.
+  h.controller.options(id, "beautify", { indent: "sp4" }, true);
+  await waitFor(() => h.runs.length === 2, "the press runs it");
+  assert.equal(h.controller.tab(id)!.resultOutdated, false);
+});
+
+test("a tool that follows the document is updating after an edit, until the document is emptied", async (t) => {
+  const h = await harness(t);
+  const id = h.newTab("hello");
+  h.controller.selectTool(id, "format.live");
+  await settleRun(h, id, "HELLO");
+
+  h.controller.edit(id, "hello there");
+  assert.equal(h.controller.tab(id)!.resultStale, true);
+  assert.equal(h.controller.tab(id)!.resultOutdated, false, "a run is scheduled");
+  await settleRun(h, id, "HELLO THERE");
+
+  // An empty document is not sent to the tool, so nothing replaces the old result.
+  h.controller.edit(id, "");
+  await setImmediate();
+  assert.equal(h.runs.length, 2);
+  assert.equal(h.controller.tab(id)!.resultOutdated, true);
 });

@@ -35,6 +35,7 @@ import {
   snapshotFormat,
   validation,
   definitionFromManifest,
+  readsDocument,
   runsAutomatically,
   type RunReason,
   type ToolDefinition,
@@ -781,8 +782,17 @@ export class WorkbenchController {
     const tab = this.tab(id);
     const tool = tab && this.toolDefinition(tab.toolId);
     if (!tab || !tool || tab.phase === "importing") return;
-    if (!runsAutomatically(tool, tab.operation, reason)) return;
-    if (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare && !tool.emptyInput) return;
+    const waits =
+      !runsAutomatically(tool, tab.operation, reason) ||
+      (tab.text === "" && tool.id !== "encoding.hash" && !tool.compare && !tool.emptyInput);
+    if (waits) {
+      // Nothing will run, so a result kept from before this change must not say it
+      // is updating. It is still the answer if the change was an edit to a document
+      // the operation never reads; otherwise it is out of date until the next run.
+      if (tab.resultStale)
+        this.dispatch({ type: "idle", id, current: reason === "input" && !readsDocument(tool, tab.operation) });
+      return;
+    }
     this.timers.set(
       id,
       setTimeout(() => {

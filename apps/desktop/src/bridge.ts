@@ -35,6 +35,8 @@ export interface ToolOperation {
   autoOnInput?: boolean;
   /** inputChange or heldRepeat: an option change (a generator's only input) may run it. */
   autoOnOption?: boolean;
+  /** False when the operation declares no document input, so an edit cannot change its result. */
+  readsDocument?: boolean;
 }
 /** Acceptance identity returned by the native host for every new job. */
 export interface ExecutionIdentity {

@@ -15,6 +15,18 @@ const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex"
 const base64 = (value) => Buffer.from(value).toString("base64");
 const verdict = (ok, note) => ({ status: ok ? "pass" : "fail", note });
 
+/** RFC 4122 name-based v5, computed here: SHA-1 of namespace then name, version and variant bits set. */
+function uuidV5(namespaceHex, name) {
+  const digest = crypto.createHash("sha1").update(Buffer.concat([Buffer.from(namespaceHex, "hex"), Buffer.from(name)])).digest();
+  const bytes = Buffer.from(digest.subarray(0, 16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x50;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = bytes.toString("hex");
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+}
+const DNS_NAMESPACE = "6ba7b8109dad11d180b400c04fd430c8";
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 /** A scratch directory for files a check opens or saves, beside the run's other evidence. */
 const scratch = resolve(root, "apps", "desktop", "test-results", "files");
 const scratchFile = (name, contents) => {
@@ -447,13 +459,7 @@ export const checks = [
     id: "TL-UUID-04",
     async run({ driver }) {
       // RFC 4122 v5 of the DNS namespace + example.com, computed here, not read back.
-      const namespace = Buffer.from("6ba7b8109dad11d180b400c04fd430c8", "hex");
-      const digest = crypto.createHash("sha1").update(Buffer.concat([namespace, Buffer.from("example.com")])).digest();
-      const bytes = Buffer.from(digest.subarray(0, 16));
-      bytes[6] = (bytes[6] & 0x0f) | 0x50;
-      bytes[8] = (bytes[8] & 0x3f) | 0x80;
-      const hex = bytes.toString("hex");
-      const expected = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+      const expected = uuidV5(DNS_NAMESPACE, "example.com");
       await driver.newTab();
       await driver.selectTool("UUID Generator");
       const defaults = await driver.settle(0);
@@ -461,6 +467,75 @@ export const checks = [
       await driver.settle(0, { changedFrom: defaults.signature });
       const body = await driver.fullResult();
       return verdict(body.toLowerCase().includes(expected), `RFC 4122 gives ${expected}; result: ${body.slice(0, 120)}`);
+    },
+  },
+  {
+    id: "TL-UUID-09",
+    async run({ driver, page }) {
+      // DU-10: typing beside Generate used to run it, and every keystroke failed with
+      // "UUID must be canonical". Nothing should happen now, so there is no change to
+      // wait for: give a run longer than its debounce to show itself, and look for any sign.
+      await driver.newTab();
+      await driver.selectTool("UUID Generator");
+      const generated = await driver.settle(0);
+      const first = generated.output.trim();
+      if (!UUID_V4.test(first)) return verdict(false, `selecting Generate gave "${first}" (error "${generated.error}")`);
+      await driver.setInput("not a uuid");
+      const disturbed = await driver.until(async () => {
+        const now = await driver.readResult();
+        return now.error || now.signature !== generated.signature ? now : null;
+      }, { timeout: 2500 });
+      if (disturbed) return verdict(false, `typing beside Generate changed the result to "${disturbed.state}" (error "${disturbed.error}")`);
+      if (!(await page.locator("#copy-result").isVisible())) return verdict(false, "typing beside Generate hid Copy on the value it generated");
+      await driver.runOperation("Generate");
+      const next = await driver.settle(undefined, { changedFrom: generated.signature });
+      const value = next.output.trim();
+      return verdict(!next.error && UUID_V4.test(value) && value !== first, `with text in the editor, Generate gave "${value}" (error "${next.error}"); the first was ${first}`);
+    },
+  },
+  {
+    id: "TL-UUID-10",
+    async run({ driver }) {
+      // Decode reads the UUID from the document and follows it. Each expected version is
+      // the value's own version nibble: v5 by construction, and the 4 in f47ac10b-58cc-4372-...
+      const five = uuidV5(DNS_NAMESPACE, "example.com");
+      const four = "f47ac10b-58cc-4372-a567-0e02b2c3d479";
+      const reports = (body, version) => new RegExp(`version\\W{0,3}${version}\\b`, "i").test(body);
+      await driver.newTab();
+      await driver.selectTool("UUID Generator");
+      const generated = await driver.settle(0);
+      await driver.setInput(five);
+      await driver.runOperation("Decode");
+      const decoded = await driver.settle(five.length, { changedFrom: generated.signature });
+      const first = await driver.fullResult();
+      if (decoded.error || !reports(first, 5)) return verdict(false, `Decode of ${five}: ${decoded.error || first.slice(0, 160)}`);
+      await driver.setInput(four);
+      const followed = await driver.settle(four.length, { changedFrom: decoded.signature });
+      const second = await driver.fullResult();
+      return verdict(!followed.error && !followed.timedOut && reports(second, 4), `after the edit, with no press: ${followed.error || second.slice(0, 160)}`);
+    },
+  },
+  {
+    id: "RES-31",
+    async run({ driver, page }) {
+      // A kept result that nothing is about to replace must say so. CSS Beautify runs only
+      // when pressed, so after an edit the old result is out of date, not updating.
+      const css = "a{color:red}";
+      await driver.newTab();
+      await driver.selectTool("CSS");
+      await driver.setInput(css);
+      const before = (await driver.readResult()).signature;
+      await driver.runOperation("Beautify");
+      const done = await driver.settle(Buffer.byteLength(css), { changedFrom: before });
+      if (done.error || done.timedOut) return verdict(false, `Beautify did not complete: ${done.error || "timed out"}`);
+      await driver.setInput("a{color:blue}");
+      const relabelled = await driver.until(async () => {
+        const now = await driver.readResult();
+        return now.state !== done.state ? now : null;
+      }, { timeout: 3000 });
+      const state = relabelled?.state ?? done.state;
+      const copyHidden = await page.locator("#copy-result").isHidden();
+      return verdict(/Out of date/.test(state) && !/Updating/.test(state) && copyHidden, `after an edit Beautify will not act on, the result reads "${state}", Copy ${copyHidden ? "hidden" : "shown"}`);
     },
   },
   {
