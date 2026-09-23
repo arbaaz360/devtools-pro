@@ -440,14 +440,12 @@ function renameAttribute(attr, inSvg, options) {
   return attr.rawName;
 }
 
-const INLINE_ELEMENTS = new Set([
-  "a", "abbr", "acronym", "b", "bdi", "bdo", "big", "br", "button", "cite", "code", "data",
-  "del", "dfn", "em", "font", "i", "img", "ins", "kbd", "label", "mark", "output", "q",
-  "rp", "rt", "rtc", "ruby", "s", "samp", "select", "small", "span", "strike", "strong",
-  "sub", "sup", "textarea", "time", "tt", "u", "var", "wbr",
-]);
-
-const isInlineNode = (node) => node.type === "element" && INLINE_ELEMENTS.has(node.name);
+// renderInlineNode recurses generically over any element, so any element adjacent to text
+// is eligible for the one-line mixed-run layout that keeps significant whitespace intact
+// (see renderChildrenLines). There is no correctness reason to gate this on a fixed tag
+// list: an unrecognized or custom element beside text needs the same protection an <a> or
+// <b> does, or JSX's line-boundary whitespace rule silently drops the space between them.
+const isInlineNode = (node) => node.type === "element";
 const collapseWhitespace = (text) => text.replace(/[ \t\n\r\f]+/g, " ");
 const escapeJsxText = (text) => text.replace(/[\{\}]/g, m => (m === "{" ? '{"{"}' : '{"}"}'));
 

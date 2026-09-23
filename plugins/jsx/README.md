@@ -34,16 +34,17 @@ The converter produces structured `warning` diagnostics for malformed inputs (wh
 The converter must render the same text, attribute values and style declarations the
 HTML has, not just something shaped like them:
 
-- **Text beside an inline element.** JSX only keeps a text node's whitespace exactly as
+- **Text beside an element.** JSX only keeps a text node's whitespace exactly as
   written when that text sits on a single source line; splitting it across lines (as a
   pretty-printer naturally would) lets JSX's own line-trimming eat a trailing or leading
-  space. So whenever a run of children mixes text with an inline element (`b`, `i`, `a`,
-  `span`, `code`, and the rest of the standard inline set — see `INLINE_ELEMENTS` in
-  `processor.mjs`), the whole run is emitted on one line, with runs of HTML whitespace in
-  that text collapsed to a single space (matching how a browser renders it). Text-only or
-  element-only content is still laid out however is clearest, since there is no adjacency
-  to lose. `<pre>` content is emitted as a JS string expression (`{"…"}`) instead of raw
-  JSX text, so its whitespace is never touched by JSX's own reflow rules.
+  space. So whenever a run of children mixes text with an element — any element, not just
+  a fixed inline set, since an unrecognized or custom tag beside text loses the same
+  whitespace an `<a>` or `<b>` would — the whole run is emitted on one line, with runs of
+  HTML whitespace in that text collapsed to a single space (matching how a browser renders
+  it). Text-only or element-only content is still laid out however is clearest, since
+  there is no adjacency to lose. `<pre>` content is emitted as a JS string expression
+  (`{"…"}`) instead of raw JSX text, so its whitespace is never touched by JSX's own
+  reflow rules.
 - **Unquoted attribute values** end only at ASCII whitespace or `>`, as the HTML
   specification's unquoted-attribute-value state requires — `/` is part of the value, not
   a terminator (`<br class=a/>` has the value `a/`).

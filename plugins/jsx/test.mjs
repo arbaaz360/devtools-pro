@@ -119,6 +119,10 @@ const ORACLE_CASES = [
   { id: "DU-24-ORACLE-inline-at-start", html: "<p><b>Start</b> middle text</p>", expectedText: "Start middle text" },
   { id: "DU-24-ORACLE-inline-at-end", html: "<p>leading text <b>End</b></p>", expectedText: "leading text End" },
   { id: "DU-24-ORACLE-nested-inline", html: "<p>a <b>bold <i>and italic</i> end</b> z</p>", expectedText: "a bold and italic end z" },
+  // AST-014 follow-up (integrator review on #133): an element outside the old hardcoded
+  // inline whitelist must not lose adjacent whitespace either.
+  { id: "DU-24-ORACLE-unlisted-element", html: "<p>Watch <video src=\"a.mp4\"></video> now</p>", expectedText: "Watch  now" },
+  { id: "DU-24-ORACLE-custom-element", html: "<p>Hello <my-comp>world</my-comp> !</p>", expectedText: "Hello world !" },
   // JSX text decodes named character references itself (a language-level rule, independent
   // of this converter), so &nbsp; in the source becomes a literal U+00A0 in the rendered text.
   { id: "DU-24-ORACLE-nbsp", html: "<p>a &nbsp;<b>b</b></p>", expectedText: "a  b" },
