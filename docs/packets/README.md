@@ -46,13 +46,20 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-117 | Markdown and HTML preview package (DU-25, DU-11) | claude | merged (#74) |
 | AG-118 | HTML and SVG to JSX package (DU-24) | antigravity | merged (#75) |
 | AG-119 | QR code generator package (DU-21) | antigravity | merged (#77) |
-| AG-120 | Parity audit: time, regex, JWT, Base64, URL parser, backslash, UUID | claude | ready |
-| AG-121 | Parity audit: HTML, CSS, JavaScript, XML, number base, example strings | antigravity | ready |
-| AG-122 | Parity audit: YAML, QR, JSX, preview, SQL, string case | claude | ready |
+| AG-120 | Parity audit: time, regex, JWT, Base64, URL parser, backslash, UUID | claude | merged (#93) |
+| AG-121 | Parity audit: HTML, CSS, JavaScript, XML, number base, example strings | antigravity | merged (#90) |
+| AG-122 | Parity audit: YAML, QR, JSX, preview, SQL, string case | claude | merged (#95) |
 | AG-123 | QR code reader package (DU-21, the reading half) | claude | merged (#96) |
 | AG-124 | The QR generator must encode UTF-8 (DU-21) | claude | merged (#102) |
 | AG-125 | Declared options that do nothing (DU-26, DU-06, DU-01) | antigravity | merged (#101) |
-| AG-126 | UUID generate and decode are two operations (DU-10) | claude | ready |
+| AG-126 | UUID generate and decode are two operations (DU-10) | claude | merged (#107) |
+| AG-127 | JavaScript minify must not change what the program does (DU-15) | antigravity | ready |
+| AG-128 | SQL minify must not join tokens into comments or broken numbers (DU-26) | antigravity | ready |
+| AG-129 | HTML/SVG to JSX must keep text, attribute values and style declarations (DU-24) | claude | ready |
+| AG-130 | YAML to JSON must emit JSON numbers (DU-17) | claude | ready |
+| AG-131 | XML beautify and minify must keep element text (DU-16) | antigravity | ready |
+| AG-132 | Dates in years 0 to 99 get correct calendar fields (DU-01) | antigravity | ready |
+| AG-133 | A JWT is expired at its exp instant (DU-04) | claude | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).

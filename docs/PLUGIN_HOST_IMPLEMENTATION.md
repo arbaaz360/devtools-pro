@@ -100,6 +100,21 @@ document data, options, cancellation and progress; it does not get an arbitrary 
 path. This keeps the native safety policy in one place and lets a future v2 executor use named
 ports, range readers and artifact sinks without changing the UI or save code.
 
+## Trust boundary
+
+A package's processor runs in a fresh web worker for each job, terminated when the job
+ends, so no state survives from one job — or tab — to the next. The worker is in the
+shell's own origin.
+The worker has what any worker there has: `fetch` (bounded only by the CSP the
+webview enforces), timers, and nothing of the host's IPC, which lives on the page,
+not in workers. So a processor **cannot** reach files, other tabs or native
+commands except through the ports the engine hands it — and it **can** make network
+requests. That is acceptable for packages that are built into the app and
+reviewed before they ship, and it is why every package today is treated as trusted
+code. It is not a sandbox. Installing plugins from outside the repository (P09)
+requires one first — at minimum a worker with no network, and grants checked by
+the engine rather than trusted from the manifest. Decided 2026-09-24.
+
 ## Save policy
 
 Every write is a sibling temporary file published with one rename, so a reader sees the old
