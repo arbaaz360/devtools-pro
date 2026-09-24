@@ -209,6 +209,51 @@ const CORE_SCHEMA_EDGES = [
   [".nan", "floatSpecial"], [".NaN", "floatSpecial"], [".NAN", "floatSpecial"], [".Nan", "str"], ["-.nan", "str"],
 ];
 
+// AST-025. A literal block scalar cannot carry every string: "\n" in clip form reads as "",
+// a CR is normalised away, and a YAML 1.1 reader folds NEL, LS and PS. Those strings are
+// written double-quoted. Every value must come back as itself; PyYAML 6.0.3 reads each of
+// these outputs the same way (checked when this was written; it is not a CI dependency).
+const NEL = String.fromCharCode(0x85), LS = String.fromCharCode(0x2028), PS = String.fromCharCode(0x2029), DEL = String.fromCharCode(0x7f);
+const AWKWARD_STRINGS = [
+  "\n", "\n\n", " \n", "\t\n", "  \n  \n", "a\n ", "\n ", " \n ", "\r\n", "a\r\nb\n", "a\rb", `x${LS}y\n`, `x${PS}y`, `x${NEL}y`, `a${DEL}b\n`,
+  "a\n", "\na", "a\n\n", "\n\n\nx\n", " a\n", "a \n", "x\n\n\n", "- a\n", "# c\n", "a: b\n", "...\n", "---\n", "é\n", "a\tb\n",
+];
+
+test("JSON to YAML writes every string so that it reads back as itself (AST-025)", async () => {
+  for (const value of AWKWARD_STRINGS) {
+    const yaml = await expectOk("convert.json-yaml", JSON.stringify({ a: value }));
+    const back = await expectOk("convert.yaml-json", yaml.text, { options: { indent: "minified" } });
+    assert.equal(JSON.parse(back.text).a, value, `${JSON.stringify(value)} -> ${JSON.stringify(yaml.text)}`);
+  }
+  // The ones a block scalar cannot carry are quoted, not blocked.
+  for (const value of ["\n", "\r\n", " \n", `x${LS}y\n`]) {
+    const yaml = await expectOk("convert.json-yaml", JSON.stringify({ a: value }));
+    assert.match(yaml.text, /^a: "/, `${JSON.stringify(value)} is written double-quoted`);
+  }
+  // Ordinary multi-line text keeps its readable block form.
+  assert.equal((await expectOk("convert.json-yaml", JSON.stringify({ a: "line one\nline two\n" }))).text, "a: |\n  line one\n  line two\n");
+});
+
+test("a block scalar line of only spaces is content past the indentation (YAML 1.2 §8.1.1.2)", async () => {
+  // [document, expected value], written by hand from the spec; PyYAML reads each the same.
+  const cases = [
+    ["a: |2\n   \n", " \n"],
+    ["a: |2\n  \t\n", "\t\n"],
+    ["a: |-\n  a\n   \n", "a\n "],
+    ["a: |\n  a\n\n  b\n", "a\n\nb\n"],
+    ["a: |\n  a\n  \n  b\n", "a\n\nb\n"],
+  ];
+  for (const [document, expected] of cases) {
+    const back = await expectOk("convert.yaml-json", document, { options: { indent: "minified" } });
+    assert.equal(JSON.parse(back.text).a, expected, JSON.stringify(document));
+  }
+});
+
+test("double-quoted scalars read all of YAML 1.2's escapes", async () => {
+  const back = await expectOk("convert.yaml-json", 'a: "\\a\\v\\e\\ \\N\\_\\L\\P\\\tx"\n', { options: { indent: "minified" } });
+  assert.deepEqual([...JSON.parse(back.text).a].map((ch) => ch.codePointAt(0)), [0x07, 0x0b, 0x1b, 0x20, 0x85, 0xa0, 0x2028, 0x2029, 0x09, 0x78]);
+});
+
 test("hex, octal, inf and nan resolve exactly as the core schema's table says", async () => {
   for (const [lexeme, kind] of CORE_SCHEMA_EDGES) assert.equal(classifyPlainScalar(lexeme).t, kind, lexeme);
   // A string that is a number to a conforming reader must be quoted on the way back to YAML,

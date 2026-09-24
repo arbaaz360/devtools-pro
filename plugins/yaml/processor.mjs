@@ -545,6 +545,17 @@ class Parser {
         case 0x72: builder.raw("\r"); i += 2; break;
         case 0x74: builder.raw("\t"); i += 2; break;
         case 0x30: builder.raw("\0"); i += 2; break;
+        // The rest of YAML 1.2's escapes (§5.7): bell, vertical tab, escape, space, tab,
+        // and the named breaks NEL, NBSP, LS and PS.
+        case 0x61: builder.raw("\x07"); i += 2; break;
+        case 0x76: builder.raw("\x0b"); i += 2; break;
+        case 0x65: builder.raw("\x1b"); i += 2; break;
+        case 0x20: builder.raw(" "); i += 2; break;
+        case 0x09: builder.raw("\t"); i += 2; break;
+        case 0x4e: builder.raw("\x85"); i += 2; break;
+        case 0x5f: builder.raw("\xa0"); i += 2; break;
+        case 0x4c: builder.raw("\u2028"); i += 2; break;
+        case 0x50: builder.raw("\u2029"); i += 2; break;
         case 0x78: builder.raw(String.fromCharCode(hex(i + 2, 2))); i += 4; break;
         case 0x75: builder.raw(String.fromCharCode(hex(i + 2, 4))); i += 6; break;
         case 0x55: builder.raw(String.fromCodePoint(hex(i + 2, 8))); i += 10; break;
@@ -688,7 +699,11 @@ class Parser {
     let lastLineHadEol = true;
     while (li < this.lines.length) {
       const l = this.lines[li];
-      const blank = l.contentStart === l.end;
+      // A line of only spaces or tabs is empty only up to the body's indentation; past
+      // it, the whitespace is content (YAML 1.2 §8.1.1.2: l-empty against
+      // l-nb-literal-text). Reading it as empty turned " \n" into "" (AST-025).
+      const whitespaceContent = l.contentStart === l.end && bodyIndentCol !== null && l.end - l.start > bodyIndentCol;
+      const blank = l.contentStart === l.end && !whitespaceContent;
       if (!blank) {
         const indentSpaces = l.indent;
         if (l.hasTab && indentSpaces < (bodyIndentCol ?? indentSpaces + 1)) fail("yaml.tab-indentation", l.start, l.contentStart, "tabs cannot be used for indentation");
@@ -883,7 +898,9 @@ function needsQuoting(text) {
   if (RESERVED_PLAIN.has(text)) return true;
   if (looksTyped(text)) return true;
   if (/^\s|\s$/.test(text)) return true;
-  if (/[\n\r]/.test(text)) return false; // handled by the caller via a block scalar
+  // A plain scalar cannot hold a line break or a character a reader may take for one; a
+  // multi-line value reaches here only when a block scalar cannot carry it.
+  if (/[\n\r]/.test(text) || NOT_PLAIN.test(text)) return true;
   if (/^[-?:,[\]{}#&*!|>'"%@`]/.test(text)) return true;
   if (/: (?:$|)/.test(text) || / #/.test(text) || text.includes(": ") || text.endsWith(":")) return true;
   return false;
@@ -900,9 +917,28 @@ function yamlQuote(text) {
     else if (ch === "\t") out += "\\t";
     else if (code === 0) out += "\\0";
     else if (code < 0x20) out += `\\x${code.toString(16).padStart(2, "0")}`;
+    // DEL and the C1 controls are not printable, and NEL, LS and PS are line breaks to a
+    // YAML 1.1 reader: written raw, a reader could fold them into spaces.
+    else if ((code >= 0x7f && code <= 0x9f) || code === 0x2028 || code === 0x2029) out += `\\u${code.toString(16).padStart(4, "0")}`;
     else out += ch;
   }
   return `${out}"`;
+}
+
+/** Characters a plain or block scalar cannot carry for every reader: YAML's non-printables, and NEL, LS, PS. */
+const NOT_PLAIN = /[^\t\n\x20-\x7e\xa0-\ud7ff\ue000-\ufffd\u{10000}-\u{10ffff}]|[\u2028\u2029]/u;
+
+/**
+ * Whether a multi-line string can be a literal block scalar that every reader reads back
+ * as itself. Not when it has a CR (readers normalise line breaks) or a character
+ * NOT_PLAIN names; not when no line has content (clip chomping reads "\n" as ""); not
+ * when a line is only spaces or tabs (readers disagree on it). Anything else is written
+ * double-quoted, with escapes: the review's AST-025, where "\n" came back as "".
+ */
+function blockSafe(text) {
+  if (text.includes("\r") || NOT_PLAIN.test(text)) return false;
+  const lines = text.split("\n");
+  return lines.some((line) => /[^ \t]/.test(line)) && !lines.some((line) => line !== "" && !/[^ \t]/.test(line));
 }
 
 /** Chooses a literal block scalar (with the chomping indicator that reproduces the exact trailing newline count) for a multi-line string. */
@@ -925,7 +961,7 @@ function scalarText(value) {
 }
 
 function emitYamlScalarString(str, indentCol, indentWidth, out) {
-  if (/\n/.test(str)) {
+  if (/\n/.test(str) && blockSafe(str)) {
     const { chomp, lines } = blockScalarLines(str);
     const needsExplicit = lines.length === 0 || lines[0] === "" || /^[ \t]/.test(lines[0]);
     const bodyIndent = indentCol + indentWidth;
