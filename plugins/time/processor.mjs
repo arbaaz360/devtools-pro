@@ -121,7 +121,8 @@ function parseInput(input, interpretation) {
       const mStr = match[2];
       const dStr = match[3];
 
-      const test = new Date(Date.UTC(parseInt(yearStr, 10), parseInt(mStr, 10) - 1, parseInt(dStr, 10)));
+      const test = new Date(0);
+      test.setUTCFullYear(parseInt(yearStr, 10), parseInt(mStr, 10) - 1, parseInt(dStr, 10));
       if (test.getUTCMonth() + 1 !== parseInt(mStr, 10)) {
         throw new TimeError("invalid-date", "Invalid ISO 8601 date: calendar date does not exist (e.g. leap day in non-leap year)");
       }
@@ -155,12 +156,14 @@ function getOutputs(millis, nowISO) {
   const dateUtc = isoUtc.split("T")[0];
   const timeUtc = isoUtc.split("T")[1];
 
-  const start = new Date(Date.UTC(d.getUTCFullYear(), 0, 0));
+  const start = new Date(0);
+  start.setUTCFullYear(d.getUTCFullYear(), 0, 0);
   const dayOfYear = Math.floor((d - start) / 86400000);
 
   const dateForWeek = new Date(d.getTime());
   dateForWeek.setUTCDate(dateForWeek.getUTCDate() + 4 - (dateForWeek.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(dateForWeek.getUTCFullYear(), 0, 1));
+  const yearStart = new Date(0);
+  yearStart.setUTCFullYear(dateForWeek.getUTCFullYear(), 0, 1);
   const isoWeek = Math.ceil((((dateForWeek - yearStart) / 86400000) + 1) / 7);
 
   const year = d.getUTCFullYear();
