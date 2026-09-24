@@ -83,8 +83,8 @@ test("round trip: beautify -> minify -> beautify is byte-identical for well-form
 // Options: kebab-case ids, camelCase aliases, structured errors.
 // ---------------------------------------------------------------------------
 test("options: defaults, aliases and structured errors", () => {
-  assert.deepEqual(normalizeOptions(undefined), { indent: "sp2", indentUnit: "  ", preserveComments: true, collapseEmpty: true });
-  assert.deepEqual(normalizeOptions({ indent: "sp4", collapseEmpty: false }), { indent: "sp4", indentUnit: "    ", preserveComments: true, collapseEmpty: false });
+  assert.deepEqual(normalizeOptions(undefined), { indent: "sp2", indentUnit: "  ", preserveComments: true, collapseEmpty: true, trimText: false });
+  assert.deepEqual(normalizeOptions({ indent: "sp4", collapseEmpty: false }), { indent: "sp4", indentUnit: "    ", preserveComments: true, collapseEmpty: false, trimText: false });
   assert.equal(normalizeOptions({ "preserve-comments": false }).preserveComments, false);
   assert.equal(normalizeOptions({ preserveComments: false }).preserveComments, false);
   assert.equal(normalizeOptions({ "preserve-comments": true, preserveComments: true }).preserveComments, true);

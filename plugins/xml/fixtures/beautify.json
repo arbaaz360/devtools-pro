@@ -39,10 +39,10 @@
     "diagnostics": []
   },
   {
-    "name": "text-only element trims leading and trailing text whitespace",
+    "name": "text-only element preserves leading and trailing text whitespace",
     "options": {},
     "input": "<a>  hello  </a>",
-    "output": "<a>hello</a>",
+    "output": "<a>  hello  </a>",
     "diagnostics": []
   },
   {

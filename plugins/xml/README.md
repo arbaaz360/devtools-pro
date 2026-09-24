@@ -22,11 +22,13 @@ content (see below) is the one deliberate departure from a pure streaming
 design, matching `plugins/json/`'s reference-implementation memory bound.
 
 **Beautify.** One node per line; child elements are indented one level.
-Whitespace-only text between elements is dropped. An element with no element
+Indentation is added, and whitespace removed, only between the children of an
+element that has element children and no non-whitespace text. An element with no element
 children is *text-like*: its significant children (text, CDATA, a lone
 comment, a lone PI, or some combination) are concatenated onto the element's
-own line, with leading/trailing whitespace trimmed from each text node
-(`<a>  hi  </a>` → `<a>hi</a>`) — this generalises the "text-only content
+own line, preserving exact text content byte-for-byte including whitespace
+(`<a>  hi  </a>` → `<a>  hi  </a>`). Trimming text is available as an
+opt-in option. This generalises the "text-only content
 stays on the element's line" requirement to the no-element-children case in
 general, and keeps beautify and minify agreeing on text trimming so the
 round trip below holds. An element with *both* element children and
@@ -61,8 +63,8 @@ own start/end tags are reformatted normally.
 fixture with zero diagnostics (`fixtures/beautify.json` cases with an empty
 `diagnostics` array); `test.mjs` checks this for every such fixture. Mixed
 content and preserved subtrees are copied byte-for-byte regardless of
-operation, and text-like content is trimmed the same way by both operations,
-which is what makes the round trip hold.
+operation, and text-like content is kept byte-for-byte by both operations (unless the trim
+option is used), which is what makes the round trip hold.
 
 ## Options
 
@@ -74,6 +76,7 @@ structured errors (`xml.invalid-option`).
 | `indent` | — | enum `sp2` \| `sp4` \| `tab` | `sp2` | 2 spaces, 4 spaces, or one tab per level. The contract schema's `ChoiceIdentifier` requires an enum choice id to start with a letter, so the packet's "2, 4, tab" values are spelled `sp2`/`sp4`/`tab` here and in the manifest. |
 | `preserve-comments` | `preserveComments` | boolean | `true` | When `false`, every comment (prolog, in-tree, trailing) is dropped from the output; comments are still counted in the `comments` property either way. |
 | `collapse-empty` | `collapseEmpty` | boolean | `true` | Controls `<a/>` vs `<a></a>` for elements with no significant content. |
+| `trim-text` | `trimText` | boolean | `false` | Trim text in elements (changes values). |
 
 ## Tolerant diagnostics
 

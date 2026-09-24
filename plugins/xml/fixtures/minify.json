@@ -7,10 +7,10 @@
     "diagnostics": []
   },
   {
-    "name": "minify trims leading and trailing text whitespace",
+    "name": "minify preserves leading and trailing text whitespace",
     "options": {},
     "input": "<a>  hello  </a>",
-    "output": "<a>hello</a>",
+    "output": "<a>  hello  </a>",
     "diagnostics": []
   },
   {
@@ -24,7 +24,7 @@
     "name": "minify keeps CDATA byte for byte",
     "options": {},
     "input": "<a>  <![CDATA[  raw  ]]>  </a>",
-    "output": "<a><![CDATA[  raw  ]]></a>",
+    "output": "<a>  <![CDATA[  raw  ]]>  </a>",
     "diagnostics": []
   },
   {
