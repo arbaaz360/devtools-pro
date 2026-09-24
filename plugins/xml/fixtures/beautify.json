@@ -1,5 +1,30 @@
 [
   {
+    "name": "AST-003: whitespace-only text is preserved",
+    "options": {},
+    "input": "<root><value> </value></root>",
+    "output": "<root>\n  <value> </value>\n</root>",
+    "diagnostics": []
+  },
+  {
+    "name": "AST-003: whitespace-only text is trimmed if trim-text is true",
+    "options": {
+      "trim-text": true
+    },
+    "input": "<root><value> </value></root>",
+    "output": "<root>\n  <value/>\n</root>",
+    "diagnostics": []
+  },
+  {
+    "name": "text-only element trims text if trim-text is true",
+    "options": {
+      "trim-text": true
+    },
+    "input": "<a>  hello  </a>",
+    "output": "<a>hello</a>",
+    "diagnostics": []
+  },
+  {
     "name": "self-closing empty element",
     "options": {},
     "input": "<a/>",

@@ -425,8 +425,10 @@ class Pieces {
 function trimRange(bytes, s, e) { let a = s, b = e; while (a < b && isWs(bytes[a])) a += 1; while (b > a && isWs(bytes[b - 1])) b -= 1; return [a, b]; }
 
 function significantChildren(node, options) {
-  if (options.preserveComments) return node.children;
-  return node.children.filter((child) => child.t !== "comment");
+  let sig = node.children;
+  if (!options.preserveComments) sig = sig.filter((child) => child.t !== "comment");
+  if (options.trimText) sig = sig.filter(child => !(child.t === "text" && child.isWsOnly));
+  return sig;
 }
 
 function classify(sig) {
@@ -479,7 +481,7 @@ function renderElement(bytes, node, depth, pieces, options, mode) {
       }
       else pieces.raw(bytes, child.s, child.e);
     }
-} else {
+  } else {
     const unit = options.indentUnit;
     for (const child of sig) {
       if (child.t === "text" && child.isWsOnly) continue;
