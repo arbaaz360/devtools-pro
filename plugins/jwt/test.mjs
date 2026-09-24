@@ -213,7 +213,11 @@ test("exp in the past is expired without tolerance and not expired once toleranc
   const noTolerance = await run({ key: FIXED_SECRET }, token);
   assert.equal(noTolerance.result.claims.expired, true);
   assert.equal(noTolerance.result.claims.expiresAt, new Date((NOW_SECONDS - 100) * 1000).toISOString());
-  const covered = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": 100 }, token);
+  // Tolerance exactly equal to the gap still lands on the expiry boundary (now == exp + tolerance),
+  // which is expired per AG-133; only a tolerance past the gap is not expired.
+  const exactlyAtBoundary = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": 100 }, token);
+  assert.equal(exactlyAtBoundary.result.claims.expired, true);
+  const covered = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": 101 }, token);
   assert.equal(covered.result.claims.expired, false);
 });
 
@@ -225,6 +229,59 @@ test("nbf in the future is not-yet-valid without tolerance and valid once tolera
   assert.equal(noTolerance.result.claims.notBefore, new Date((NOW_SECONDS + 100) * 1000).toISOString());
   const covered = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": 100 }, token);
   assert.equal(covered.result.claims.notYetValid, false);
+});
+
+test("exp: expired strictly from the boundary instant onward, at whole-second and tolerance-shifted boundaries (AG-133)", async () => {
+  const sign = await hmacSigner(te.encode(FIXED_SECRET), "SHA-256");
+  const cases = [
+    { label: "exp one second before now, tolerance 0", exp: NOW_SECONDS - 1, tolerance: 0, expectedExpired: true },
+    { label: "exp exactly at now, tolerance 0", exp: NOW_SECONDS, tolerance: 0, expectedExpired: true },
+    { label: "exp one second after now, tolerance 0", exp: NOW_SECONDS + 1, tolerance: 0, expectedExpired: false },
+    { label: "exp one second before now, tolerance 30", exp: NOW_SECONDS - 1, tolerance: 30, expectedExpired: false },
+    { label: "exp exactly at now, tolerance 30", exp: NOW_SECONDS, tolerance: 30, expectedExpired: false },
+    { label: "exp one second after now, tolerance 30", exp: NOW_SECONDS + 1, tolerance: 30, expectedExpired: false },
+  ];
+  for (const { label, exp, tolerance, expectedExpired } of cases) {
+    const { token } = await signToken("HS256", { alg: "HS256" }, { exp }, sign);
+    const { result } = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": tolerance }, token);
+    assert.equal(result.claims.expired, expectedExpired, label);
+  }
+});
+
+test("exp: a fractional NumericDate is honoured to sub-second precision, never floored toward validity (AG-133)", async () => {
+  const sign = await hmacSigner(te.encode(FIXED_SECRET), "SHA-256");
+  const clock = new FixedClock("2024-01-01T00:00:00.500Z");
+  const halfSecondNow = NOW_SECONDS + 0.5;
+  const cases = [
+    { label: "fractional exp one second before now, tolerance 0", exp: halfSecondNow - 1, tolerance: 0, expectedExpired: true },
+    { label: "fractional exp exactly at now, tolerance 0", exp: halfSecondNow, tolerance: 0, expectedExpired: true },
+    { label: "fractional exp one second after now, tolerance 0", exp: halfSecondNow + 1, tolerance: 0, expectedExpired: false },
+    { label: "fractional exp one second before now, tolerance 30", exp: halfSecondNow - 1, tolerance: 30, expectedExpired: false },
+    { label: "fractional exp exactly at now, tolerance 30", exp: halfSecondNow, tolerance: 30, expectedExpired: false },
+    { label: "fractional exp one second after now, tolerance 30", exp: halfSecondNow + 1, tolerance: 30, expectedExpired: false },
+  ];
+  for (const { label, exp, tolerance, expectedExpired } of cases) {
+    const { token } = await signToken("HS256", { alg: "HS256" }, { exp }, sign);
+    const { result } = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": tolerance }, token, { clock });
+    assert.equal(result.claims.expired, expectedExpired, label);
+  }
+});
+
+test("nbf: valid from the boundary instant onward, not-yet-valid only strictly before it, at whole-second and tolerance-shifted boundaries (AG-133)", async () => {
+  const sign = await hmacSigner(te.encode(FIXED_SECRET), "SHA-256");
+  const cases = [
+    { label: "nbf one second before now, tolerance 0", nbf: NOW_SECONDS - 1, tolerance: 0, expectedNotYetValid: false },
+    { label: "nbf exactly at now, tolerance 0", nbf: NOW_SECONDS, tolerance: 0, expectedNotYetValid: false },
+    { label: "nbf one second after now, tolerance 0", nbf: NOW_SECONDS + 1, tolerance: 0, expectedNotYetValid: true },
+    { label: "nbf one second before now, tolerance 30", nbf: NOW_SECONDS - 1, tolerance: 30, expectedNotYetValid: false },
+    { label: "nbf exactly at now, tolerance 30", nbf: NOW_SECONDS, tolerance: 30, expectedNotYetValid: false },
+    { label: "nbf one second after now, tolerance 30", nbf: NOW_SECONDS + 1, tolerance: 30, expectedNotYetValid: false },
+  ];
+  for (const { label, nbf, tolerance, expectedNotYetValid } of cases) {
+    const { token } = await signToken("HS256", { alg: "HS256" }, { nbf }, sign);
+    const { result } = await run({ key: FIXED_SECRET, "clock-tolerance-seconds": tolerance }, token);
+    assert.equal(result.claims.notYetValid, expectedNotYetValid, label);
+  }
 });
 
 test("expired claims are reported separately from a valid signature: expired true, signature valid, valid false", async () => {

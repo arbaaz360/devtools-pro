@@ -79,8 +79,8 @@ Unknown option keys and options of the wrong type are structured
 
 ```text
 claims: {
-  expired: boolean,      // exp is a number and now > exp + tolerance
-  notYetValid: boolean,  // nbf is a number and now < nbf - tolerance
+  expired: boolean,      // exp is a number and now >= exp + tolerance (expired from the exp instant itself)
+  notYetValid: boolean,  // nbf is a number and now < nbf - tolerance (valid from the nbf instant itself)
   expiresAt: string | null,  // ISO UTC, or null when exp is absent/non-numeric
   notBefore: string | null,
   issuedAt: string | null,   // from iat, informational only (not compared to now)
@@ -88,9 +88,12 @@ claims: {
 ```
 
 `now` comes from `context.clock.now()`, not the host clock, so expiry is
-testable with a fixed clock. A claim that is present but not a JSON number is
-treated as absent (`expired`/`notYetValid` default to `false`, the ISO field
-to `null`) rather than throwing, since RFC 7519 defines these as NumericDate.
+testable with a fixed clock. The comparison uses the clock's full precision
+(fractional seconds are never floored toward validity), and `exp`/`nbf` may
+themselves be fractional NumericDate values, honoured exactly. A claim that
+is present but not a JSON number is treated as absent (`expired`/
+`notYetValid` default to `false`, the ISO field to `null`) rather than
+throwing, since RFC 7519 defines these as NumericDate.
 
 ## Text representation
 
