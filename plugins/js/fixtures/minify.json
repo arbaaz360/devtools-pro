@@ -81,13 +81,13 @@
     "name": "ASI newline after return",
     "options": {},
     "input": "function a() {\n  return\n  value;\n}",
-    "output": "function a(){\nreturn\nvalue;}"
+    "output": "function a(){return\nvalue;}"
   },
   {
     "name": "ASI newline after throw",
     "options": {},
     "input": "function a() {\n  throw\n  new Error();\n}",
-    "output": "function a(){\nthrow\nnew Error();}"
+    "refused": "js.syntax-error"
   },
   {
     "name": "ASI newline before ++",
@@ -99,19 +99,19 @@
     "name": "ASI newline with +",
     "options": {},
     "input": "let a = 1\n+ 2;",
-    "output": "let a=1\n+2;"
+    "output": "let a=1+2;"
   },
   {
     "name": "ASI newline with array",
     "options": {},
     "input": "let a = b\n[1, 2, 3].forEach();",
-    "output": "let a=b\n[1,2,3].forEach();"
+    "output": "let a=b[1,2,3].forEach();"
   },
   {
     "name": "ASI newline with parens",
     "options": {},
     "input": "let a = b\n(c).d();",
-    "output": "let a=b\n(c).d();"
+    "output": "let a=b(c).d();"
   },
   {
     "name": "ASI newline with template",
@@ -123,49 +123,49 @@
     "name": "ASI newline with regex",
     "options": {},
     "input": "let a = b\n/c/g.test(d);",
-    "output": "let a=b\n/c/g.test(d);"
+    "output": "let a=b/c/g.test(d);"
   },
   {
     "name": "unterminated string",
     "options": {},
     "input": "const a = \"b",
-    "output": "const a=\"b"
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated string single",
     "options": {},
     "input": "const a = 'b",
-    "output": "const a='b"
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated template",
     "options": {},
     "input": "const a = `b",
-    "output": "const a=`b"
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated template expression",
     "options": {},
     "input": "const a = `b ${c",
-    "output": "const a=`b ${c"
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated block comment",
     "options": {},
     "input": "/* comment",
-    "output": ""
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated regex",
     "options": {},
     "input": "const a = /b",
-    "output": "const a=/b"
+    "refused": "js.syntax-error"
   },
   {
     "name": "unterminated regex char class",
     "options": {},
     "input": "const a = /[b",
-    "output": "const a=/[b"
+    "refused": "js.syntax-error"
   },
   {
     "name": "keyword spacing",
@@ -177,7 +177,7 @@
     "name": "identifier spacing",
     "options": {},
     "input": "let a b c;",
-    "output": "let a b c;"
+    "refused": "js.syntax-error"
   },
   {
     "name": "multiple whitespace removed",
@@ -189,6 +189,6 @@
     "name": "newlines removed if not ASI",
     "options": {},
     "input": "const\n  a\n  =\n  1\n  ;",
-    "output": "const\na\n=\n1;"
+    "output": "const a=1;"
   }
 ]

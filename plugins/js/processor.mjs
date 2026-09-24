@@ -1,5 +1,6 @@
 import { ProcessorCancelled } from "../../packages/plugin-sdk/src/index.ts";
 import { js_beautify } from "../../packages/vendor/js-beautify/js-beautify.mjs";
+import { parse as parseJs } from "../../packages/vendor/acorn/acorn.mjs";
 
 export class JsError extends Error {
   constructor(code, message, data) {
@@ -71,7 +72,7 @@ export async function execute(request, context) {
   else throw new Error("unknown operation " + op);
 }
 
-async function beautify(context, options) {
+async function readText(context) {
   let length = 0;
   const chunks = [];
   for await (const chunk of context.readChunks("input", 65536)) {
@@ -80,24 +81,225 @@ async function beautify(context, options) {
     if (length > context.limits.maxInputBytes) throw new JsError("js.input-limit", "input exceeds max bytes");
     chunks.push(chunk);
   }
-  
-  if (length === 0) {
-    const bytes = new Uint8Array(0);
-    const result = { lines: 0, comments: 0, strings: 0, templates: 0, regexes: 0, diagnostics: 0, bytes: 0 };
-    await context.writeValue("output", result);
-    await context.write("output", bytes);
-    return result;
-  }
-  
   const bytes = new Uint8Array(length);
   let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+}
+
+async function emit(context, text, result) {
+  const outBytes = new TextEncoder().encode(text);
+  if (outBytes.byteLength > context.limits.maxOutputBytes) throw new JsError("js.output-limit", "output exceeds max bytes");
+  const value = { ...result, lines: text === "" ? 0 : text.split("\n").length - (text.endsWith("\n") ? 1 : 0), bytes: outBytes.byteLength };
+  await context.writeValue("output", value);
+  await context.write("output", outBytes);
+  return value;
+}
+
+// ---------------------------------------------------------------------------
+// Reading JavaScript: acorn, not a hand-written tokenizer.
+//
+// Owner decision (2026-09-25, docs/DEVUTILS_REQUIREMENTS.md): three reviews found input
+// classes a hand-written tokenizer got wrong without saying so (a regex after `)`, a
+// template after `return`, Unicode names). Both operations now read the program with a
+// real parser, and accept their own output only if it parses to the same syntax tree.
+// ---------------------------------------------------------------------------
+
+const ACORN = { ecmaVersion: "latest", allowHashBang: true };
+// A CommonJS file may `return` at top level (Node wraps it in a function), and so may a
+// function body pasted on its own; neither is valid in a module.
+const GOAL = { script: { allowReturnOutsideFunction: true }, module: {} };
+
+/**
+ * The program as a script, else as a module. A script comes first: code valid both ways
+ * means what it means as a script, the way a <script> tag or Node's CommonJS runs it; a
+ * module is strict and reserves `await`. When neither parses, the error that got further
+ * into the text is the one reported.
+ */
+function parseProgram(text) {
+  let failure = null;
+  for (const sourceType of ["script", "module"]) {
+    const tokens = [];
+    const comments = [];
+    try {
+      const ast = parseJs(text, { ...ACORN, ...GOAL[sourceType], sourceType, onToken: tokens, onComment: comments });
+      return { ast, tokens: tokens.filter((token) => token.type.label !== "eof"), comments, sourceType };
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      if (!failure || (error.pos ?? 0) > (failure.pos ?? 0)) failure = error;
+    }
   }
-  
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-  
+  return { failure };
+}
+
+function reparse(text, sourceType) {
+  try { return parseJs(text, { ...ACORN, ...GOAL[sourceType], sourceType }); } catch { return null; }
+}
+
+/** Keys that say where a node is, not what it is. */
+const POSITION_KEYS = new Set(["start", "end", "loc", "range"]);
+
+/**
+ * Whether two syntax trees are the same program: every node type, name, operator and
+ * value alike, positions aside. A literal is compared by its value (and a regex by pattern
+ * and flags), not its spelling; a template's raw text counts, since String.raw reads it.
+ * Iterative, so a deeply nested program cannot overflow the stack.
+ */
+export function sameTree(left, right) {
+  const stack = [[left, right]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    if (a === b) continue;
+    if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) {
+      if (typeof a === "number" && typeof b === "number" && Object.is(a, b)) continue;
+      return false;
+    }
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false;
+      for (let i = 0; i < a.length; i += 1) stack.push([a[i], b[i]]);
+      continue;
+    }
+    if (a.type !== b.type) return false;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+      if (POSITION_KEYS.has(key)) continue;
+      if (a.type === "Literal" && (key === "raw" || (key === "value" && (a.regex || a.bigint !== undefined)))) continue;
+      stack.push([a[key], b[key]]);
+    }
+  }
+  return true;
+}
+
+function hasLineBreak(text) {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code === 10 || code === 13 || code === 0x2028 || code === 0x2029) return true;
+  }
+  return false;
+}
+
+const WORD_END = /[\p{ID_Continue}$]$/u;
+const WORD_START = /^[\p{ID_Continue}$\\#]/u;
+
+/** Whether two tokens printed touching would read as something else. */
+function needsSpace(prevText, nextText, prev) {
+  if (WORD_END.test(prevText) && WORD_START.test(nextText)) return true;            // let x, 1 in a, /a/g in b
+  if (prev.type.label === "regexp" && WORD_START.test(nextText)) return true;       // /a/ in b: `in` would be flags
+  const a = prevText[prevText.length - 1];
+  const b = nextText[0];
+  if ((a === "+" || a === "-") && b === a) return true;                              // a - -b, a+ ++b
+  if (a === "/" && (b === "/" || b === "*")) return true;                            // a / /re/, /re/ / b
+  if (a === "<" && nextText.startsWith("!--")) return true;                          // <!-- opens a comment in a script
+  if (prev.type.label === "num" && b === ".") return true;                           // 1 .toString()
+  return false;
+}
+
+/** Tokens after which a line break is part of the grammar (a restricted production). */
+const RESTRICTED = new Set(["return", "throw", "break", "continue", "yield", "async", "let"]);
+/** Tokens that can end an expression: only after one does a line break before `++`/`--` matter. */
+const ENDS_EXPRESSION = new Set(["name", "num", "string", "regexp", "privateId", ")", "]", "}", "`", "this", "super", "true", "false", "null", "++/--"]);
+
+function isLicense(comment, text) {
+  const body = text.slice(comment.start, comment.end);
+  return body.startsWith("/*!") || body.includes("@license") || body.includes("@preserve");
+}
+
+/**
+ * Tokens joined with the least separation that reads as the same tokens. A line break in
+ * the source survives after a restricted token or before `++`/`--`, or everywhere when
+ * `keepLineBreaks` is set (the fallback when the compact form parses to another tree).
+ */
+function joinTokens(text, parsed, { keepLicense, keepLineBreaks, check }) {
+  const license = keepLicense ? parsed.comments.filter((comment) => isLicense(comment, text)) : [];
+  const hashbang = text.startsWith("#!") ? text.slice(0, text.search(/\r\n|[\n\r]|$/)) : "";
+  const parts = hashbang ? [hashbang] : [];
+  let prev = null;
+  let prevText = "";
+  let next = 0; // the next licence comment to place
+  let cursor = hashbang.length;
+  const tokens = parsed.tokens;
+  for (let index = 0; index <= tokens.length; index += 1) {
+    if (index % 4096 === 0) check();
+    const token = tokens[index];
+    const gapEnd = token ? token.start : text.length;
+    const gap = text.slice(cursor, gapEnd);
+    const kept = [];
+    while (next < license.length && license[next].start < gapEnd) {
+      if (license[next].start >= cursor) kept.push(text.slice(license[next].start, license[next].end));
+      next += 1;
+    }
+    const lineBreak = hasLineBreak(gap);
+    let separator = "";
+    if (kept.length) {
+      // A kept line comment ends with a line break, and a block comment keeps the gap's
+      // kind: a line break the comment spanned may be one the grammar reads. A comment
+      // is whitespace to the lexer, so it needs a space before it only after `/`, where
+      // `/` + `/*` would read as a line comment.
+      separator = lineBreak ? `${parts.length ? "\n" : ""}${kept.join("\n")}\n` : `${prev ? " " : ""}${kept.join(" ")}`;
+    } else if (!token) {
+      separator = "";
+    } else if (prev && lineBreak && (keepLineBreaks || RESTRICTED.has(prevText) || (token.type.label === "++/--" && ENDS_EXPRESSION.has(prev.type.label)))) {
+      separator = "\n";
+    } else if (hashbang && !prev) {
+      separator = "\n";
+    } else if (gap === "") {
+      // Tokens that touched in the source touch in the output. This is also what keeps a
+      // template's own text whole: `a${` is two tokens with nothing between them.
+      separator = "";
+    } else if (prev && needsSpace(prevText, text.slice(token.start, token.end), prev)) {
+      separator = " ";
+    }
+    if (!token) {
+      if (kept.length) parts.push(separator.trimEnd() + (lineBreak ? "\n" : ""));
+      break;
+    }
+    const tokenText = text.slice(token.start, token.end);
+    parts.push(separator, tokenText);
+    prev = token;
+    prevText = tokenText;
+    cursor = token.end;
+  }
+  return parts.join("");
+}
+
+function counts(parsed) {
+  let strings = 0, templates = 0, regexes = 0;
+  for (const token of parsed.tokens) {
+    if (token.type.label === "string") strings += 1;
+    else if (token.type.label === "regexp") regexes += 1;
+    else if (token.type.label === "`") templates += 1;
+  }
+  return { comments: parsed.comments.length, strings, templates: templates / 2, regexes };
+}
+
+function syntaxError(failure) {
+  const where = failure.loc ? ` at line ${failure.loc.line}, column ${failure.loc.column + 1}` : "";
+  return new JsError("js.syntax-error", `${failure.message.replace(/ \(\d+:\d+\)$/, "")}${where}; the input is not JavaScript this tool can read, so it cannot show the output means the same`, {
+    line: failure.loc?.line ?? null, column: failure.loc ? failure.loc.column + 1 : null, offset: failure.pos ?? null,
+  });
+}
+
+async function minify(context, options) {
+  const text = await readText(context);
+  if (text === "") return emit(context, "", { comments: 0, strings: 0, templates: 0, regexes: 0, diagnostics: 0, verified: true });
+  const parsed = parseProgram(text);
+  if (!parsed.ast) throw syntaxError(parsed.failure);
+  const check = () => { if (context.cancellation.isCancelled()) throw new ProcessorCancelled(); };
+  const keepLicense = options.preserveComments === "license";
+  // The compact form first; where it would parse as another program, the source's own line
+  // breaks; and if even that differs, a refusal rather than a changed program.
+  for (const keepLineBreaks of [false, true]) {
+    const out = joinTokens(text, parsed, { keepLicense, keepLineBreaks, check });
+    const tree = reparse(out, parsed.sourceType);
+    if (tree && sameTree(parsed.ast, tree)) return emit(context, out, { ...counts(parsed), diagnostics: 0, verified: true });
+  }
+  throw new JsError("js.minify.changes-meaning", "Minify could not produce a program that parses the same as the input; nothing was written", null);
+}
+
+async function beautify(context, options) {
+  const text = await readText(context);
+  if (text === "") return emit(context, "", { comments: 0, strings: 0, templates: 0, regexes: 0, diagnostics: 0, verified: true });
   const beautifyOptions = {
     indent_size: options.indent === "tab" ? 1 : (options.indent === "space-4" ? 4 : 2),
     indent_with_tabs: options.indent === "tab",
@@ -108,396 +310,23 @@ async function beautify(context, options) {
     space_in_paren: options.spaceInParens,
     end_with_newline: options.endWithNewline
   };
-  
-  let formatted = "";
+  let formatted;
   try {
     formatted = js_beautify(text, beautifyOptions);
   } catch (err) {
     throw new JsError("format.js-beautify", err.message, null);
   }
-  
-  const encoder = new TextEncoder();
-  const outBytes = encoder.encode(formatted);
-  if (outBytes.byteLength > context.limits.maxOutputBytes) throw new JsError("js.output-limit", "output exceeds limit");
-  
-  const inProps = processTokens(text, "none");
-  const props = processTokens(formatted, "none");
-  
-  if (inProps.tokens.length !== props.tokens.length) {
-    throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
+  const parsed = parseProgram(text);
+  if (!parsed.ast) {
+    // Not JavaScript acorn can read (a fragment, JSX, TypeScript): js-beautify still lays it
+    // out, and the result says it was not checked rather than implying it was.
+    const where = parsed.failure.loc ? ` (line ${parsed.failure.loc.line}, column ${parsed.failure.loc.column + 1})` : "";
+    return emit(context, formatted, { comments: 0, strings: 0, templates: 0, regexes: 0, diagnostics: 1, verified: false,
+      note: `Not checked: the input does not parse as JavaScript${where}, so the output could not be compared with it.` });
   }
-
-  const restrictedTokens = new Set(["return", "throw", "break", "continue", "yield", "async", "++", "--"]);
-  for (let k = 0; k < inProps.tokens.length; k++) {
-    const t1 = inProps.tokens[k];
-    const t2 = props.tokens[k];
-
-    if (t1.value !== t2.value) {
-      throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
-    }
-
-    if (k > 0) {
-      const prev = inProps.tokens[k-1];
-      if (restrictedTokens.has(prev.value) || t1.value === "++" || t1.value === "--") {
-        if (t1.hasNewlineBefore && !t2.hasNewlineBefore) {
-          throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
-        }
-      }
-    }
+  const tree = reparse(formatted, parsed.sourceType);
+  if (!tree || !sameTree(parsed.ast, tree)) {
+    throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does (for example a line break after return); Minify keeps it, or add the semicolon", null);
   }
-
-  const result = {
-    lines: props.lines,
-    comments: props.comments,
-    strings: props.strings,
-    templates: props.templates,
-    regexes: props.regexes,
-    diagnostics: props.diagnosticsCount,
-    bytes: outBytes.byteLength
-  };
-  
-  await context.writeValue("output", result);
-  await context.write("output", outBytes);
-  return result;
-}
-
-async function minify(context, options) {
-  let length = 0;
-  const chunks = [];
-  for await (const chunk of context.readChunks("input", 65536)) {
-    if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
-    length += chunk.byteLength;
-    if (length > context.limits.maxInputBytes) throw new JsError("js.input-limit", "input exceeds max bytes");
-    chunks.push(chunk);
-  }
-  
-  if (length === 0) {
-    const bytes = new Uint8Array(0);
-    const result = { lines: 0, comments: 0, strings: 0, templates: 0, regexes: 0, diagnostics: 0, bytes: 0 };
-    await context.writeValue("output", result);
-    await context.write("output", bytes);
-    return result;
-  }
-  
-  const bytes = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  const text = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
-  
-  const minified = processTokens(text, options.preserveComments);
-  const encoder = new TextEncoder();
-  const outBytes = encoder.encode(minified.out);
-  if (outBytes.byteLength > context.limits.maxOutputBytes) throw new JsError("js.output-limit", "output exceeds max bytes");
-  
-  const result = {
-    lines: minified.lines,
-    comments: minified.comments,
-    strings: minified.strings,
-    templates: minified.templates,
-    regexes: minified.regexes,
-    diagnostics: minified.diagnosticsCount,
-    bytes: outBytes.byteLength
-  };
-  
-  await context.writeValue("output", result);
-  await context.write("output", outBytes);
-  return result;
-}
-
-function processTokens(text, preserveComments) {
-  let out = "";
-  let lines = 0;
-  let commentsCount = 0;
-  let stringsCount = 0;
-  let templatesCount = 0;
-  let regexesCount = 0;
-  let diagnosticsCount = 0;
-  let annotations = [];
-  let tokens = [];
-  
-  let i = 0;
-  let len = text.length;
-  
-  let lastType = null;
-  let lastValue = null;
-  let lastCharEmitted = null;
-  let endsWithNewline = false;
-  
-  const regexKeywords = new Set(["return", "typeof", "instanceof", "in", "of", "new", "delete", "void", "throw", "case", "do", "else"]);
-  const regexPunct = new Set(["(", ",", "[", "{", ";", ":", "!", "?", "="]);
-  
-  function canRegexFollow(lastType, lastValue) {
-    if (!lastType) return true;
-    if (lastType === "keyword" && regexKeywords.has(lastValue)) return true;
-    if ((lastType === "op" || lastType === "punct") && regexPunct.has(lastValue)) return true;
-    if (lastType === "op") return true;
-    return false;
-  }
-  
-  function isIdentifierChar(c) { return c && /[a-zA-Z0-9_$]/.test(c); }
-  function isOpChar(c) { return c && "+-*/%&|^~<>=!?:".includes(c); }
-  
-  let stack = [];
-  let braceDepth = 0;
-  let braceStack = [];
-  
-  function emit(str, type) {
-    if (!str) return;
-    for (let j = 0; j < str.length; j++) if (str[j] === "\n") lines++;
-    
-    if (type !== "comment") {
-      if (out.length > 0 && endsWithNewline) {
-         if (lastValue !== ";" && str !== ";") {
-            if (lastCharEmitted !== "\n") {
-               out += "\n";
-               lines++;
-            }
-         } else {
-            let ns = needsSpace(lastCharEmitted, str[0]);
-            if (lastType === "num" && str[0] === ".") ns = true;
-            if (ns && lastCharEmitted !== "\n") out += " ";
-         }
-      } else if (out.length > 0) {
-         let ns = needsSpace(lastCharEmitted, str[0]);
-         if (lastType === "num" && str[0] === ".") ns = true;
-         if (ns && lastCharEmitted !== "\n") out += " ";
-      }
-      
-      tokens.push({ value: str, type: type, hasNewlineBefore: endsWithNewline });
-      out += str;
-      lastCharEmitted = str[str.length - 1];
-      lastType = type;
-      lastValue = str;
-      endsWithNewline = false;
-    }
-  }
-  
-  function needsSpace(L, R) {
-     if (!L || !R) return false;
-     if (isIdentifierChar(L) && isIdentifierChar(R)) return true;
-     if (L === '+' && R === '+') return true;
-     if (L === '-' && R === '-') return true;
-     if (L === '/' && R === '*') return true;
-     if (L === '/' && R === '/') return true;
-     return false;
-  }
-  
-  while (i < len) {
-    let char = text[i];
-    
-    if (stack[stack.length - 1] === "TEMPLATE") {
-       let start = i;
-       let closed = false;
-       while (i < len) {
-          if (text[i] === "\\") { i += 2; continue; }
-          if (text[i] === "$" && text[i+1] === "{") {
-             out += text.substring(start, i + 2);
-             for (let j = start; j < i + 2; j++) if (text[j] === "\n") lines++;
-             stack.pop();
-             braceStack.push(braceDepth);
-             braceDepth++;
-             i += 2;
-             lastCharEmitted = "{";
-             lastType = "punct";
-             lastValue = "{";
-             endsWithNewline = false;
-             closed = true;
-             break;
-          }
-          if (text[i] === "`") {
-             i++;
-             out += text.substring(start, i);
-             for (let j = start; j < i; j++) if (text[j] === "\n") lines++;
-             stack.pop();
-             lastCharEmitted = "`";
-             lastType = "template";
-             lastValue = "`";
-             endsWithNewline = false;
-             templatesCount++;
-             closed = true;
-             break;
-          }
-          i++;
-       }
-       if (!closed) {
-          out += text.substring(start, i);
-          for (let j = start; j < i; j++) if (text[j] === "\n") lines++;
-          stack.pop();
-          diagnosticsCount++;
-          annotations.push({ code: "js.unterminated-template", severity: "warning", message: "unterminated template", offset: start });
-       }
-       continue;
-    }
-    
-    if (/\s/.test(char)) {
-      if (char === "\n" || char === "\r" || char === "\u2028" || char === "\u2029") endsWithNewline = true;
-      i++;
-      continue;
-    }
-    
-    if (char === "\/" && text[i+1] === "\/") {
-      let start = i;
-      while(i < len && text[i] !== "\n" && text[i] !== "\r" && text[i] !== "\u2028" && text[i] !== "\u2029") i++;
-      let commentText = text.substring(start, i);
-      if (preserveComments === "license" && (commentText.includes("/*!") || commentText.includes("@license") || commentText.includes("@preserve"))) {
-         if (out.length > 0 && lastCharEmitted !== "\n") { out += "\n"; lines++; }
-         out += commentText;
-         out += "\n";
-         lines++;
-         lastCharEmitted = "\n";
-         commentsCount++;
-      }
-      endsWithNewline = true;
-      continue;
-    }
-    
-    if (char === "\/" && text[i+1] === "*") {
-      let start = i;
-      i += 2;
-      let closed = false;
-      while(i < len - 1) {
-         if (text[i] === "*" && text[i+1] === "\/") {
-            closed = true;
-            i += 2;
-            break;
-         }
-         if (text[i] === "\n") endsWithNewline = true;
-         i++;
-      }
-      if (!closed) {
-         diagnosticsCount++;
-         annotations.push({ code: "js.unterminated-comment", severity: "warning", message: "unterminated block comment", offset: start });
-         i = len;
-      }
-      let commentText = text.substring(start, i);
-      if (preserveComments === "license" && (commentText.includes("/*!") || commentText.includes("@license") || commentText.includes("@preserve"))) {
-         if (out.length > 0 && lastCharEmitted !== "\n" && out[out.length-1] !== " ") out += " ";
-         out += commentText;
-         lastCharEmitted = commentText[commentText.length - 1];
-         commentsCount++;
-      }
-      continue;
-    }
-    
-    if (char === "\/" && canRegexFollow(lastType, lastValue)) {
-      let start = i;
-      i++;
-      let inClass = false;
-      let closed = false;
-      while(i < len) {
-        if (text[i] === "\\") { i += 2; continue; }
-        if (text[i] === "[") inClass = true;
-        if (text[i] === "]") inClass = false;
-        if (text[i] === "\/" && !inClass) { i++; closed = true; break; }
-        if (text[i] === "\n" || text[i] === "\r") break;
-        i++;
-      }
-      if (!closed) {
-         diagnosticsCount++;
-         annotations.push({ code: "js.unterminated-regex", severity: "warning", message: "unterminated regex", offset: start });
-      } else {
-         while (i < len && /[a-zA-Z]/.test(text[i])) i++;
-      }
-      emit(text.substring(start, i), "regex");
-      regexesCount++;
-      continue;
-    }
-    
-    if (char === "\"" || char === "'") {
-      let quote = char;
-      let start = i;
-      i++;
-      let closed = false;
-      while(i < len) {
-        if (text[i] === "\\") { i += 2; continue; }
-        if (text[i] === quote) { i++; closed = true; break; }
-        if (text[i] === "\n" || text[i] === "\r") break;
-        i++;
-      }
-      if (!closed) {
-         diagnosticsCount++;
-         annotations.push({ code: "js.unterminated-string", severity: "warning", message: "unterminated string", offset: start });
-      }
-      emit(text.substring(start, i), "string");
-      stringsCount++;
-      continue;
-    }
-    
-    if (char === "`") {
-      let start = i;
-      i++;
-      out += (out.length > 0 && needsSpace(lastCharEmitted, "`") ? " `" : "`");
-      lastCharEmitted = "`";
-      lastType = "template";
-      stack.push("TEMPLATE");
-      continue;
-    }
-    
-    if (char === "{") {
-       braceDepth++;
-       emit("{", "punct");
-       i++;
-       continue;
-    }
-    if (char === "}") {
-       braceDepth--;
-       emit("}", "punct");
-       if (braceStack.length > 0 && braceDepth === braceStack[braceStack.length - 1]) {
-          braceStack.pop();
-          stack.push("TEMPLATE");
-          lastType = "template";
-       }
-       i++;
-       continue;
-    }
-    
-    if (/[a-zA-Z_$]/.test(char)) {
-      let start = i;
-      while(i < len && /[a-zA-Z0-9_$]/.test(text[i])) i++;
-      let val = text.substring(start, i);
-      let type = regexKeywords.has(val) ? "keyword" : "id";
-      emit(val, type);
-      continue;
-    }
-    
-    if (/[0-9]/.test(char) || (char === "." && /[0-9]/.test(text[i+1]))) {
-      let start = i;
-      while(i < len && /[0-9.a-zA-Z_]/.test(text[i])) i++;
-      emit(text.substring(start, i), "num");
-      continue;
-    }
-    
-    const operators = [">>>=", "<<<=", "===", "!==", "**=", ">>=", "<<=", "&&=", "||=", "??=", ">>>", "<<<", "++", "--", "**", "==", "!=", ">=", "<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "&&", "||", "??", "=>", "+", "-", "*", "/", "%", "&", "|", "^", "!", "~", "?", ":", "=", "<", ">"];
-    let matchedOp = null;
-    for (let op of operators) {
-       if (text.startsWith(op, i)) {
-          matchedOp = op;
-          break;
-       }
-    }
-    if (matchedOp) {
-       emit(matchedOp, "op");
-       i += matchedOp.length;
-       continue;
-    }
-    
-    emit(char, "punct");
-    i++;
-  }
-  
-  if (out.length > 0 && out[out.length - 1] === "\n") {
-    lines--;
-  }
-  
-  return {
-    out,
-    tokens,
-    lines,
-    comments: commentsCount,
-    strings: stringsCount,
-    templates: templatesCount,
-    regexes: regexesCount,
-    diagnosticsCount,
-    annotations
-  };
+  return emit(context, formatted, { ...counts(parsed), diagnostics: 0, verified: true });
 }

@@ -30,7 +30,7 @@ the webview worker engine (see
 | DU-12 | Text diff | `text.compare` | rust | usable |
 | DU-13 | HTML beautify/minify | `format.html` | js | usable |
 | DU-14 | CSS beautify/minify | `format.css` | js | usable |
-| DU-15 | JavaScript beautify/minify | `format.js` | js | usable; beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`), minify is comment and whitespace removal |
+| DU-15 | JavaScript beautify/minify | `format.js` | js | usable; code read by vendored `acorn` 8.18.0, beautify via vendored `js-beautify` 2.0.3 (`packages/vendor/`); both check their output parses to the same syntax tree |
 | DU-16 | XML beautify/minify | `format.xml` | js | usable |
 | DU-17 | YAML to JSON | `convert.yaml-json` | js | usable |
 | DU-18 | JSON to YAML | `convert.json-yaml` | js | usable |
