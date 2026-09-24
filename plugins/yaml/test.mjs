@@ -200,6 +200,27 @@ test("every AG-130 number lexeme round-trips through the full pipeline as exact,
   }
 });
 
+// Found verifying AG-130, against YAML 1.2.2 §10.3.2's own table: hex and octal take no sign,
+// and .inf / .nan have exactly three spellings each. [lexeme, the core schema's type]
+const CORE_SCHEMA_EDGES = [
+  ["-0x1F", "str"], ["+0x1F", "str"], ["-0o17", "str"], ["0X1F", "str"], ["0O17", "str"],
+  [".inf", "floatSpecial"], [".Inf", "floatSpecial"], [".INF", "floatSpecial"], ["+.Inf", "floatSpecial"], ["-.INF", "floatSpecial"],
+  [".iNf", "str"], ["inf", "str"],
+  [".nan", "floatSpecial"], [".NaN", "floatSpecial"], [".NAN", "floatSpecial"], [".Nan", "str"], ["-.nan", "str"],
+];
+
+test("hex, octal, inf and nan resolve exactly as the core schema's table says", async () => {
+  for (const [lexeme, kind] of CORE_SCHEMA_EDGES) assert.equal(classifyPlainScalar(lexeme).t, kind, lexeme);
+  // A string that is a number to a conforming reader must be quoted on the way back to YAML,
+  // or that reader loads it as infinity.
+  for (const text of [".Inf", ".NAN", "-0x1F"]) {
+    const yaml = await expectOk("convert.json-yaml", JSON.stringify({ a: text }));
+    const back = await expectOk("convert.yaml-json", yaml.text, { options: { indent: "minified" } });
+    assert.equal(back.text, JSON.stringify({ a: text }), `${text} -> ${JSON.stringify(yaml.text)}`);
+    assert.match(yaml.text, /a: "/, `${text} must be written quoted`);
+  }
+});
+
 // ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------

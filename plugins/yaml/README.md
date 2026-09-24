@@ -54,8 +54,10 @@ YAML-specific tool holds documents to that rule.
 **Scalar typing** (YAML 1.2 core schema, plain scalars only — a quoted
 scalar is always a string): empty, `~`, `null`/`Null`/`NULL` → JSON `null`;
 `true`/`True`/`TRUE`/`false`/`False`/`FALSE` → boolean; decimal, `0x`
-(hex) and `0o` (octal) integers → a JSON number, converted to decimal;
-`.inf`/`-.inf`/`.nan` (case-sensitive, matching the core schema) → JSON
+(hex) and `0o` (octal) integers → a JSON number, converted to decimal (hex
+and octal take no sign, so `-0x10` is a string, as the core schema's table
+says); `.inf`/`.Inf`/`.INF` with an optional sign, and `.nan`/`.NaN`/`.NAN`
+(exactly the core schema's spellings, so `.iNf` is a string) → JSON
 `null`, plus an `info` diagnostic (`yaml.float-special`) since JSON has no
 such value; every other float lexeme is normalized just enough to be valid
 JSON (`.5` → `0.5`, `1.` → `1.0`, and a leading zero before another digit in

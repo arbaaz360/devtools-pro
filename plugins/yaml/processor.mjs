@@ -167,8 +167,12 @@ function trimTrailing(bytes, start, end) {
 // ---------------------------------------------------------------------------
 
 const RE_INT_DEC = /^[-+]?[0-9]+$/;
-const RE_INT_HEX = /^-?0x[0-9a-fA-F]+$/;
-const RE_INT_OCT = /^-?0o[0-7]+$/;
+// The core schema's hex and octal forms take no sign: `-0x1F` is a string (YAML 1.2.2 §10.3.2).
+const RE_INT_HEX = /^0x[0-9a-fA-F]+$/;
+const RE_INT_OCT = /^0o[0-7]+$/;
+// Three spellings each, as the core schema lists them; `.iNf` is a string.
+const RE_INF = /^[-+]?(?:\.inf|\.Inf|\.INF)$/;
+const RE_NAN = /^(?:\.nan|\.NaN|\.NAN)$/;
 const RE_FLOAT = /^[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)(?:[eE][-+]?[0-9]+)?$/;
 
 function makeInt(text) {
@@ -212,8 +216,8 @@ export function classifyPlainScalar(text) {
   if (/^(?:true|True|TRUE)$/.test(text)) return { t: "bool", v: true };
   if (/^(?:false|False|FALSE)$/.test(text)) return { t: "bool", v: false };
   if (RE_INT_DEC.test(text) || RE_INT_HEX.test(text) || RE_INT_OCT.test(text)) return makeInt(text);
-  if (/^[-+]?\.inf$/.test(text)) return { t: "floatSpecial", kind: text.startsWith("-") ? "-inf" : "inf" };
-  if (/^\.nan$/.test(text)) return { t: "floatSpecial", kind: "nan" };
+  if (RE_INF.test(text)) return { t: "floatSpecial", kind: text.startsWith("-") ? "-inf" : "inf" };
+  if (RE_NAN.test(text)) return { t: "floatSpecial", kind: "nan" };
   if (RE_FLOAT.test(text) && /[.eE]/.test(text)) return { t: "float", text: normalizeFloat(text) };
   return { t: "str", v: text };
 }

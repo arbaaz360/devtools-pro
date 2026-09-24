@@ -100,7 +100,13 @@ test("oracle test: SQLite parity", async () => {
     "SELECT 1 <> 2 AS n;",
     "SELECT 1 <= 2 AS n;",
     "SELECT 1 >= 2 AS n;",
-    "SELECT 1 -- kept comment \n + 2 AS n;"
+    "SELECT 1 -- kept comment \n + 2 AS n;",
+    // Found verifying AG-128: an upper-case hex prefix, and Beautify joining two strings
+    // into one (`'a' 'b'` is the string a aliased b; `'a''b'` is the string a'b).
+    "SELECT 0X1f AS n;",
+    "SELECT 'a' 'b';",
+    "SELECT 'a''b' 'c';",
+    "SELECT 'x' AS \"q\", 'y' \"r\";"
   ];
 
   for (const query of corpus) {

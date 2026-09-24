@@ -74,6 +74,18 @@ const ALL_KEYWORDS = new Set([
   "EXISTS", "CAST", "ASC", "DESC", "PRIMARY", "KEY", "INT", "VARCHAR", "CONSTRAINT", "FOREIGN", "REFERENCES", "DEFAULT", "UNIQUE", "INDEX"
 ]);
 
+const QUIET = { cancellation: { isCancelled: () => false } };
+
+/**
+ * Whether printing `next` straight after `prev` lexes differently from the two tokens:
+ * `-` then `-` opens a comment, `'a'` then `'b'` is one string with an escaped quote,
+ * `<` then `>` is `<>`. Minify and Beautify both ask before they join two tokens.
+ */
+function joinChangesTokens(prev, next, dialect) {
+  const joined = tokenize(prev + next, dialect, QUIET).tokens;
+  return joined.length !== 2 || joined[0].value !== prev || joined[1].value !== next;
+}
+
 function tokenize(text, dialect, context) {
   const tokens = [];
   let i = 0;
@@ -183,7 +195,7 @@ function tokenize(text, dialect, context) {
       continue;
     }
 
-    let numMatch = text.substring(i).match(/^(0x[0-9a-fA-F]+|[0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?|\.[0-9]+([eE][+-]?[0-9]+)?)/);
+    let numMatch = text.substring(i).match(/^(0[xX][0-9a-fA-F]+|[0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?|\.[0-9]+([eE][+-]?[0-9]+)?)/);
     if (numMatch) {
       let start = i;
       i += numMatch[0].length;
@@ -261,8 +273,6 @@ function processTokens(tokens, options, isMinify, context) {
 
       let needsSpace = false;
       if (lastToken) {
-          let combined = lastToken.value + t.value;
-
           let lastType = lastToken.type;
           let currType = t.type;
 
@@ -273,13 +283,8 @@ function processTokens(tokens, options, isMinify, context) {
           if ((lastType === 'number' && !currIsQuoted && (currType === 'identifier' || currType === 'keyword' || currType === 'number' || (currType === 'operator' && /^[a-zA-Z]/.test(t.value)))) ||
               ((lastType === 'identifier' || lastType === 'keyword') && !lastIsQuoted && !currIsQuoted && (currType === 'identifier' || currType === 'keyword' || currType === 'number' || (currType === 'operator' && /^[a-zA-Z]/.test(t.value))))) {
              needsSpace = true;
-          } else {
-             let testRes = tokenize(combined, options.dialect, { cancellation: { isCancelled: () => false } });
-             if (testRes.tokens.length !== 2 ||
-                 testRes.tokens[0].value !== lastToken.value ||
-                 testRes.tokens[1].value !== t.value) {
-               needsSpace = true;
-             }
+          } else if (joinChangesTokens(lastToken.value, t.value, options.dialect)) {
+             needsSpace = true;
           }
       }
 
@@ -333,6 +338,8 @@ function processTokens(tokens, options, isMinify, context) {
   }
 
   let out = "";
+  // The last token printed with nothing after it yet: the join check's left side.
+  let lastPrinted = null;
   let indentLevel = 0;
   let newlinesToEmit = 0;
   let inSelectList = false;
@@ -413,6 +420,7 @@ function processTokens(tokens, options, isMinify, context) {
       }
 
       out += t.value;
+      lastPrinted = null;
       if (t.isLineComment) emitNewline();
       continue;
     }
@@ -498,6 +506,9 @@ function processTokens(tokens, options, isMinify, context) {
            }
         }
       }
+      // Layout never decides meaning: a pair the style would print touching is still
+      // separated when touching lexes differently (`'a' 'b'` must not become `'a''b'`).
+      if (!needsSpace && lastPrinted !== null && out.endsWith(lastPrinted) && joinChangesTokens(lastPrinted, getCase(t), options.dialect)) needsSpace = true;
       if (needsSpace) out += ' ';
     }
 
@@ -510,6 +521,7 @@ function processTokens(tokens, options, isMinify, context) {
     }
 
     out += getCase(t);
+    lastPrinted = getCase(t);
 
     // AFTER PRINTING
     if (t.type === 'keyword' && t.upper === 'CASE') {
