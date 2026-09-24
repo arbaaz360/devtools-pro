@@ -154,3 +154,52 @@ test("Explicit interpretation match: iso valid", async () => {
   const isoValid = await run({ interpretation: "iso" }, { input: "2024-02-29T12:00:00Z" });
   assert.equal(isoValid.value.interpretation, "iso");
 });
+
+
+test("Calendar invariants and ISO 8601 week rules across edge-case years", async () => {
+  function isLeap(y) { return (y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0); }
+  function daysInMonths(y) { return [31, isLeap(y) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; }
+  function getDayOfYear(y, m, d) {
+    let days = 0; const dims = daysInMonths(y);
+    for (let i = 0; i < m - 1; i++) days += dims[i];
+    return days + d;
+  }
+  function weekday(y, m, d) {
+    const date = new Date(0); date.setUTCFullYear(y, m - 1, d); return date.getUTCDay();
+  }
+  function getIsoWeek(y, m, d) {
+    const dow = weekday(y, m, d) || 7;
+    const date = new Date(0); date.setUTCFullYear(y, m - 1, d + 4 - dow);
+    const isoYear = date.getUTCFullYear();
+    const t = new Date(0); t.setUTCFullYear(isoYear, 0, 1);
+    const firstDow = t.getUTCDay() || 7;
+    let firstThursdayDiff = 4 - firstDow;
+    if (firstThursdayDiff < 0) firstThursdayDiff += 7;
+    const jan1 = new Date(0); jan1.setUTCFullYear(isoYear, 0, 1);
+    const diffDays = Math.floor((date - jan1) / 86400000);
+    const week1MondayDayOfYear = (1 + firstThursdayDiff) - 3;
+    return Math.floor((diffDays + 1 - week1MondayDayOfYear) / 7) + 1;
+  }
+
+  const years = [0, 1, 4, 99, 100, 400, 1900, 1970, 2000, 9999];
+  for (const y of years) {
+    const dates = [[1, 1], [12, 31]];
+    if (isLeap(y)) dates.push([2, 29]);
+
+    for (const [m, d] of dates) {
+      const yStr = String(y).padStart(4, "0");
+      const mStr = String(m).padStart(2, "0");
+      const dStr = String(d).padStart(2, "0");
+      const input = `${yStr}-${mStr}-${dStr}`;
+
+      const expectedLeapYear = isLeap(y);
+      const expectedDayOfYear = getDayOfYear(y, m, d);
+      const expectedIsoWeek = getIsoWeek(y, m, d);
+
+      const res = await run({}, { input });
+      assert.equal(res.value.leapYear, expectedLeapYear, `${input} leapYear expected ${expectedLeapYear} got ${res.value.leapYear}`);
+      assert.equal(res.value.dayOfYear, expectedDayOfYear, `${input} dayOfYear expected ${expectedDayOfYear} got ${res.value.dayOfYear}`);
+      assert.equal(res.value.isoWeek, expectedIsoWeek, `${input} isoWeek expected ${expectedIsoWeek} got ${res.value.isoWeek}`);
+    }
+  }
+});
