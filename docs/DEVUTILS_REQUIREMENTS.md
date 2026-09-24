@@ -199,6 +199,23 @@ bytes** while the document is unedited: a UTF-8 BOM, CRLF line ends and any othe
 bytes the editor does not show are part of what is hashed. Once the document is
 edited, the tool reads the edited text encoded as UTF-8, and the result says so.
 
+### Save keeps a file's conventions
+
+Decided 2026-09-25 on the third review (AST-026). An edit and a save change **what the
+user edited and nothing else**. Save writes a file's UTF-8 BOM back if it had one, and
+its line-ending style: CRLF files stay CRLF. A file with mixed endings gets its dominant
+one, and the *Saved* notice says so. A tab with no file of its own is saved as UTF-8
+with LF. (The editor itself holds LF text without a BOM; the conventions are applied on
+the way to disk, in `apps/desktop/src/workbench/fileConventions.ts`.)
+
+### JavaScript is read by a real parser
+
+Decided 2026-09-25 on the third review (AST-001). A hand-written tokenizer failed
+three reviews on input classes nobody listed (regex after `)`, templates, Unicode
+names). The JavaScript package reads code with **acorn** (vendored, MIT), and both
+operations accept their output only if it parses to the same syntax tree as the
+input; anything else is refused with a diagnostic.
+
 ### Plugins are trusted code, for now
 
 Packages are built into the app and reviewed before they ship; the worker engine

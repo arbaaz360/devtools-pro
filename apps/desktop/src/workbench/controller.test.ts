@@ -66,6 +66,8 @@ async function harness(t: TestContext) {
     /** Throw to make the host refuse the write. */
     saveDocument?: () => void;
     saveResult?: () => void;
+    /** The answer to "Save your changes?"; Discard unless a test says otherwise. */
+    closeAnswer?: "save" | "discard" | "cancel";
   } = {};
 
   function page(id: string, offset = 0): FileDocument {
@@ -184,7 +186,7 @@ async function harness(t: TestContext) {
   const controller = new WorkbenchController(api, {
     changed: () => undefined,
     notify: (message) => { notices.push(message); },
-    confirmClose: async () => "discard",
+    confirmClose: async () => effects.closeAnswer ?? "discard",
   });
   t.after(() => controller.dispose());
   await controller.initialize();
@@ -883,6 +885,45 @@ async function openedFile(h: Awaited<ReturnType<typeof harness>>, text: string, 
   await waitFor(() => h.controller.tab(id)?.text === text, "the opened file to become editable text");
   return { id, document };
 }
+
+test("closing with Save releases the file the save wrote, so Save As drafts do not pile up (AST-027)", async (t) => {
+  const h = await harness(t);
+  h.effects.closeAnswer = "save";
+  for (let n = 0; n < 3; n += 1) {
+    const id = h.newTab(`draft ${n}`);
+    h.effects.chooseDocument = () => `C:/work/draft-${n}.txt`;
+    assert.equal(await h.controller.close(id), true, `draft ${n} closes`);
+    // The mock host drops a released document from its registry, as the real one does.
+    await waitFor(
+      () => ![...h.documents.values()].some((entry) => entry.document.path === `C:/work/draft-${n}.txt`),
+      `the document draft ${n} was saved to, released on close`,
+    );
+  }
+  assert.equal(h.controller.state.tabs.length, 0, "and the tabs are gone");
+});
+
+test("Save writes a file's BOM and line endings back after an edit (AST-026)", async (t) => {
+  const h = await harness(t);
+  const document = h.register("hello\r\nworld\r\n", { path: "/mock/win.txt", name: "win.txt", encoding: "UTF-8 BOM" });
+  await h.controller.openPath(document.path);
+  const id = h.controller.state.activeId!;
+  await waitFor(() => h.controller.tab(id)?.text === "hello\r\nworld\r\n", "the opened file to become editable text");
+  // What the editor hands back: a textarea's value has LF, and the host dropped the BOM.
+  h.controller.edit(id, "hello!\nworld\n");
+  assert.equal(await h.controller.save(id), true);
+  assert.equal(h.creates.at(-1)!.text, "\uFEFFhello!\r\nworld\r\n");
+  assert.match(h.notices.at(-1)!, /^Saved \S+$/, "nothing to announce when nothing the user did not do changed");
+
+  // A file with both endings gets its dominant one, and the notice says so.
+  const mixed = h.register("a\r\nb\r\nc\n", { path: "/mock/mixed.txt", name: "mixed.txt" });
+  await h.controller.openPath(mixed.path);
+  const other = h.controller.state.activeId!;
+  await waitFor(() => h.controller.tab(other)?.text === "a\r\nb\r\nc\n", "the mixed file to open");
+  h.controller.edit(other, "a\nb\nc!\n");
+  assert.equal(await h.controller.save(other), true);
+  assert.equal(h.creates.at(-1)!.text, "a\r\nb\r\nc!\r\n");
+  assert.match(h.notices.at(-1)!, /line endings made CRLF throughout/);
+});
 
 test("Save writes back to the file a tab was opened from, without asking", async (t) => {
   const h = await harness(t);

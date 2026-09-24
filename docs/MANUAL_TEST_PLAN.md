@@ -182,6 +182,8 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-34 (suite) **[P1]** | Open A, edit, Ctrl+Shift+S to B; change B in Notepad; Ctrl+S; then open A | The save to B is refused and B keeps Notepad's text. Opening A shows A's own contents in its own tab, not the tab that now holds B |
 | DOC-35 (suite) | Open a file and hover its tab | The tooltip is the ordinary path (`C:\...\file.txt`), not the `\\?\C:\...` form |
 | DOC-36 (suite) **[P1]** | Type in a tab, press Ctrl+W, and while *Save your changes?* is open press Ctrl+PageUp, Ctrl+PageDown, Ctrl+Tab, Ctrl+S, Ctrl+N | Nothing happens behind the dialog: the same tab stays active, no tab opens, nothing is saved. Cancel then leaves the tab open and unsaved |
+| DOC-37 (suite) **[P1]** | Open a file saved with a UTF-8 BOM and CRLF line ends, change one word, Ctrl+S; then a file with mostly CRLF and one LF | The first file keeps its BOM and every CRLF, and only the word changed. The second has CRLF throughout, and the *Saved* notice says so |
+| DOC-38 (suite) | Seventy times: new tab, type, close it, choose *Save…* and a new file name | Every save and close works; the host never reports the 64-document limit while only a tab or two is open |
 | DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
@@ -808,6 +810,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | A11Y-07 | Text scaling at 125%/150% (Windows setting) | No clipped labels or overlapping controls |
 | A11Y-08 | Row D small window (640×520) | Every control is reachable, possibly via scrolling; nothing is unreachable |
 | A11Y-16 (suite) **[P1]** | Open three documents. Focus the active tab and press Left, Left, End, Home, Right; then, from the editor, press Ctrl+Tab and Ctrl+Shift+Tab (Ctrl+PageDown/PageUp too) | Arrows step through the tabs and Home/End jump, each showing the tab and moving focus onto it; Ctrl+Tab switches documents from anywhere and leaves focus in the editor |
+| A11Y-18 (suite) | Focus an inactive tab and press Enter; focus another and press Space | Each activates its tab, and focus stays on that tab, so the arrows keep working |
 | A11Y-17 (suite) | Inspect the accessibility tree (Accessibility Insights, or Narrator) with three tabs; move with the arrows | Every tab *controls* the document panel; the panel is *labelled by* the selected tab and follows the selection |
 | A11Y-09 | Ultrawide (row C) | The layout does not stretch controls absurdly; the result pane stays usable |
 | A11Y-10 | Colour check on the result state line | Success/failure is distinguishable without relying on colour alone (icon or words) |

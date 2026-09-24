@@ -27,6 +27,7 @@ import type {
   TabState,
   WorkspaceState,
 } from "./state";
+import { applyConventions, conventionsNotice, conventionsOf } from "./fileConventions.ts";
 import {
   bundledTools,
   defaultTool,
@@ -1138,9 +1139,11 @@ export class WorkbenchController {
         (await this.api.chooseDocumentOutput(tab.savedPath ?? own?.path ?? tab.name));
       if (!path) return false;
       let doc = tab.source;
+      // The editor holds LF text without a BOM; the file gets its own conventions back.
+      const conventions = conventionsOf(own);
       if (tab.text !== null) {
         snapshot = await this.api.createTextDocument(
-          tab.text,
+          applyConventions(tab.text, conventions),
           tab.name,
           snapshotFormat(tab),
         );
@@ -1153,7 +1156,7 @@ export class WorkbenchController {
       // from be opened again as itself rather than finding this tab.
       this.dispatch({ type: "saved", id, text: tab.text, path: saved.path, source: saved });
       if (tab.source && tab.source.id !== saved.id) this.retire(tab.source.id);
-      this.hooks.notify(`Saved ${displayPath(saved.path)}`);
+      this.hooks.notify(`Saved ${displayPath(saved.path)}${tab.text !== null ? conventionsNotice(conventions) : ""}`);
       return true;
     } catch (error) {
       // A failed save is not a failed tool run: the result and the edits stay.
@@ -1219,9 +1222,13 @@ export class WorkbenchController {
         )
           return false;
       }
+      // A save above binds the tab to the file it wrote, so the document to release is
+      // the one the tab has now, not the one it had when close began: releasing that
+      // stale one leaked every Save As destination until the 64-document limit (AST-027).
+      const source = this.tab(id)?.source ?? tab.source;
       this.invalidate(id);
       this.dispatch({ type: "close", id });
-      if (tab.source) this.retire(tab.source.id);
+      if (source) this.retire(source.id);
       return true;
     } finally {
       this.closing.delete(id);

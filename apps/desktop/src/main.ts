@@ -261,7 +261,9 @@ function renderTabs() {
     button.onkeydown = (event) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        controller.activate(tab.id);
+        // The same path as the arrows: activating re-renders the strip, and focus has to
+        // come back to the tab or it lands in the editor (AST-028).
+        selectTabFromKeyboard(tab.id, true);
         return;
       }
       const target = neighbourTab(tab.id, event.key);

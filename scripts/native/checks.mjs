@@ -847,6 +847,91 @@ export const checks = [
     },
   },
   {
+    // AST-026: an edit and a save keep what the edit did not touch. The oracle is the file's
+    // own bytes: a BOM and CRLFs go back as they came; a mixed file gets its dominant ending
+    // and the notice says so.
+    id: "DOC-37",
+    async run({ driver, page }) {
+      const bom = Buffer.from([0xef, 0xbb, 0xbf]);
+      const file = freshFile("bom-crlf.txt", Buffer.concat([bom, Buffer.from("hello\r\nworld\r\n")]));
+      await driver.openPath(file);
+      await driver.setInput("hello!\nworld\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const status = await statusStarting(driver, "Saved");
+      const bytes = await driver.until(() => {
+        const now = readFileSync(file);
+        return now.includes(Buffer.from("hello!")) ? now : null;
+      });
+      const expected = Buffer.concat([bom, Buffer.from("hello!\r\nworld\r\n")]);
+      const mixed = freshFile("mixed-endings.txt", "a\r\nb\r\nc\n");
+      await driver.openPath(mixed);
+      await driver.setInput("a\nb\nc!\n");
+      await clearStatus(driver);
+      await page.locator("#preview").press("Control+s");
+      const mixedStatus = await statusStarting(driver, "Saved");
+      const mixedBytes = await driver.until(() => (read(mixed)?.includes("c!") ? read(mixed) : null));
+      const ok = bytes?.equals(expected) && mixedBytes === "a\r\nb\r\nc!\r\n" && /CRLF throughout/.test(mixedStatus ?? "") && !/throughout/.test(status ?? "");
+      return verdict(ok, `BOM+CRLF file after edit: ${bytes?.toString("hex")} (want ${expected.toString("hex")}); mixed file: ${JSON.stringify(mixedBytes)}, notice "${mixedStatus}"`);
+    },
+  },
+  {
+    // AST-027: closing a tab with Save releases the file the save wrote. Every cycle used to
+    // leave one host document behind, so the 65th reached the 64-document limit while the
+    // window showed one tab; that save then failed with the draft still open.
+    id: "DOC-38",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      // More cycles than the host holds documents, whatever this run already has open: a
+      // check that stops at exactly 64 passes on a leak when it starts from none.
+      const cycles = 72;
+      let completed = 0, failure = null;
+      for (let n = 0; n < cycles && !failure; n += 1) {
+        const before = await page.locator("#tabs .tab").count();
+        await driver.newTab();
+        await driver.setInput(`draft ${n}`);
+        await driver.presetDialogPaths([freshFile(`close-save-${String(n).padStart(2, "0")}.txt`)]);
+        await clearStatus(driver);
+        await page.locator(".tab-wrap.active .tab-close").click();
+        await driver.until(async () => page.locator("#unsaved-dialog").isVisible(), { timeout: 3000 });
+        await page.locator("#unsaved-save").click();
+        const status = await nextStatus(driver);
+        const closed = await driver.until(async () => (await page.locator("#tabs .tab").count()) === before, { timeout: 3000 });
+        if (!/^Saved /.test(status ?? "") || !closed) failure = `cycle ${n}: "${status}"`;
+        else completed += 1;
+      }
+      await driver.presetDialogPaths([]);
+      if (await page.locator("#unsaved-dialog").isVisible()) await page.locator("#unsaved-cancel").click();
+      return verdict(!failure && completed === cycles, failure ?? `${completed} drafts saved and closed; the last save still worked`);
+    },
+  },
+  {
+    // AST-028: Enter and Space activate the focused tab and leave focus on it (WAI-ARIA
+    // tabs), as the arrows do; activating re-renders the strip, which had dropped focus
+    // into the editor.
+    id: "A11Y-18",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const probe = async (key, index) => {
+        await page.locator("#tabs .tab").nth(index).focus();
+        await page.keyboard.press(key);
+        return page.evaluate(() => {
+          const tabs = [...document.querySelectorAll("#tabs .tab")];
+          return {
+            active: tabs.findIndex((tab) => tab.getAttribute("aria-selected") === "true"),
+            focused: tabs.indexOf(document.activeElement),
+            element: document.activeElement?.id || document.activeElement?.tagName,
+          };
+        });
+      };
+      const enter = await probe("Enter", 0);
+      const space = await probe(" ", 1);
+      const ok = enter.active === 0 && enter.focused === 0 && space.active === 1 && space.focused === 1;
+      return verdict(ok, `Enter on tab 0 -> active ${enter.active}, focus ${enter.focused} (${enter.element}); Space on tab 1 -> active ${space.active}, focus ${space.focused} (${space.element})`);
+    },
+  },
+  {
     id: "TL-NUMBASE-01",
     async run({ driver }) {
       // Exercises the option controls too: the defaults would answer this one by accident.
