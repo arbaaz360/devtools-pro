@@ -77,6 +77,42 @@ const ALL_KEYWORDS = new Set([
 const QUIET = { cancellation: { isCancelled: () => false } };
 
 /**
+ * Beautify's output. It used to be a string grown with `+=`, which V8 keeps as a rope, and
+ * Beautify reads its last character before every token and trims its end before every line
+ * break: each read flattened the whole rope, and a `/[ \t]+$/` trim scanned it from the
+ * start. Once per token, that was quadratic (a 432 KB script took 54 s against a 5 s
+ * deadline). Pieces stay in an array; the tail is read from the last pieces.
+ */
+class Output {
+  constructor() { this.parts = []; this.length = 0; }
+  push(text) {
+    if (!text) return;
+    this.parts.push(text);
+    this.length += text.length;
+  }
+  /** The last `count` characters, or fewer if there are fewer. */
+  tail(count) {
+    let text = "";
+    for (let i = this.parts.length - 1; i >= 0 && text.length < count; i -= 1) text = this.parts[i] + text;
+    return text.slice(-count);
+  }
+  lastChar() { return this.tail(1); }
+  endsWith(text) { return this.tail(text.length) === text; }
+  /** Drop trailing spaces and tabs. */
+  trimTrailingBlanks() {
+    while (this.parts.length) {
+      const last = this.parts[this.parts.length - 1];
+      let end = last.length;
+      while (end > 0 && (last[end - 1] === " " || last[end - 1] === "\t")) end -= 1;
+      this.length -= last.length - end;
+      if (end > 0) { this.parts[this.parts.length - 1] = last.slice(0, end); return; }
+      this.parts.pop();
+    }
+  }
+  toString() { return this.parts.join(""); }
+}
+
+/**
  * Whether printing `next` straight after `prev` lexes differently from the two tokens:
  * `-` then `-` opens a comment, `'a'` then `'b'` is one string with an escaped quote,
  * `<` then `>` is `<>`. Minify and Beautify both ask before they join two tokens.
@@ -304,6 +340,9 @@ function processTokens(tokens, options, isMinify, context) {
       cleanTokens.push({ token: tokens[i], origIndex: i, cleanIndex: cleanTokens.length });
     }
   }
+  // Looked up once per token below; a linear find there made Beautify quadratic
+  // (a 432 KB script took 54 s against a 5 s deadline).
+  const cleanByOrigin = new Map(cleanTokens.map((ct) => [ct.origIndex, ct]));
 
   const MAJOR_CLAUSES = [
     ["LEFT", "OUTER", "JOIN"], ["RIGHT", "OUTER", "JOIN"], ["FULL", "OUTER", "JOIN"],
@@ -337,7 +376,7 @@ function processTokens(tokens, options, isMinify, context) {
     }
   }
 
-  let out = "";
+  const out = new Output();
   // The last token printed with nothing after it yet: the join check's left side.
   let lastPrinted = null;
   let indentLevel = 0;
@@ -407,25 +446,25 @@ function processTokens(tokens, options, isMinify, context) {
       if (wasNewline) {
         emitNewline();
       } else {
-        if (out.length > 0 && out[out.length - 1] !== ' ' && out[out.length - 1] !== '\n') {
-          out += ' ';
+        if (out.length > 0 && out.lastChar() !== ' ' && out.lastChar() !== '\n') {
+          out.push(' ');
         }
       }
 
       if (newlinesToEmit > 0) {
-        out = out.replace(/[ \t]+$/, '');
-        for (let k = 0; k < newlinesToEmit; k++) out += '\n';
-        out += indentStr.repeat(Math.max(0, indentLevel));
+        out.trimTrailingBlanks();
+        for (let k = 0; k < newlinesToEmit; k++) out.push('\n');
+        out.push(indentStr.repeat(Math.max(0, indentLevel)));
         newlinesToEmit = 0;
       }
 
-      out += t.value;
+      out.push(t.value);
       lastPrinted = null;
       if (t.isLineComment) emitNewline();
       continue;
     }
 
-    let ct = cleanTokens.find(c => c.origIndex === i);
+    let ct = cleanByOrigin.get(i);
     let isMajor = ct && ct.majorClause !== undefined && !ct.isPartOfMajorClause;
 
     if (isMajor) {
@@ -478,7 +517,7 @@ function processTokens(tokens, options, isMinify, context) {
 
     // Add necessary spacing before token
     if (out.length > 0 && newlinesToEmit === 0) {
-      let lastChar = out[out.length - 1];
+      let lastChar = out.lastChar();
       let needsSpace = false;
       if (lastChar !== ' ' && lastChar !== '\n' && lastChar !== '(' && lastChar !== '[' && t.value !== ')' && t.value !== ',' && t.value !== ';') {
         let prevCt = cleanTokens[ct.cleanIndex - 1];
@@ -509,18 +548,18 @@ function processTokens(tokens, options, isMinify, context) {
       // Layout never decides meaning: a pair the style would print touching is still
       // separated when touching lexes differently (`'a' 'b'` must not become `'a''b'`).
       if (!needsSpace && lastPrinted !== null && out.endsWith(lastPrinted) && joinChangesTokens(lastPrinted, getCase(t), options.dialect)) needsSpace = true;
-      if (needsSpace) out += ' ';
+      if (needsSpace) out.push(' ');
     }
 
     // Custom emitWhitespace to include extraIndent
     if (newlinesToEmit > 0) {
-      out = out.replace(/[ \t]+$/, '');
-      for (let k = 0; k < newlinesToEmit; k++) out += '\n';
-      out += indentStr.repeat(Math.max(0, indentLevel + extraIndent));
+      out.trimTrailingBlanks();
+      for (let k = 0; k < newlinesToEmit; k++) out.push('\n');
+      out.push(indentStr.repeat(Math.max(0, indentLevel + extraIndent)));
       newlinesToEmit = 0;
     }
 
-    out += getCase(t);
+    out.push(getCase(t));
     lastPrinted = getCase(t);
 
     // AFTER PRINTING
@@ -568,7 +607,7 @@ function processTokens(tokens, options, isMinify, context) {
     }
   }
 
-  return { output: out.trimEnd(), statements };
+  return { output: out.toString().trimEnd(), statements };
 }
 
 export async function execute(request, context) {

@@ -75,6 +75,17 @@ test("a cancelled token rejects both operations before any output, even for an e
   }
 });
 
+test("Beautify is linear in its input: 432 KB well inside the 5 s deadline", async () => {
+  // It was quadratic (a string read and trimmed at its end once per token): this input
+  // took 54 s. Linear, it takes about a tenth of a second; the bound leaves room for CI.
+  const text = "SELECT a, b + 1 AS c FROM t WHERE x = 'y' AND z <> 2;\n".repeat(8000);
+  const started = performance.now();
+  const result = await run("beautify", {}, text, { limits: { ...defaultLimits(), maxOutputBytes: 8 << 20, maxChunkBytes: 8 << 20 } });
+  const elapsed = performance.now() - started;
+  assert.ok(result.text.length > text.length, "beautify produced its output");
+  assert.ok(elapsed < 3000, `beautify of ${text.length} bytes took ${Math.round(elapsed)} ms`);
+});
+
 test("oracle test: SQLite parity", async () => {
   const { DatabaseSync } = await import("node:sqlite");
   const db = new DatabaseSync(":memory:");
