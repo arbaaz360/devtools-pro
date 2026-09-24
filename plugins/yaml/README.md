@@ -25,7 +25,8 @@ tokenizer, `JsonError` and `resolvePositions`, so both packages agree on
   (`yaml.trailing-comma`), not silently accepted.
 - Plain, single-quoted and double-quoted scalars. Double-quoted scalars
   support the JSON escapes (`\" \\ \/ \b \f \n \r \t \uXXXX`) plus `\x` (2
-  hex digits), `\U` (8 hex digits) and `\0`; a backslash immediately before a
+  hex digits), `\U` (8 hex digits), `\0`, and the rest of YAML 1.2's set
+  (`\a \v \e \N \_ \L \P`, an escaped space or tab); a backslash immediately before a
   line break escapes the break itself (no folding). Single- and
   double-quoted scalars may span physical lines; interior line breaks fold
   to a single space (two or more folds to `n-1` newlines), per YAML 1.2.
@@ -98,6 +99,14 @@ explicit indentation digit chosen so the string's exact trailing-newline
 count reproduces on the way back — never unconditionally `|-`, because that
 would lose a trailing newline the original string had.
 
+A block scalar is used only when every reader reads it back as the same
+string, and the string is double-quoted with escapes otherwise: when it holds
+a CR (readers normalise line breaks), a character YAML does not print or a
+YAML 1.1 reader takes for a line break (DEL, C1 controls, NEL, LS, PS), no
+line with content (clip chomping reads `"\n"` as `""`), or a line of only
+spaces or tabs. The reader keeps whitespace past a block's indentation as
+content, and understands every YAML 1.2 double-quoted escape.
+
 JSON number lexemes (exact digits, never routed through `Number`) are
 copied verbatim into the YAML output, so `1.2300` and
 `18446744073709551615` come back unchanged; a lexeme this parser would
@@ -136,10 +145,6 @@ checks before the read, between reader chunks and before the write.
 
 ## Known limitations
 
-- **Embedded literal `\r`.** A JSON string containing an embedded `\r` not
-  immediately followed by `\n` is not distinguished, on the way back, from a
-  CRLF line ending inside a literal block scalar's body; the round-trip
-  fixtures avoid this case rather than special-case it.
 - **No anchors, tags, multi-document streams.** Rejected outright (see
   above), never silently dropped, per the packet's scope.
 - **Compact nested sequence, one level only.** `- - a` (a sequence item
