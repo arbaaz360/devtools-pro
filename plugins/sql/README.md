@@ -6,6 +6,18 @@
 
 The tokenizer parses the input text into semantic tokens: `whitespace`, `comment` (single-line `--` or `#`, multi-line `/* */`), `string` (single-quoted, and dialect-specific double-quoted or backtick-quoted literals), `keyword`, `operator`, `punctuation` (like commas and parentheses), and `identifier`. It gracefully handles unterminated strings and comments, emitting `sql.unterminated-string` and `sql.unterminated-comment` warnings. It periodically checks for cancellation to prevent blocking on massive files.
 
+### What each dialect changes
+
+The `dialect` option decides how comments and quotes are read, because the same
+text means different things in different databases:
+
+| Dialect | Comments | Strings |
+|---|---|---|
+| `sql` (default) | `--` always starts a comment; `/* */` does not nest | `'...'` with `''` doubling; a backslash is plain text. `"..."` and `[...]` are identifiers |
+| `mysql`, `mariadb` | `--` starts a comment only when whitespace or a control character follows (`1--1` is 2); `#` starts one; `/*! ... */` (executed) and `/*+ ... */` (optimizer hints) are **kept by Minify** | `'...'` and `"..."` are strings with backslash escapes, as in the default SQL mode. ANSI_QUOTES is not modelled |
+| `postgresql` | block comments nest | `E'...'` takes backslash escapes, `'...'` does not; `$$...$$` and `$tag$...$tag$` are opaque (`$1` is a parameter) |
+| `plsql` | `/*+ ... */` hints are kept by Minify | `q'[...]'`, `q'{...}'`, `q'<...>'`, `q'(...)'` and `q'X...X'` are opaque |
+
 ## Beautify and Minify Rules
 
 **Beautify** restructures the token stream:

@@ -75,6 +75,41 @@ test("a cancelled token rejects both operations before any output, even for an e
   }
 });
 
+// AST-002 reopened: each dialect lexes by its own rules. No engine for these dialects runs
+// here, so the expected texts are written by hand from each one's documentation:
+// MySQL 8.0 manual 11.7 (comments: "--" needs a following space; /*! */ runs; /*+ */ hints)
+// and 11.1.1 (string literals: "..." is a string in the default mode; backslash escapes);
+// PostgreSQL 16 manual 4.1.2.2 (E'' strings), 4.1.2.4 (dollar quoting), 4.1.5 (nested
+// comments); Oracle 23 SQL Language Reference, Text Literals (q'[...]' quoting).
+const BS = String.fromCharCode(92);
+const DIALECT_CASES = [
+  // [dialect, source, exact Minify output, text Beautify must keep intact]
+  ["mysql", "SELECT 1--1 AS answer;", "SELECT 1- -1 AS answer;", null],
+  ["mariadb", "SELECT 1--1 AS answer;", "SELECT 1- -1 AS answer;", null],
+  ["mysql", "SELECT 1-- note\n+2 AS n;", "SELECT 1+2 AS n;", "-- note"],
+  ["mysql", `SELECT "a${BS}"  b" AS s;`, `SELECT"a${BS}"  b"AS s;`, `"a${BS}"  b"`],
+  ["mysql", `SELECT 'it${BS}'s -- x' AS s;`, `SELECT'it${BS}'s -- x'AS s;`, `'it${BS}'s -- x'`],
+  ["mysql", "SELECT /*!40001 SQL_NO_CACHE */ a FROM t;", "SELECT /*!40001 SQL_NO_CACHE */ a FROM t;", "/*!40001 SQL_NO_CACHE */"],
+  ["mysql", "SELECT /*+ BKA(t) */ a FROM t;", "SELECT /*+ BKA(t) */ a FROM t;", "/*+ BKA(t) */"],
+  ["plsql", "SELECT /*+ INDEX(t) */ a FROM t;", "SELECT /*+ INDEX(t) */ a FROM t;", "/*+ INDEX(t) */"],
+  ["plsql", "SELECT q'[it's -- here]' AS s FROM dual;", "SELECT q'[it's -- here]'AS s FROM dual;", "q'[it's -- here]'"],
+  ["postgresql", `SELECT E'a${BS}'  select b' AS s;`, `SELECT E'a${BS}'  select b'AS s;`, `E'a${BS}'  select b'`],
+  ["postgresql", "SELECT /* a /* b */ still comment */ 1 AS n;", "SELECT 1 AS n;", "/* a /* b */ still comment */"],
+  ["postgresql", "SELECT $tag$ a -- b $tag$ AS s, $1 AS p;", "SELECT $tag$ a -- b $tag$AS s,$1 AS p;", "$tag$ a -- b $tag$"],
+  // Standard SQL keeps its own rules: -- always starts a comment, backslash is plain text.
+  ["sql", "SELECT 1--1\n AS answer;", "SELECT 1 AS answer;", "--1"],
+];
+
+test("each dialect lexes comments and strings by its own rules (AST-002)", async () => {
+  for (const [dialect, source, minified, kept] of DIALECT_CASES) {
+    assert.equal((await run("minify", { dialect }, source)).text, minified, `${dialect} minify ${JSON.stringify(source)}`);
+    const beautified = (await run("beautify", { dialect }, source)).text;
+    if (kept) assert.ok(beautified.includes(kept), `${dialect} beautify keeps ${kept}: ${JSON.stringify(beautified)}`);
+  }
+  // Beautify keeps MySQL's two minus signs apart, as Minify does.
+  assert.doesNotMatch((await run("beautify", { dialect: "mysql" }, "SELECT 1--1 AS answer;")).text, /--/);
+});
+
 test("Beautify is linear in its input: 432 KB well inside the 5 s deadline", async () => {
   // It was quadratic (a string read and trimmed at its end once per token): this input
   // took 54 s. Linear, it takes about a tenth of a second; the bound leaves room for CI.
@@ -117,7 +152,9 @@ test("oracle test: SQLite parity", async () => {
     "SELECT 0X1f AS n;",
     "SELECT 'a' 'b';",
     "SELECT 'a''b' 'c';",
-    "SELECT 'x' AS \"q\", 'y' \"r\";"
+    "SELECT 'x' AS \"q\", 'y' \"r\";",
+    // Standard SQL (and SQLite): a backslash is plain text, so this string ends at \'.
+    `SELECT 'a${String.fromCharCode(92)}' AS x, 'b' AS y;`
   ];
 
   for (const query of corpus) {
