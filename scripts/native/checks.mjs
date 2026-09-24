@@ -986,6 +986,33 @@ export const checks = [
     },
   },
   {
+    // AG-134: the app's local time comes from WebView2's ICU (Intl.DateTimeFormat); this
+    // check asks Windows' own TimeZoneInfo for the same instant's machine-local offset and
+    // date-time, a path through neither WebView2 nor this package. Windows zone ids are not
+    // IANA names, so only the offset and date-time are compared, never the zone name.
+    id: "TL-TIME-08",
+    async run({ driver }) {
+      const windows = execFileSync("powershell.exe", [
+        "-NoProfile", "-NonInteractive", "-Command",
+        "[TimeZoneInfo]::ConvertTime([DateTimeOffset]::FromUnixTimeSeconds(1700000000), [TimeZoneInfo]::Local).ToString('yyyy-MM-ddTHH:mm:ss.fffzzz')",
+      ], { encoding: "utf8" }).trim();
+      const match = /^(.+?)([+-]\d{2}:\d{2})$/.exec(windows);
+      if (!match) return verdict(false, `PowerShell gave an unparsable time: ${windows}`);
+      const [, windowsDateTime, windowsOffset] = match;
+
+      await driver.tool("Unix Timestamp Converter", { text: "1700000000" });
+      await sleep(300);
+      const body = await driver.fullResult();
+      const local = /local: ([^\n]+)/.exec(body)?.[1];
+      const offset = /utcOffset: ([^\n]+)/.exec(body)?.[1];
+      if (!local || !offset) return verdict(false, `no local/utcOffset field in result: ${body.slice(0, 160)}`);
+      const appDateTime = local.slice(0, local.length - offset.length);
+
+      const ok = appDateTime === windowsDateTime && offset === windowsOffset;
+      return verdict(ok, `Windows: ${windowsDateTime}${windowsOffset}; app: ${appDateTime}${offset}`);
+    },
+  },
+  {
     id: "TL-UUID-04",
     async run({ driver }) {
       // RFC 4122 v5 of the DNS namespace + example.com, computed here, not read back.

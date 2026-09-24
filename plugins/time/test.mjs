@@ -10,11 +10,11 @@ const CLOCK = "2024-02-01T12:00:00.000Z";
 
 const text = bytes => new TextDecoder().decode(bytes);
 
-function harness(options, { input, clock = CLOCK, cancellation = new CancellationToken(), limits } = {}) {
+function harness(options, { input, clock = CLOCK, zone = "UTC", cancellation = new CancellationToken(), limits } = {}) {
   const reader = new MemoryReader();
   if (input !== undefined && input !== null) reader.insert("input", new TextEncoder().encode(input));
   const outputs = new MemoryOutputSink();
-  const context = new ProcessorContext(reader, outputs, cancellation, new FixedClock(clock), new SeededRandom(42), new MemorySecrets(), limits || {maxInputBytes: 4096});
+  const context = new ProcessorContext(reader, outputs, cancellation, new FixedClock(clock, zone), new SeededRandom(42), new MemorySecrets(), limits || {maxInputBytes: 4096});
   const request = { pluginId: manifest.id, toolId: manifest.tools[0].id, operationId: operation.id, options };
   return { outputs, reader, execute: () => execute(request, context) };
 }
@@ -202,4 +202,44 @@ test("Calendar invariants and ISO 8601 week rules across edge-case years", async
       assert.equal(res.value.isoWeek, expectedIsoWeek, `${input} isoWeek expected ${expectedIsoWeek} got ${res.value.isoWeek}`);
     }
   }
+});
+
+// Every expected `local` and `utcOffset` below is the packet's evidence table: computed
+// once with Node's ICU and once with Windows' own TimeZoneInfo, the two agreeing. They are
+// pasted as given, not recomputed with the code under test (docs/WORKER_PROTOCOL.md,
+// "Where an expected value comes from").
+test("Local time and offset across DST, half-hour and LMT zone boundaries", async () => {
+  const cases = [
+    ["America/New_York", "2024-03-10T06:59:59.999Z", "2024-03-10T01:59:59.999-05:00", "-05:00"],
+    ["America/New_York", "2024-03-10T07:00:00.000Z", "2024-03-10T03:00:00.000-04:00", "-04:00"],
+    ["America/New_York", "2024-11-03T05:59:59.000Z", "2024-11-03T01:59:59.000-04:00", "-04:00"],
+    ["America/New_York", "2024-11-03T06:00:00.000Z", "2024-11-03T01:00:00.000-05:00", "-05:00"],
+    ["Europe/London", "2024-03-31T00:59:59.000Z", "2024-03-31T00:59:59.000+00:00", "+00:00"],
+    ["Europe/London", "2024-03-31T01:00:00.000Z", "2024-03-31T02:00:00.000+01:00", "+01:00"],
+    ["Asia/Kolkata", "2023-11-14T22:13:20.000Z", "2023-11-15T03:43:20.000+05:30", "+05:30"],
+    ["Asia/Kathmandu", "2023-11-14T22:13:20.000Z", "2023-11-15T03:58:20.000+05:45", "+05:45"],
+    ["Australia/Lord_Howe", "2024-10-05T15:29:59.000Z", "2024-10-06T01:59:59.000+10:30", "+10:30"],
+    ["Australia/Lord_Howe", "2024-10-05T15:30:00.000Z", "2024-10-06T02:30:00.000+11:00", "+11:00"],
+    ["Pacific/Chatham", "2024-01-15T00:00:00.000Z", "2024-01-15T13:45:00.000+13:45", "+13:45"],
+    ["Pacific/Chatham", "2024-07-15T00:00:00.000Z", "2024-07-15T12:45:00.000+12:45", "+12:45"],
+    ["UTC", "0099-01-01T00:00:00.000Z", "0099-01-01T00:00:00.000+00:00", "+00:00"],
+    ["Asia/Kolkata", "1800-01-01T00:00:00.000Z", "1800-01-01T05:53:28.000+05:53:28", "+05:53:28"],
+  ];
+  for (const [zone, instant, expectedLocal, expectedOffset] of cases) {
+    const res = await run({ interpretation: "iso" }, { input: instant, zone });
+    assert.equal(res.value.timeZone, zone, `${zone} ${instant}: timeZone`);
+    assert.equal(res.value.utcOffset, expectedOffset, `${zone} ${instant}: utcOffset`);
+    assert.equal(res.value.local, expectedLocal, `${zone} ${instant}: local`);
+  }
+});
+
+test("Local time defaults to UTC when the clock names no other zone", async () => {
+  const res = await run({}, { input: "0" });
+  assert.equal(res.value.timeZone, "UTC");
+  assert.equal(res.value.utcOffset, "+00:00");
+  assert.equal(res.value.local, "1970-01-01T00:00:00.000+00:00");
+});
+
+test("An unknown time zone is a named error, not a silent UTC", async () => {
+  await rejects({}, { input: "0", zone: "Not/AZone" }, /Unknown time zone: Not\/AZone/);
 });

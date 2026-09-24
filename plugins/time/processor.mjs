@@ -145,7 +145,47 @@ function parseInput(input, interpretation) {
   }
 }
 
-function getOutputs(millis, nowISO) {
+/**
+ * The local wall-clock time and offset for `millis` in `timeZone`, read from `Intl`
+ * (never the host's own zone). `longOffset` gives whole-second precision, which the tz
+ * database needs for pre-1900s zones defined in local mean time (e.g. Asia/Kolkata's
+ * historical +05:53:28). The year is read back from the era so 1 BC round-trips as
+ * astronomical year 0, matching `isoUtc`'s extended-year convention.
+ */
+function formatLocal(millis, timeZone) {
+  let parts;
+  try {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      era: "short",
+      timeZoneName: "longOffset",
+    });
+    parts = Object.fromEntries(formatter.formatToParts(new Date(millis)).map((part) => [part.type, part.value]));
+  } catch {
+    throw new TimeError("invalid-timezone", `Unknown time zone: ${timeZone}`);
+  }
+
+  let year = parseInt(parts.year, 10);
+  if (parts.era === "BC") year = 1 - year;
+  const yearStr = (year < 0 ? "-" : "") + String(Math.abs(year)).padStart(4, "0");
+  const milliseconds = String(new Date(millis).getUTCMilliseconds()).padStart(3, "0");
+  const utcOffset = parts.timeZoneName.replace(/^GMT/, "") || "+00:00";
+
+  return {
+    timeZone,
+    utcOffset,
+    local: `${yearStr}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}.${milliseconds}${utcOffset}`,
+  };
+}
+
+function getOutputs(millis, nowISO, timeZone) {
   if (millis < -8640000000000000 || Math.ceil(millis) > 8640000000000000) {
     throw new TimeError("out-of-range", "Timestamp is outside the ECMAScript date range (±8,640,000,000,000,000 ms)");
   }
@@ -183,12 +223,17 @@ function getOutputs(millis, nowISO) {
   else relative = diffSecs < 0 ? `${Math.floor(abs/86400)} days ago` : `in ${Math.floor(abs/86400)} days`;
   if (diffSecs === 0) relative = "now";
 
+  const local = formatLocal(millis, timeZone);
+
   return {
     epochSeconds: millis / 1000,
     epochMilliseconds: millis,
     isoUtc,
     dateUtc,
     timeUtc,
+    timeZone: local.timeZone,
+    utcOffset: local.utcOffset,
+    local: local.local,
     weekday,
     dayOfYear,
     isoWeek,
@@ -266,7 +311,8 @@ export async function execute(request, context) {
     }
   }
 
-  const outputs = getOutputs(millis, nowISO);
+  const timeZone = context.clock.timeZone();
+  const outputs = getOutputs(millis, nowISO, timeZone);
 
   const resultObj = {
     ...outputs,

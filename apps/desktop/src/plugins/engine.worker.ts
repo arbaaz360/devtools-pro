@@ -112,7 +112,7 @@ async function run(request: RunRequest): Promise<RunOutcome> {
       new BytesReader(request.inputs, request.inputInfo ?? {}),
       sink,
       { isCancelled: () => false },
-      { now: () => new Date().toISOString() },
+      { now: () => new Date().toISOString(), timeZone: () => Intl.DateTimeFormat().resolvedOptions().timeZone },
       { id: "webcrypto", fill: (bytes) => void crypto.getRandomValues(bytes as Uint8Array<ArrayBuffer>) },
       { resolve: (handle) => { throw new Error(`secret handle ${handle} is unavailable`); } },
       request.limits,
