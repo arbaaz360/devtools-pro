@@ -25,7 +25,8 @@ tokenizer, `JsonError` and `resolvePositions`, so both packages agree on
   (`yaml.trailing-comma`), not silently accepted.
 - Plain, single-quoted and double-quoted scalars. Double-quoted scalars
   support the JSON escapes (`\" \\ \/ \b \f \n \r \t \uXXXX`) plus `\x` (2
-  hex digits), `\U` (8 hex digits) and `\0`; a backslash immediately before a
+  hex digits), `\U` (8 hex digits), `\0`, and the rest of YAML 1.2's set
+  (`\a \v \e \N \_ \L \P`, an escaped space or tab); a backslash immediately before a
   line break escapes the break itself (no folding). Single- and
   double-quoted scalars may span physical lines; interior line breaks fold
   to a single space (two or more folds to `n-1` newlines), per YAML 1.2.
