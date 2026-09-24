@@ -83,8 +83,8 @@ test("round trip: beautify -> minify -> beautify is byte-identical for well-form
 // Options: kebab-case ids, camelCase aliases, structured errors.
 // ---------------------------------------------------------------------------
 test("options: defaults, aliases and structured errors", () => {
-  assert.deepEqual(normalizeOptions(undefined), { indent: "sp2", indentUnit: "  ", preserveComments: true, collapseEmpty: true });
-  assert.deepEqual(normalizeOptions({ indent: "sp4", collapseEmpty: false }), { indent: "sp4", indentUnit: "    ", preserveComments: true, collapseEmpty: false });
+  assert.deepEqual(normalizeOptions(undefined), { indent: "sp2", indentUnit: "  ", preserveComments: true, collapseEmpty: true, trimText: false });
+  assert.deepEqual(normalizeOptions({ indent: "sp4", collapseEmpty: false }), { indent: "sp4", indentUnit: "    ", preserveComments: true, collapseEmpty: false, trimText: false });
   assert.equal(normalizeOptions({ "preserve-comments": false }).preserveComments, false);
   assert.equal(normalizeOptions({ preserveComments: false }).preserveComments, false);
   assert.equal(normalizeOptions({ "preserve-comments": true, preserveComments: true }).preserveComments, true);
@@ -209,4 +209,78 @@ test("source bytes are never mutated while tolerating every diagnostic category 
   const input = "<root><a b=unquoted>1 < 2 & 3<![CDATA[keep]]></a>garbage";
   const result = await expectOk("beautify", input);
   assert.ok(result.value.diagnostics >= 4, `expected several diagnostics, saw ${result.value.diagnostics}`);
+});
+
+
+// ---------------------------------------------------------------------------
+// Invariant test: XML leaf text is preserved
+// ---------------------------------------------------------------------------
+function extractLeafText(str) {
+  const leaves = [];
+  const stack = [];
+  let currentText = "";
+  for (let i = 0; i < str.length; ) {
+    if (str.startsWith("<!--", i)) {
+      if (currentText && stack.length > 0) stack[stack.length - 1].text.push(currentText);
+      currentText = "";
+      const end = str.indexOf("-->", i);
+      i = end === -1 ? str.length : end + 3;
+    } else if (str.startsWith("<![CDATA[", i)) {
+      if (currentText && stack.length > 0) stack[stack.length - 1].text.push(currentText);
+      currentText = "";
+      const end = str.indexOf("]]>", i);
+      const content = end === -1 ? str.slice(i + 9) : str.slice(i + 9, end);
+      if (stack.length > 0) stack[stack.length - 1].text.push(content);
+      i = end === -1 ? str.length : end + 3;
+    } else if (str.startsWith("<?", i) || (str.startsWith("<!", i) && !str.startsWith("<![CDATA[", i))) {
+      if (currentText && stack.length > 0) stack[stack.length - 1].text.push(currentText);
+      currentText = "";
+      const end = str.indexOf(">", i);
+      i = end === -1 ? str.length : end + 1;
+    } else if (str.startsWith("</", i)) {
+      if (currentText && stack.length > 0) stack[stack.length - 1].text.push(currentText);
+      currentText = "";
+      const end = str.indexOf(">", i);
+      const node = stack.pop();
+      if (node && !node.hasElementChildren) {
+         leaves.push(node.text.join(""));
+      }
+      i = end === -1 ? str.length : end + 1;
+    } else if (str.startsWith("<", i)) {
+      if (currentText && stack.length > 0) stack[stack.length - 1].text.push(currentText);
+      currentText = "";
+      const end = str.indexOf(">", i);
+      if (stack.length > 0) stack[stack.length - 1].hasElementChildren = true;
+      const selfClosing = str[end - 1] === "/";
+      if (!selfClosing) {
+        stack.push({ hasElementChildren: false, text: [] });
+      } else {
+        leaves.push("");
+      }
+      i = end === -1 ? str.length : end + 1;
+    } else {
+      currentText += str[i];
+      i++;
+    }
+  }
+  return leaves;
+}
+
+test("invariant: leaf text is preserved byte-for-byte across operations", async () => {
+  for (const item of await fixture("beautify")) {
+    if (item.diagnostics.length > 0) continue;
+    if (item.options && item.options["trim-text"]) continue; // skip if trimmer is ON
+    const result = await expectOk("beautify", item.input, { options: item.options });
+    const originalLeaves = extractLeafText(item.input);
+    const outputLeaves = extractLeafText(result.text);
+    assert.deepEqual(outputLeaves, originalLeaves, `Leaf text changed in beautify for fixture: ${item.name}`);
+  }
+  for (const item of await fixture("minify")) {
+    if (item.diagnostics.length > 0) continue;
+    if (item.options && item.options["trim-text"]) continue;
+    const result = await expectOk("minify", item.input, { options: item.options });
+    const originalLeaves = extractLeafText(item.input);
+    const outputLeaves = extractLeafText(result.text);
+    assert.deepEqual(outputLeaves, originalLeaves, `Leaf text changed in minify for fixture: ${item.name}`);
+  }
 });

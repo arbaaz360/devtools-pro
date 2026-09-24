@@ -55,7 +55,8 @@ function invalidOption(message, data) {
 const INDENT_CHOICES = Object.freeze({ sp2: "  ", sp4: "    ", tab: "\t" });
 const PRESERVE_COMMENTS_IDS = ["preserve-comments", "preserveComments"];
 const COLLAPSE_EMPTY_IDS = ["collapse-empty", "collapseEmpty"];
-const KNOWN_OPTIONS = new Set(["indent", ...PRESERVE_COMMENTS_IDS, ...COLLAPSE_EMPTY_IDS]);
+const TRIM_TEXT_IDS = ["trim-text", "trimText"];
+const KNOWN_OPTIONS = new Set(["indent", ...PRESERVE_COMMENTS_IDS, ...COLLAPSE_EMPTY_IDS, ...TRIM_TEXT_IDS]);
 
 /**
  * `indent` accepts `sp2`/`sp4`/`tab` (the manifest's enum choice ids; the
@@ -85,6 +86,7 @@ export function normalizeOptions(raw) {
     indentUnit: INDENT_CHOICES[indent],
     preserveComments: readBoolPair(PRESERVE_COMMENTS_IDS, true),
     collapseEmpty: readBoolPair(COLLAPSE_EMPTY_IDS, true),
+    trimText: readBoolPair(TRIM_TEXT_IDS, false),
   };
 }
 
@@ -292,12 +294,15 @@ function parseXml(bytes, check) {
   };
 
   function handleTextRun(s, e) {
-    if (currentSpacePreserve()) { pushChild({ t: "text", s, e }); return; }
+    if (currentSpacePreserve()) { pushChild({ t: "text", s, e, isWsOnly: false }); return; }
     let allWs = true;
     for (let k = s; k < e; k += 1) if (!isWs(bytes[k])) { allWs = false; break; }
-    if (allWs) return;
-    if (stack.length === 0) { if (root === null) return; flagTrailing(s); return; }
-    pushChild({ t: "text", s, e });
+    if (stack.length === 0) {
+      if (allWs) return;
+      if (root === null) return;
+      flagTrailing(s); return;
+    }
+    pushChild({ t: "text", s, e, isWsOnly: allWs });
   }
 
   function handleTextLikeAux(node) {
@@ -420,18 +425,21 @@ class Pieces {
 function trimRange(bytes, s, e) { let a = s, b = e; while (a < b && isWs(bytes[a])) a += 1; while (b > a && isWs(bytes[b - 1])) b -= 1; return [a, b]; }
 
 function significantChildren(node, options) {
-  if (options.preserveComments) return node.children;
-  return node.children.filter((child) => child.t !== "comment");
+  let sig = node.children;
+  if (!options.preserveComments) sig = sig.filter((child) => child.t !== "comment");
+  if (options.trimText) sig = sig.filter(child => !(child.t === "text" && child.isWsOnly));
+  return sig;
 }
 
 function classify(sig) {
   if (sig.length === 0) return "empty";
-  let hasElement = false, hasTextLike = false;
+  let hasElement = false, hasNonWsTextLike = false;
   for (const child of sig) {
     if (child.t === "element") hasElement = true;
-    else if (child.t === "text" || child.t === "cdata") hasTextLike = true;
+    else if (child.t === "cdata") hasNonWsTextLike = true;
+    else if (child.t === "text" && !child.isWsOnly) hasNonWsTextLike = true;
   }
-  if (hasElement && hasTextLike) return "mixed";
+  if (hasElement && hasNonWsTextLike) return "mixed";
   if (hasElement) return "structural";
   return "textish";
 }
@@ -463,15 +471,20 @@ function renderElement(bytes, node, depth, pieces, options, mode) {
   if (shape === "mixed") {
     pieces.raw(bytes, node.contentStart, node.contentEnd);
   } else if (shape === "textish") {
-    // Text nodes here are never whitespace-only (those are dropped while scanning), so trimming
-    // is always safe; this is what keeps beautify -> minify -> beautify byte-identical.
     for (const child of sig) {
-      if (child.t === "text") { const [a, b] = trimRange(bytes, child.s, child.e); pieces.raw(bytes, a, b); }
+      if (child.t === "text") {
+        if (options.trimText) {
+          const [a, b] = trimRange(bytes, child.s, child.e); pieces.raw(bytes, a, b);
+        } else {
+          pieces.raw(bytes, child.s, child.e);
+        }
+      }
       else pieces.raw(bytes, child.s, child.e);
     }
   } else {
     const unit = options.indentUnit;
     for (const child of sig) {
+      if (child.t === "text" && child.isWsOnly) continue;
       if (mode === "beautify") { pieces.lit("\n"); pieces.lit(unit.repeat(depth + 1)); }
       if (child.t === "element") renderElement(bytes, child, depth + 1, pieces, options, mode);
       else pieces.raw(bytes, child.s, child.e);

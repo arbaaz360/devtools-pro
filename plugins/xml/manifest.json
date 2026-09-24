@@ -17,7 +17,8 @@
       "options": [
         { "id": "indent", "type": "enum", "label": "Indent", "default": "sp2", "choices": [{ "id": "sp2", "label": "2 spaces" }, { "id": "sp4", "label": "4 spaces" }, { "id": "tab", "label": "Tab" }], "persistence": "instance", "sensitive": false },
         { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
-        { "id": "collapse-empty", "type": "boolean", "label": "Collapse empty elements", "default": true, "persistence": "instance", "sensitive": false }
+        { "id": "collapse-empty", "type": "boolean", "label": "Collapse empty elements", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "trim-text", "type": "boolean", "label": "Trim text in elements (changes values)", "default": false, "persistence": "instance", "sensitive": false }
       ],
       "trigger": { "modes": ["explicit"], "debounceMs": "0" },
       "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
@@ -31,7 +32,8 @@
       "options": [
         { "id": "indent", "type": "enum", "label": "Indent", "default": "sp2", "choices": [{ "id": "sp2", "label": "2 spaces" }, { "id": "sp4", "label": "4 spaces" }, { "id": "tab", "label": "Tab" }], "persistence": "instance", "sensitive": false },
         { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
-        { "id": "collapse-empty", "type": "boolean", "label": "Collapse empty elements", "default": true, "persistence": "instance", "sensitive": false }
+        { "id": "collapse-empty", "type": "boolean", "label": "Collapse empty elements", "default": true, "persistence": "instance", "sensitive": false },
+        { "id": "trim-text", "type": "boolean", "label": "Trim text in elements (changes values)", "default": false, "persistence": "instance", "sensitive": false }
       ],
       "trigger": { "modes": ["explicit"], "debounceMs": "0" },
       "limits": { "maxInputBytes": "16777216", "maxOutputBytes": "33554432", "maxChunkBytes": "33554432", "deadlineMs": "5000" }
