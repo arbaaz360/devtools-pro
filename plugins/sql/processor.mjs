@@ -145,7 +145,12 @@ function tokenize(text, dialect, context) {
       continue;
     }
 
-    if ((c === '-' && text[i+1] === '-') || ((c === '#' && (dialect === 'mysql' || dialect === 'mariadb')))) {
+    // MySQL and MariaDB read `--` as a comment only when whitespace or a control character
+    // follows it (or the text ends): `1--1` is 1 - -1 there, and 2 (AST-002, reopened).
+    const mysqlFamily = dialect === 'mysql' || dialect === 'mariadb';
+    const dashComment = c === '-' && text[i+1] === '-' &&
+      (!mysqlFamily || i + 2 >= len || text.charCodeAt(i + 2) <= 0x20);
+    if (dashComment || (c === '#' && mysqlFamily)) {
       let start = i;
       while (i < len && text[i] !== '\n') i++;
       tokens.push({ type: 'comment', value: text.substring(start, i), isLineComment: true });
@@ -156,25 +161,52 @@ function tokenize(text, dialect, context) {
     if (c === '/' && text[i+1] === '*') {
       let start = i;
       i += 2;
-      while (i < len && !(text[i-1] === '*' && text[i] === '/')) {
+      // PostgreSQL nests block comments: `/* a /* b */ still comment */` is one comment.
+      let depth = 1;
+      while (i < len) {
         if (text[i] === '\n') line++;
+        if (text[i] === '*' && text[i+1] === '/') { depth--; i += 2; if (depth === 0) break; continue; }
+        if (dialect === 'postgresql' && text[i] === '/' && text[i+1] === '*') { depth++; i += 2; continue; }
         i++;
       }
-      if (i < len) i++;
-      tokens.push({ type: 'comment', value: text.substring(start, i), isLineComment: false });
+      const value = text.substring(start, i);
+      // Not every comment is a comment: MySQL runs the body of `/*! ... */`, and
+      // `/*+ ... */` is an optimizer hint in MySQL, MariaDB and Oracle. Minify keeps both.
+      const kept = (mysqlFamily && value.startsWith('/*!')) || ((mysqlFamily || dialect === 'plsql') && value.startsWith('/*+'));
+      tokens.push({ type: 'comment', value, isLineComment: false, kept });
       commentsCount++;
       continue;
     }
 
-    if (c === "'") {
+    // PostgreSQL's escape strings (`E'a\'b'`) take backslash escapes; its plain strings do not.
+    const escapeString = dialect === 'postgresql' && (c === 'E' || c === 'e') && text[i+1] === "'";
+    // Oracle's alternative quoting: q'[...]', q'{...}', q'<...>', q'(...)', or q'X...X'.
+    const oracleQuote = dialect === 'plsql' && (c === 'q' || c === 'Q') && text[i+1] === "'" && i + 2 < len && !/[\s']/.test(text[i+2]);
+    if (oracleQuote) {
+      const open = text[i+2];
+      const close = { '[': ']', '{': '}', '<': '>', '(': ')' }[open] ?? open;
+      const end = text.indexOf(close + "'", i + 3);
+      const stop = end === -1 ? len : end + 2;
+      for (let k = i; k < stop; k++) if (text[k] === '\n') line++;
+      tokens.push({ type: 'string', value: text.substring(i, stop) });
+      i = stop;
+      continue;
+    }
+
+    // MySQL and MariaDB (in their default SQL mode, without ANSI_QUOTES) read "..." as a
+    // string, and both quote styles take backslash escapes there.
+    if (c === "'" || escapeString || (c === '"' && mysqlFamily)) {
       let start = i;
+      if (escapeString) i++;
+      const quote = text[i];
+      const backslashes = mysqlFamily || escapeString;
       i++;
       while (i < len) {
         if (text[i] === '\n') line++;
-        if (text[i] === "'") {
-          if (text[i+1] === "'") i += 2;
+        if (text[i] === quote) {
+          if (text[i+1] === quote) i += 2;
           else { i++; break; }
-        } else if (text[i] === '\\' && (dialect === 'mysql' || dialect === 'mariadb')) {
+        } else if (text[i] === '\\' && backslashes) {
           i += 2;
         } else {
           i++;
@@ -202,7 +234,8 @@ function tokenize(text, dialect, context) {
     }
 
     if (c === '$' && dialect === 'postgresql') {
-      let match = text.substring(i).match(/^\$[a-zA-Z0-9_]*\$/);
+      // A dollar-quote tag is empty or an identifier; `$1` is a parameter, never a tag.
+      let match = text.substring(i, i + 64).match(/^\$(?:[a-zA-Z_][a-zA-Z0-9_]*)?\$/);
       if (match) {
         let tag = match[0];
         let start = i;
@@ -303,12 +336,13 @@ function processTokens(tokens, options, isMinify, context) {
       const t = tokens[i];
       if (t.type === 'whitespace') continue;
 
-      if (t.type === 'comment') {
-        continue;
-      }
+      // Comments go, except the ones the database reads (see `kept` in tokenize).
+      if (t.type === 'comment' && !t.kept) continue;
 
       let needsSpace = false;
-      if (lastToken) {
+      if (lastToken && (t.kept || lastToken.kept)) {
+          needsSpace = true;
+      } else if (lastToken) {
           let lastType = lastToken.type;
           let currType = t.type;
 
