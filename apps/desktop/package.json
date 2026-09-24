@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
     "build": "tsc --noEmit && vite build",
-    "test:shell": "node --experimental-strip-types --test src/resultLifecycle.test.ts src/toolViews/registry.test.ts src/workbench/state.test.ts src/workbench/controller.test.ts src/workbench/findReplace.test.ts src/toolViews/diffView.test.ts src/plugins/describe.test.ts src/ui/annotations.test.ts src/ui/jsonPath.test.ts src/ui/jsonTree.test.ts src/ui/imageClipboard.test.ts src/ui/losslessJson.test.ts",
+    "test:shell": "node --experimental-strip-types --test src/resultLifecycle.test.ts src/toolViews/registry.test.ts src/workbench/state.test.ts src/workbench/controller.test.ts src/workbench/fileConventions.test.ts src/workbench/findReplace.test.ts src/toolViews/diffView.test.ts src/plugins/describe.test.ts src/ui/annotations.test.ts src/ui/jsonPath.test.ts src/ui/jsonTree.test.ts src/ui/imageClipboard.test.ts src/ui/losslessJson.test.ts",
     "test:ui": "playwright test",
     "preview": "vite preview --host 127.0.0.1 --port 1420 --strictPort",
     "tauri": "tauri"
