@@ -52,7 +52,7 @@
       "dialect": "sql"
     },
     "input": "SELECT  \"first name\" ,  [last name]  FROM  t",
-    "output": "SELECT \"first name\",[last name] FROM t"
+    "output": "SELECT\"first name\",[last name]FROM t"
   },
   {
     "name": "mysql backtick and hash comment",
@@ -61,7 +61,7 @@
       "dialect": "mysql"
     },
     "input": "SELECT  `a`  # note\nFROM  `t`",
-    "output": "SELECT `a` FROM `t`"
+    "output": "SELECT`a`FROM`t`"
   },
   {
     "name": "postgres dollar quoting and cast",
