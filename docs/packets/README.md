@@ -53,13 +53,14 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-124 | The QR generator must encode UTF-8 (DU-21) | claude | merged (#102) |
 | AG-125 | Declared options that do nothing (DU-26, DU-06, DU-01) | antigravity | merged (#101) |
 | AG-126 | UUID generate and decode are two operations (DU-10) | claude | merged (#107) |
-| AG-127 | JavaScript minify must not change what the program does (DU-15) | antigravity | ready |
-| AG-128 | SQL minify must not join tokens into comments or broken numbers (DU-26) | antigravity | ready |
-| AG-129 | HTML/SVG to JSX must keep text, attribute values and style declarations (DU-24) | claude | ready |
-| AG-130 | YAML to JSON must emit JSON numbers (DU-17) | claude | ready |
-| AG-131 | XML beautify and minify must keep element text (DU-16) | antigravity | ready |
-| AG-132 | Dates in years 0 to 99 get correct calendar fields (DU-01) | antigravity | ready |
-| AG-133 | A JWT is expired at its exp instant (DU-04) | claude | ready |
+| AG-127 | JavaScript minify must not change what the program does (DU-15) | antigravity | merged (#127) |
+| AG-128 | SQL minify must not join tokens into comments or broken numbers (DU-26) | antigravity | merged (#137) |
+| AG-129 | HTML/SVG to JSX must keep text, attribute values and style declarations (DU-24) | claude | merged (#133) |
+| AG-130 | YAML to JSON must emit JSON numbers (DU-17) | claude | merged (#135) |
+| AG-131 | XML beautify and minify must keep element text (DU-16) | antigravity | merged (#138) |
+| AG-132 | Dates in years 0 to 99 get correct calendar fields (DU-01) | antigravity | merged (#139) |
+| AG-133 | A JWT is expired at its exp instant (DU-04) | claude | merged (#136) |
+| AG-134 | The Unix timestamp converter shows local time (DU-01, #104) | claude | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).
