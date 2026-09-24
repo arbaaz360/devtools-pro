@@ -183,6 +183,13 @@ function makeInt(text) {
   return { t: "int", decimal: big.toString(10), unsafe };
 }
 
+/** Strips leading zeros from a digit string, keeping at least one digit (JSON forbids a leading zero before more digits). */
+function stripLeadingZeros(digits) {
+  let i = 0;
+  while (i < digits.length - 1 && digits[i] === "0") i += 1;
+  return digits.slice(i);
+}
+
 function normalizeFloat(text) {
   let sign = "";
   let body = text;
@@ -193,6 +200,7 @@ function normalizeFloat(text) {
   const hasDot = mantissa.includes(".");
   if (!intPart) intPart = "0";
   if (hasDot && !fracPart) fracPart = "0";
+  intPart = stripLeadingZeros(intPart);
   let out = intPart + (hasDot ? `.${fracPart}` : "");
   if (exp !== undefined) out += `e${exp === "" ? "0" : exp}`;
   return sign + out;

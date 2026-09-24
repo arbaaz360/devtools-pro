@@ -58,7 +58,9 @@ scalar is always a string): empty, `~`, `null`/`Null`/`NULL` → JSON `null`;
 `.inf`/`-.inf`/`.nan` (case-sensitive, matching the core schema) → JSON
 `null`, plus an `info` diagnostic (`yaml.float-special`) since JSON has no
 such value; every other float lexeme is normalized just enough to be valid
-JSON (`.5` → `0.5`, `1.` → `1.0`) and otherwise preserved. An integer
+JSON (`.5` → `0.5`, `1.` → `1.0`, and a leading zero before another digit in
+the integer part is stripped: `01.2` → `1.2`, `00e2` → `0e2`, `-00.3` →
+`-0.3`) and otherwise preserved digit-for-digit. An integer
 lexeme whose magnitude exceeds `Number.MAX_SAFE_INTEGER` is emitted as a
 JSON *string* of its decimal digits, plus an `info` diagnostic
 (`yaml.unsafe-integer`), so it survives byte-for-byte instead of silently
