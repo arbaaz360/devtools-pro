@@ -37,6 +37,6 @@ test("a file with no line breaks, or no file at all, is saved plain", () => {
 
 test("stray CRs from the editor are made the file's ending, and a BOM is never doubled", () => {
   const conventions = { bom: true, eol: "\r\n" as const, mixed: false };
-  assert.equal(applyConventions("a\r\nb\rc\n", conventions), "﻿a\r\nb\r\nc\r\n");
-  assert.equal(applyConventions("﻿a", conventions), "﻿a");
+  assert.equal(applyConventions("a\r\nb\rc\n", conventions), "\ufeffa\r\nb\r\nc\r\n");
+  assert.equal(applyConventions("\ufeffa", conventions), "\ufeffa");
 });

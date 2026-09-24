@@ -39,7 +39,7 @@ export function conventionsOf(file: { encoding: string; preview: string } | null
 export function applyConventions(text: string, conventions: FileConventions): string {
   const lines = text.replace(/\r\n?/g, "\n");
   const body = conventions.eol === "\r\n" ? lines.replace(/\n/g, "\r\n") : lines;
-  return conventions.bom && !body.startsWith("﻿") ? `﻿${body}` : body;
+  return conventions.bom && !body.startsWith("\ufeff") ? `\ufeff${body}` : body;
 }
 
 /** What the Saved notice adds, if anything: only a change the user did not make is news. */
