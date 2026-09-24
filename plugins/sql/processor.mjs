@@ -287,9 +287,6 @@ function processTokens(tokens, options, isMinify, context) {
         out += " ";
       }
       out += t.value;
-      if (t.type === 'comment' && t.isLineComment) {
-        out += "\n";
-      }
       lastToken = t;
     }
     return { output: out, statements };
