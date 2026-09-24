@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 import { CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorContext, SeededRandom, defaultLimits } from "../../packages/plugin-sdk/src/index.ts";
 import { execute, JsError } from "./processor.mjs";
 
@@ -28,6 +29,76 @@ async function expectOk(operationId, input, options) {
   if (result.error) throw result.error;
   return result;
 }
+
+const corpus = [
+  "(()=>{function f(){return\n{a:1}};return f()})()",
+  "// @license MIT\nglobalThis.answer=42",
+  "(1 .toString())",
+  "a=1\rb=2",
+  "function f(){return\n{}} f()",
+  "function f(){try{throw\n1}catch(e){return e}} f()",
+  "let i=0;while(i<1){i++;break\n}",
+  "let i=0;while(i<1){i++;continue\n}",
+  "function* f(){yield\n1} f().next().value",
+  "const f = async\n()=>1; typeof f",
+  "let a=1,b=1;a\n++b;a+b",
+  "let a=1,b=1;a\n--b;a+b",
+  "let a=()=>1;let b=2;a\n(b)",
+  "let a=1,b=2;a/(b)/g",
+  "function f(){return\n/a/g} f()",
+  "let a=1; a/ /a/g",
+  "`//`",
+  "`/*`",
+  "'*/'",
+  "let a=1; // end",
+  "let a=1\r\n++a",
+  "let a=1\r++a",
+  "let a=1\u2028++a",
+  "let a=1\u2029++a",
+  "'a'\n+'b'",
+  "1\n-1",
+  "`temp`\n.length",
+  "(1)\n[0]",
+  "lbl: while(true) { continue lbl\n}"
+];
+
+function evaluate(source) {
+  const sandbox = {};
+  vm.createContext(sandbox);
+  try {
+    const result = vm.runInContext(source, sandbox, { timeout: 50 });
+    return JSON.stringify({ result, globals: sandbox });
+  } catch (e) {
+    return e.name;
+  }
+}
+
+test("oracle test for minify and beautify", async () => {
+  for (const input of corpus) {
+    let sourceCompiles = true;
+    try { new vm.Script(input); } catch(e) { sourceCompiles = false; }
+
+    const minified = await expectOk("minify", input);
+
+    if (sourceCompiles) {
+       assert.doesNotThrow(() => new vm.Script(minified.text), `minified ${JSON.stringify(input)} must compile`);
+    }
+    const inputResult = evaluate(input);
+    const minResult = evaluate(minified.text);
+    assert.equal(minResult, inputResult, `minify changes result for ${JSON.stringify(input)}`);
+
+    const beautified = await run("beautify", input);
+    if (beautified.error) {
+       assert.equal(beautified.error.code, "js.beautify.changes-meaning");
+    } else {
+       if (sourceCompiles) {
+         assert.doesNotThrow(() => new vm.Script(beautified.text), `beautified ${JSON.stringify(input)} must compile`);
+       }
+       const beautResult = evaluate(beautified.text);
+       assert.equal(beautResult, inputResult, `beautify changes result for ${JSON.stringify(input)}`);
+    }
+  }
+});
 
 try {
   const beautifyCases = await fixture("beautify");

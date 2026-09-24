@@ -81,13 +81,13 @@
     "name": "ASI newline after return",
     "options": {},
     "input": "function a() {\n  return\n  value;\n}",
-    "output": "function a(){return\nvalue;}"
+    "output": "function a(){\nreturn\nvalue;}"
   },
   {
     "name": "ASI newline after throw",
     "options": {},
     "input": "function a() {\n  throw\n  new Error();\n}",
-    "output": "function a(){throw\nnew Error();}"
+    "output": "function a(){\nthrow\nnew Error();}"
   },
   {
     "name": "ASI newline before ++",
@@ -189,6 +189,6 @@
     "name": "newlines removed if not ASI",
     "options": {},
     "input": "const\n  a\n  =\n  1\n  ;",
-    "output": "const\na=1;"
+    "output": "const\na\n=\n1;"
   }
 ]

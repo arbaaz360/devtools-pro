@@ -120,8 +120,32 @@ async function beautify(context, options) {
   const outBytes = encoder.encode(formatted);
   if (outBytes.byteLength > context.limits.maxOutputBytes) throw new JsError("js.output-limit", "output exceeds limit");
   
+  const inProps = processTokens(text, "none");
   const props = processTokens(formatted, "none");
   
+  if (inProps.tokens.length !== props.tokens.length) {
+    throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
+  }
+
+  const restrictedTokens = new Set(["return", "throw", "break", "continue", "yield", "async", "++", "--"]);
+  for (let k = 0; k < inProps.tokens.length; k++) {
+    const t1 = inProps.tokens[k];
+    const t2 = props.tokens[k];
+
+    if (t1.value !== t2.value) {
+      throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
+    }
+
+    if (k > 0) {
+      const prev = inProps.tokens[k-1];
+      if (restrictedTokens.has(prev.value) || t1.value === "++" || t1.value === "--") {
+        if (t1.hasNewlineBefore && !t2.hasNewlineBefore) {
+          throw new JsError("js.beautify.changes-meaning", "Beautify would change what this program does; Minify keeps it, or add the semicolon.");
+        }
+      }
+    }
+  }
+
   const result = {
     lines: props.lines,
     comments: props.comments,
@@ -189,6 +213,7 @@ function processTokens(text, preserveComments) {
   let regexesCount = 0;
   let diagnosticsCount = 0;
   let annotations = [];
+  let tokens = [];
   
   let i = 0;
   let len = text.length;
@@ -222,39 +247,27 @@ function processTokens(text, preserveComments) {
     
     if (type !== "comment") {
       if (out.length > 0 && endsWithNewline) {
-         let needSemicolon = false;
-         let endTokens = ["return", "break", "continue", "throw", "++", "--", ")", "]", "}"];
-         if (lastType === "id" || lastType === "num" || lastType === "string" || lastType === "template") needSemicolon = true;
-         else if ((lastType === "keyword" || lastType === "punct" || lastType === "op") && endTokens.includes(lastValue)) needSemicolon = true;
-         
-         if (needSemicolon) {
-            let nextStarts = ["(", "[", "`", "+", "-", "/"];
-            let startsWith = false;
-            if (isIdentifierChar(str[0])) startsWith = true;
-            else if (nextStarts.includes(str[0])) startsWith = true;
-            
-            if (startsWith) {
+         if (lastValue !== ";" && str !== ";") {
+            if (lastCharEmitted !== "\n") {
                out += "\n";
                lines++;
-            } else {
-               if (needsSpace(lastCharEmitted, str[0])) out += " ";
             }
          } else {
-            if (needsSpace(lastCharEmitted, str[0])) out += " ";
+            let ns = needsSpace(lastCharEmitted, str[0]);
+            if (lastType === "num" && str[0] === ".") ns = true;
+            if (ns && lastCharEmitted !== "\n") out += " ";
          }
       } else if (out.length > 0) {
-         if (needsSpace(lastCharEmitted, str[0])) out += " ";
+         let ns = needsSpace(lastCharEmitted, str[0]);
+         if (lastType === "num" && str[0] === ".") ns = true;
+         if (ns && lastCharEmitted !== "\n") out += " ";
       }
       
+      tokens.push({ value: str, type: type, hasNewlineBefore: endsWithNewline });
       out += str;
       lastCharEmitted = str[str.length - 1];
-      if (type !== "punct" && type !== "op") {
-         lastType = type;
-         lastValue = str;
-      } else {
-         lastType = type;
-         lastValue = str;
-      }
+      lastType = type;
+      lastValue = str;
       endsWithNewline = false;
     }
   }
@@ -317,21 +330,24 @@ function processTokens(text, preserveComments) {
     }
     
     if (/\s/.test(char)) {
-      if (char === "\n") endsWithNewline = true;
+      if (char === "\n" || char === "\r" || char === "\u2028" || char === "\u2029") endsWithNewline = true;
       i++;
       continue;
     }
     
     if (char === "\/" && text[i+1] === "\/") {
       let start = i;
-      while(i < len && text[i] !== "\n" && text[i] !== "\r") i++;
+      while(i < len && text[i] !== "\n" && text[i] !== "\r" && text[i] !== "\u2028" && text[i] !== "\u2029") i++;
       let commentText = text.substring(start, i);
       if (preserveComments === "license" && (commentText.includes("/*!") || commentText.includes("@license") || commentText.includes("@preserve"))) {
-         if (out.length > 0 && lastCharEmitted !== "\n") out += " ";
+         if (out.length > 0 && lastCharEmitted !== "\n") { out += "\n"; lines++; }
          out += commentText;
-         lastCharEmitted = commentText[commentText.length - 1];
+         out += "\n";
+         lines++;
+         lastCharEmitted = "\n";
          commentsCount++;
       }
+      endsWithNewline = true;
       continue;
     }
     
@@ -451,13 +467,18 @@ function processTokens(text, preserveComments) {
       continue;
     }
     
-    let opChars = "+-*/%&|^~<>=!?:";
-    if (opChars.includes(char)) {
-      let start = i;
-      while(i < len && opChars.includes(text[i])) i++;
-      let val = text.substring(start, i);
-      emit(val, "op");
-      continue;
+    const operators = [">>>=", "<<<=", "===", "!==", "**=", ">>=", "<<=", "&&=", "||=", "??=", ">>>", "<<<", "++", "--", "**", "==", "!=", ">=", "<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "&&", "||", "??", "=>", "+", "-", "*", "/", "%", "&", "|", "^", "!", "~", "?", ":", "=", "<", ">"];
+    let matchedOp = null;
+    for (let op of operators) {
+       if (text.startsWith(op, i)) {
+          matchedOp = op;
+          break;
+       }
+    }
+    if (matchedOp) {
+       emit(matchedOp, "op");
+       i += matchedOp.length;
+       continue;
     }
     
     emit(char, "punct");
@@ -468,5 +489,15 @@ function processTokens(text, preserveComments) {
     lines--;
   }
   
-  return { out, lines, comments: commentsCount, strings: stringsCount, templates: templatesCount, regexes: regexesCount, diagnosticsCount, annotations };
+  return {
+    out,
+    tokens,
+    lines,
+    comments: commentsCount,
+    strings: stringsCount,
+    templates: templatesCount,
+    regexes: regexesCount,
+    diagnosticsCount,
+    annotations
+  };
 }
