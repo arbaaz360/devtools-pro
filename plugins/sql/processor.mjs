@@ -183,7 +183,7 @@ function tokenize(text, dialect, context) {
       continue;
     }
 
-    let numMatch = text.substring(i).match(/^(0x[0-9a-fA-F]+|[0-9]+(\.[0-9]+)?(e[+-]?[0-9]+)?|\.[0-9]+(e[+-]?[0-9]+)?)/);
+    let numMatch = text.substring(i).match(/^(0x[0-9a-fA-F]+|[0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)?|\.[0-9]+([eE][+-]?[0-9]+)?)/);
     if (numMatch) {
       let start = i;
       i += numMatch[0].length;
@@ -249,7 +249,7 @@ function processTokens(tokens, options, isMinify, context) {
 
   if (isMinify) {
     let out = "";
-    let lastNeedsSpace = false;
+    let lastToken = null;
     for (let i = 0; i < tokens.length; i++) {
       if (i % 4096 === 0) check(context);
       const t = tokens[i];
@@ -259,12 +259,38 @@ function processTokens(tokens, options, isMinify, context) {
         continue;
       }
 
-      let needsSpace = (t.type === 'identifier' || t.type === 'keyword' || t.type === 'number' || t.type === 'parameter' || (t.type === 'operator' && /^[a-zA-Z]/.test(t.value)) || (t.type === 'string' && t.value.startsWith('$')));
-      if (lastNeedsSpace && needsSpace) {
+      let needsSpace = false;
+      if (lastToken) {
+          let combined = lastToken.value + t.value;
+
+          let lastType = lastToken.type;
+          let currType = t.type;
+
+          let currIsQuoted = (currType === 'identifier' || currType === 'string') && (t.value[0] === '"' || t.value[0] === '`' || t.value[0] === '[' || t.value[0] === "'");
+          let lastIsQuoted = (lastType === 'identifier' || lastType === 'string') && (lastToken.value[0] === '"' || lastToken.value[0] === '`' || lastToken.value[0] === '[' || lastToken.value[0] === "'");
+
+          // Explicitly unsafe pairs per requirements
+          if ((lastType === 'number' && !currIsQuoted && (currType === 'identifier' || currType === 'keyword' || currType === 'number' || (currType === 'operator' && /^[a-zA-Z]/.test(t.value)))) ||
+              ((lastType === 'identifier' || lastType === 'keyword') && !lastIsQuoted && !currIsQuoted && (currType === 'identifier' || currType === 'keyword' || currType === 'number' || (currType === 'operator' && /^[a-zA-Z]/.test(t.value))))) {
+             needsSpace = true;
+          } else {
+             let testRes = tokenize(combined, options.dialect, { cancellation: { isCancelled: () => false } });
+             if (testRes.tokens.length !== 2 ||
+                 testRes.tokens[0].value !== lastToken.value ||
+                 testRes.tokens[1].value !== t.value) {
+               needsSpace = true;
+             }
+          }
+      }
+
+      if (needsSpace) {
         out += " ";
       }
       out += t.value;
-      lastNeedsSpace = needsSpace;
+      if (t.type === 'comment' && t.isLineComment) {
+        out += "\n";
+      }
+      lastToken = t;
     }
     return { output: out, statements };
   }

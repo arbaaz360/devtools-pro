@@ -74,3 +74,44 @@ test("a cancelled token rejects both operations before any output, even for an e
     await rejects(operationId, {}, input, ProcessorCancelled, { cancellation });
   }
 });
+
+test("oracle test: SQLite parity", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const db = new DatabaseSync(":memory:");
+  const corpus = [
+    "SELECT 1 - -2 AS answer;",
+    "SELECT 1 - - -2 AS answer;",
+    "SELECT -(-1) AS answer;",
+    "SELECT 4 / -2 AS answer;",
+    "SELECT 2 * -3 AS answer;",
+    "SELECT 1E+3 AS n;",
+    "SELECT 1e3 AS n;",
+    "SELECT 1E-3 AS n;",
+    "SELECT .5 AS n;",
+    "SELECT 5. AS n;",
+    "SELECT 0x1F AS n;",
+    "SELECT '--not a comment' AS n;",
+    "SELECT '/* not a comment */' AS n;",
+    "SELECT 1 AS \"--x\";",
+    "SELECT 1 AS \"/*x*/\";",
+    "SELECT CASE WHEN 1 THEN 2 ELSE 3 END AS n;",
+    "SELECT (SELECT 1) AS n;",
+    "SELECT 'a' || 'b' AS n;",
+    "SELECT 1 <> 2 AS n;",
+    "SELECT 1 <= 2 AS n;",
+    "SELECT 1 >= 2 AS n;",
+    "SELECT 1 -- kept comment \n + 2 AS n;"
+  ];
+
+  for (const query of corpus) {
+    const originalRows = db.prepare(query).all();
+
+    const minified = await run("minify", {}, query);
+    const minifyRows = db.prepare(minified.text).all();
+    assert.deepEqual(minifyRows, originalRows, `Minify changed meaning of: ${query}`);
+
+    const beautified = await run("beautify", {}, query);
+    const beautifyRows = db.prepare(beautified.text).all();
+    assert.deepEqual(beautifyRows, originalRows, `Beautify changed meaning of: ${query}`);
+  }
+});
