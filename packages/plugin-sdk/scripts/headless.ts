@@ -18,6 +18,7 @@ const flags = (name: string): string[] => {
 const pluginId = flag("--plugin");
 const operationId = flag("--operation");
 const optionsText = flag("--options");
+const timeZone = flag("--time-zone") ?? "UTC";
 const packages = await discoverPlugins(root);
 if (packages.length === 0) throw new Error(`no trusted plugins found under ${root}`);
 const plugin = (pluginId ? packages.find((item) => item.manifest.id === pluginId) : packages[0]);
@@ -43,7 +44,7 @@ for (const value of inputValues) {
 for (const [port, value] of supplied) reader.insert(port, value);
 const outputs = new MemoryOutputSink();
 const cancellation = new CancellationToken();
-const context = new ProcessorContext(reader, outputs, cancellation, new FixedClock("2025-01-01T00:00:00Z"), new SeededRandom(1), new MemorySecrets());
+const context = new ProcessorContext(reader, outputs, cancellation, new FixedClock("2025-01-01T00:00:00Z", timeZone), new SeededRandom(1), new MemorySecrets());
 const processor = await import(pathToFileURL(plugin.processorPath).href) as { execute?: (request: { pluginId: string; toolId: string; operationId: string; options: Record<string, unknown> }, context: ProcessorContext) => unknown };
 if (typeof processor.execute !== "function") throw new Error(`processor for ${plugin.manifest.id} does not export execute`);
 await processor.execute({ pluginId: plugin.manifest.id, toolId: tool.id, operationId: operation.id, options }, context);

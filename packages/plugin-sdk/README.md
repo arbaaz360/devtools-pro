@@ -28,7 +28,8 @@ node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins
 ```
 
 The default command runs the first discovered operation. A worker can select a
-package, operation, text input and JSON options explicitly:
+package, operation, text input, JSON options and the clock's IANA time zone
+explicitly (`--time-zone`, default `UTC`; never the host machine's own zone):
 
 ```text
 node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins --plugin identity.uuid --operation generate --options '{"version":"v4","count":2}'

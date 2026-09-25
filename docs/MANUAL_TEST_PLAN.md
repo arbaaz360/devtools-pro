@@ -406,6 +406,7 @@ Options: interpretation (auto, seconds, milliseconds, iso), milliseconds-from-di
 | 05 | `0`, `-1`, `2147483648` | Epoch, pre-epoch and post-2038 all handled |
 | 06 | `abc` | Readable error |
 | 07 | — | Compare the displayed time zone handling with the DU-01 card |
+| 08 (suite) | `1700000000` | The displayed local time and UTC offset match Windows' own `TimeZoneInfo` conversion of the same instant to the machine's local zone |
 
 ### TL-UUID — UUID Generator · `identity.uuid` · package · generator
 Operations: **Generate** (version v1/v3/v4/v5, namespace, name, count 1–100, case) and **Decode** (case; the UUID is whatever is in the editor).

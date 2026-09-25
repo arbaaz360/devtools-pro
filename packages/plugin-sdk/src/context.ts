@@ -33,7 +33,7 @@ export interface NamedReader {
 export interface OutputArtifact { handle: string; byteLength: number; contentHash: string; }
 export interface OutputSink { write(port: string, bytes: Uint8Array, limits: Limits): OutputArtifact | Promise<OutputArtifact>; value(port: string, value: unknown): void | Promise<void>; }
 export interface Cancellation { isCancelled(): boolean; }
-export interface Clock { now(): string; }
+export interface Clock { now(): string; timeZone(): string; }
 export interface Randomness { fill(bytes: Uint8Array): void; readonly id: string; }
 export interface SecretStore { resolve(handle: string): Uint8Array | Promise<Uint8Array>; }
 
@@ -107,7 +107,7 @@ export class MemoryOutputSink implements OutputSink {
   async write(port: string, bytes: Uint8Array, limits: Limits): Promise<OutputArtifact> { if (bytes.byteLength > limits.maxChunkBytes) throw new Error("output chunk exceeds limit"); const previous = this.bytes.get(port); const total = new Uint8Array((previous?.byteLength ?? 0) + bytes.byteLength); if (previous) total.set(previous, 0); total.set(bytes, previous?.byteLength ?? 0); if (total.byteLength > limits.maxOutputBytes) throw new Error("output exceeds limit"); const contentHash = await sha256Hex(total); const artifact = { handle: `memory:${port}`, byteLength: total.byteLength, contentHash }; this.bytes.set(port, total); this.artifacts.set(port, artifact); return artifact; }
   value(port: string, value: unknown): void { this.values.set(port, value); }
 }
-export class FixedClock implements Clock { readonly value: string; constructor(value: string) { this.value = value; } now(): string { return this.value; } }
+export class FixedClock implements Clock { readonly value: string; readonly zone: string; constructor(value: string, zone: string = "UTC") { this.value = value; this.zone = zone; } now(): string { return this.value; } timeZone(): string { return this.zone; } }
 export class CancellationToken implements Cancellation { private cancelled = false; cancel(): void { this.cancelled = true; } isCancelled(): boolean { return this.cancelled; } }
 export class SeededRandom implements Randomness { private state: number; readonly id: string; constructor(seed: number) { this.state = seed >>> 0; this.id = `seed:${seed}`; } fill(bytes: Uint8Array): void { for (let i = 0; i < bytes.length; i++) { this.state ^= this.state << 13; this.state ^= this.state >>> 17; this.state ^= this.state << 5; bytes[i] = this.state & 255; } } }
 export class MemorySecrets implements SecretStore { readonly values = new Map<string, Uint8Array>(); insert(handle: string, value: Uint8Array | string): this { this.values.set(handle, typeof value === "string" ? new TextEncoder().encode(value) : value); return this; } resolve(handle: string): Uint8Array { const value = this.values.get(handle); if (!value) throw new Error(`secret handle ${handle} is unavailable`); return value.slice(); } }

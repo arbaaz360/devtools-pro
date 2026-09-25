@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import { CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorCancelled, ProcessorContext, SeededRandom, defaultLimits } from "./context.ts";
 test("processor context is named, bounded, cancellable and deterministic", async () => { const reader = new MemoryReader().insert("input", "hello"); const sink = new MemoryOutputSink(); const cancel = new CancellationToken(); const random = new SeededRandom(7); const ctx = new ProcessorContext(reader, sink, cancel, new FixedClock("2025-01-01T00:00:00Z"), random, new MemorySecrets().insert("secret:1", "key"), { ...defaultLimits(), maxOutputBytes: 5 }); assert.equal(new TextDecoder().decode(await ctx.read("input")), "hello"); assert.equal(new TextDecoder().decode(await ctx.secret("secret:1")), "key"); assert.equal((await ctx.write("output", new TextEncoder().encode("hello"))).handle, "memory:output"); const first = new Uint8Array(3); random.fill(first); const second = new SeededRandom(7); const repeat = new Uint8Array(3); second.fill(repeat); assert.deepEqual(first, repeat); cancel.cancel(); await assert.rejects(() => ctx.read("input"), ProcessorCancelled); });
 
+test("FixedClock reports UTC unless given a zone", () => {
+  assert.equal(new FixedClock("2025-01-01T00:00:00Z").timeZone(), "UTC");
+  assert.equal(new FixedClock("2025-01-01T00:00:00Z", "Asia/Kolkata").timeZone(), "Asia/Kolkata");
+});
+
 test("streaming reads use bounded ranges and observe cancellation between chunks", async () => {
   const reader = new MemoryReader().insert("input", "abcdefghij");
   const cancel = new CancellationToken();
