@@ -1003,8 +1003,8 @@ export const checks = [
       await driver.tool("Unix Timestamp Converter", { text: "1700000000" });
       await sleep(300);
       const body = await driver.fullResult();
-      const local = /local: ([^\n]+)/.exec(body)?.[1];
-      const offset = /utcOffset: ([^\n]+)/.exec(body)?.[1];
+      const local = /local: (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}(?::\d{2})?)/.exec(body)?.[1];
+      const offset = /utcOffset: ([+-]\d{2}:\d{2}(?::\d{2})?)/.exec(body)?.[1];
       if (!local || !offset) return verdict(false, `no local/utcOffset field in result: ${body.slice(0, 160)}`);
       const appDateTime = local.slice(0, local.length - offset.length);
 
