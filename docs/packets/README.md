@@ -60,7 +60,7 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-131 | XML beautify and minify must keep element text (DU-16) | antigravity | merged (#138) |
 | AG-132 | Dates in years 0 to 99 get correct calendar fields (DU-01) | antigravity | merged (#139) |
 | AG-133 | A JWT is expired at its exp instant (DU-04) | claude | merged (#136) |
-| AG-134 | The Unix timestamp converter shows local time (DU-01, #104) | claude | ready |
+| AG-134 | The Unix timestamp converter shows local time (DU-01, #104) | claude | merged (#148) |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).

@@ -6,7 +6,7 @@ see `docs/packets/` for the packet that produced each batch of cards.
 
 | Card | Tool id | Met | Partial | Missing | n/a (shell) | Most significant gap |
 |---|---|---|---|---|---|---|
-| [DU-01](DU-01.md) Unix Timestamp Converter | `time.unix` | 24 / 1 / 2 / 5 | No local-time representation at all — every output is UTC-only, despite the card asking for "local and UTC/ISO representations." |
+| [DU-01](DU-01.md) Unix Timestamp Converter | `time.unix` | 25 / 0 / 1 / 5 | No common-date parsing beyond ISO 8601 (local time was added in #148). |
 | [DU-03](DU-03.md) RegExp Tester | `text.regex` | 19 / 2 / 4 / 4 | Not ICU (plain ECMAScript `RegExp`); no whitespace/comment (`x`) mode and no real Unicode UAX 29 word boundary, which are the two flavor features the card calls out by name. |
 | [DU-04](DU-04.md) JWT Debugger, decode/sign/verify | `security.jwt` | 17 / 1 / 3 / 2 | No signing at all — the card is titled "decode/sign/verify" and only decode/verify exist; there is no private-key input or re-signing workflow. |
 | [DU-06](DU-06.md) Base64 String Encoder/Decoder | `encoding.base64-text` | 14 / 0 / 1 / 6 | Fixed in #101 (AG-125): the output port declares `useAsInput`. |
