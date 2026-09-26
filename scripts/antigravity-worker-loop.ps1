@@ -38,6 +38,9 @@
   conversation, at most once every 30 minutes: when the packet's branch is on origin and
   its last commit is older than 10 minutes, it asks for the PR; when no branch exists
   45 minutes after dispatch, it asks the agent to continue or post BLOCKED or QUESTION.
+  An agent that posted BLOCKED or QUESTION waits for an answer it cannot see, so each
+  `[ID][ANSWER]` comment on the packet's issue or pull request is forwarded once, and
+  starts a new round.
 
   When -Root points at another checkout, the loop's own checkout is pulled every tick
   and the loop restarts itself when this script changes, so merged fixes take effect
@@ -176,6 +179,29 @@ function Get-LatestVerdict($prNumber) {
 }
 function Write-State($state) { $state | ConvertTo-Json | Set-Content $statePath -Encoding UTF8 }
 
+# An agent that posted [QUESTION] or [BLOCKED] has stopped and cannot see GitHub. Forward
+# each [ID][ANSWER] the integrator posts on the packet's issue or pull request, once.
+# Returns $true when something was forwarded; the answer starts a new round.
+$answerLine = '^\s*\[[A-Z]+-\d+\]\[ANSWER\]'
+function Send-Answers($state, $threads) {
+  $sent = $false
+  foreach ($thread in $threads) {
+    $comments = gh api "repos/$repo/issues/$thread/comments?per_page=100" | ConvertFrom-Json
+    foreach ($answer in @($comments | Where-Object { $_.body -match $answerLine -and $state.forwarded -notcontains $_.id })) {
+      $text = "The integrator answered on #$thread for packet #$($state.issue). Act on the answer and continue the packet through Step 6 without waiting for further confirmation. Answer:`n`n$($answer.body)"
+      Write-Host ('{0}  forwarding an answer on #{1} to Antigravity' -f (Get-Date -Format 'HH:mm'), $thread)
+      $out = Invoke-AgentApi send-message "--title=[answer] #$thread" $ConversationId $text
+      if ($out -match '"error"\s*:\s*"[^"]') { Write-Warning "forwarding failed: $out"; return $sent }
+      $state.forwarded = @($state.forwarded) + $answer.id
+      $state.startedAt = (Get-Date).ToString('o')
+      $state.nudgedAt = (Get-Date).ToString('o')   # give the agent 30 minutes before any nudge
+      Write-State $state
+      $sent = $true
+    }
+  }
+  return $sent
+}
+
 function Get-ReadyIssue {
   $issues = gh issue list --repo $repo --state open --label packet --label ready --label antigravity --json number,title,body | ConvertFrom-Json
   if (-not $issues) { return $null }
@@ -248,8 +274,12 @@ function Test-InFlight($state) {
   $open = gh issue view $state.issue --repo $repo --json state --jq .state
   if ($open -ne 'OPEN') { return $false }
   $prs = gh pr list --repo $repo --state all --search "`"Packet: $($state.packet)`" in:body" --json number,state | ConvertFrom-Json
-  if (-not $prs -or $prs.Count -eq 0) { Send-Nudge $state; return $true }   # still working, no PR yet
+  if (-not $prs -or $prs.Count -eq 0) {   # still working, no PR yet
+    if (-not (Send-Answers $state @($state.issue))) { Send-Nudge $state }
+    return $true
+  }
   $pr = $prs[0]
+  if ($pr.state -eq 'OPEN' -and (Send-Answers $state @($state.issue, $pr.number))) { return $true }
   if ($pr.state -ne 'OPEN') {
     Write-Host "packet #$($state.issue): PR #$($pr.number) is $($pr.state); releasing"
     return $false
