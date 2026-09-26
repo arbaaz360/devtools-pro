@@ -61,6 +61,11 @@ parses **Allowed files** from the fenced block under that heading:
 | AG-132 | Dates in years 0 to 99 get correct calendar fields (DU-01) | antigravity | merged (#139) |
 | AG-133 | A JWT is expired at its exp instant (DU-04) | claude | merged (#136) |
 | AG-134 | The Unix timestamp converter shows local time (DU-01, #104) | claude | merged (#148) |
+| AG-135 | Hex ↔ text converter (new package) | antigravity | ready |
+| AG-136 | Line tools: sort, dedupe, reverse, remove blanks (new package) | antigravity | ready |
+| AG-137 | The Unix timestamp converter reads RFC 5322 and HTTP dates (DU-01) | antigravity | ready |
+| AG-138 | JWT signing (DU-04) | antigravity | ready |
+| AG-139 | X.509 certificate decoder (new package) | antigravity | ready |
 
 The earlier packets live in `docs/ANTIGRAVITY_TASKS.md` (AG-001 to AG-007) and
 `docs/CLAUDE_TASKS.md` on branch `codex/claude-task-pack` (CL-001 to CL-006).
