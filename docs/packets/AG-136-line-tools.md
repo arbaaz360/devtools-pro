@@ -30,7 +30,9 @@ sort/dedupe", `docs/PARITY_AND_BUILDING_BLOCKS.md`) and not yet built.
   operation `text.lines`.
   - Input port `input`, a text document.
   - Output `output`, representations `["text", "properties"]`, mime `["text/plain"]`.
-  - Triggers `explicit` + `inputChange` + `optionChange`.
+  - Triggers `explicit` + `inputChange`. There is no option-change mode: a tool with
+    `inputChange` also re-runs when an option changes (`autoOnOption` in
+    `apps/desktop/src/plugins/describe.ts`).
   - Limits: 4 MiB in and out, `deadlineMs` 2000.
 - **Options:** kebab-case, camelCase aliases, structured errors.
   - `action`: `sort` | `dedupe` | `reverse` | `remove-blank`, default `sort`.
