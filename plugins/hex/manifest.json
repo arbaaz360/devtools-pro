@@ -1,0 +1,29 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "encoding.hex",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Hex Text",
+  "description": "Encode the exact input bytes as hexadecimal, or decode hex digits to UTF-8 text with binary payloads labelled as bytes.",
+  "tools": [{"id":"encoding.hex","title":"Hex Text","category":"converter","operationIds":["encoding.hex"],"workspaceId":"hex"}],
+  "operations": [{
+    "id":"encoding.hex",
+    "title":"Encode or decode hex text",
+    "executor":{"kind":"javascriptWorker","id":"encoding.hex.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain","application/octet-stream"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+    "options":[
+      {"id":"mode","type":"enum","label":"Mode","default":"encode","choices":[{"id":"encode","label":"Encode"},{"id":"decode","label":"Decode"}],"persistence":"instance","sensitive":false},
+      {"id":"case","type":"enum","label":"Case","default":"lower","choices":[{"id":"lower","label":"Lower"},{"id":"upper","label":"Upper"}],"persistence":"instance","sensitive":false},
+      {"id":"separator","type":"enum","label":"Separator","default":"none","choices":[{"id":"none","label":"None"},{"id":"space","label":"Space"},{"id":"colon","label":"Colon"}],"persistence":"instance","sensitive":false},
+      {"id":"bytes-per-line","type":"integer","label":"Bytes per line","default":"0","minimum":"0","maximum":"256","persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
+    "limits":{"maxInputBytes":"2097152","maxOutputBytes":"8388608","maxChunkBytes":"8388608","deadlineMs":"1000"}
+  }],
+  "workspaces":[{"id":"hex","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":[],"fixtures":[],"uiScenarios":[]}
+}
