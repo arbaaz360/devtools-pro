@@ -170,8 +170,9 @@ question: <one question>
 options: <the readings you see and which you would pick>
 ```
 
-Then stop. The integrator answers in the same thread. Do not pick an option and
-continue unless the packet says the choice is yours.
+Then stop. The integrator answers in the same thread, with a comment that starts
+`[<ID>][ANSWER]`; the Antigravity loop forwards it to the conversation. Do not pick
+an option and continue unless the packet says the choice is yours.
 
 If the quality gate fails on files you did not touch, that is a shared
 failure: post `[BLOCKED]` with the run link. Do not patch shared code from a
