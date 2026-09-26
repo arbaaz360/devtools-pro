@@ -16,7 +16,7 @@ The tool supports four primary operations on the lines of the input text:
 When using the **Sort** action, four comparison methods are available:
 
 1. **Natural**: Splits each line into alternating runs of digits and non-digits. Digit runs are compared by numeric value (ignoring leading zeros), but equal numeric values are ordered such that shorter runs (fewer leading zeros) appear first. Non-digit runs are compared by Unicode code point. A digit run will always sort before a non-digit run.
-   - *Example*: `a2`, `a02`, `a10`, `a1b`, `10`
+   - *Example*: `9`, `10`, `a1b`, `a2`, `a02`, `a10`
 2. **Numeric**: Extracts a leading number from each line (which may include a sign, decimal fraction, and exponent) and sorts lines by this numeric value. Lines that do not begin with a valid number are sorted after all numbered lines, by code point among themselves.
    - *Example*: `-1.5e2`, `0.5`, `42`, `abc`, `no number`
 3. **Case Insensitive**: Converts all text to lower case before comparing by Unicode code point.

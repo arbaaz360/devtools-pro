@@ -77,11 +77,11 @@ test("Limits: output bytes", async () => {
 test("Performance: 100,000 lines sorted inside the deadline", async () => {
   const lines = Array.from({ length: 100000 }, (_, i) => `line${100000 - i}`);
   const input = lines.join("\n");
-  
+
   const start = performance.now();
   const { result, error } = await run({ action: "sort", compare: "natural" }, input);
   const end = performance.now();
-  
+
   if (error) throw error;
   assert.ok(result, "should return a result");
   assert.equal(result.lines, 100000);
@@ -92,4 +92,47 @@ test("Performance: 100,000 lines sorted inside the deadline", async () => {
 test("Cancellation is checked", async () => {
   const res = await run({ action: "sort" }, "a\nb\nc", { cancelFlag: true });
   assert.equal(res.error.name, "ProcessorCancelled");
+
+  // test cancellation during sort
+  const lines = Array.from({ length: 150000 }, (_, i) => `line${(i * 17) % 150000}`);
+  const input = lines.join("\n");
+
+  let readOnce = false;
+  const context = {
+    limits: defaultLimits,
+    cancellation: {
+      isCancelled: () => readOnce
+    },
+    read: async () => {
+      if (!readOnce) {
+        readOnce = true;
+        return new TextEncoder().encode(input);
+      }
+      return null;
+    },
+    write: async () => {},
+    writeValue: async () => {}
+  };
+
+  try {
+    await execute({ options: { action: "sort", compare: "natural" } }, context);
+    assert.fail("Should have cancelled");
+  } catch (error) {
+    if (error.name === "AssertionError") throw error;
+    assert.equal(error.name, "ProcessorCancelled");
+  }
+});
+
+test("Empty document properties", async () => {
+  const { result } = await run({}, "");
+  assert.equal(result.lines, 0);
+  assert.equal(result.linesOut, 0);
+  assert.equal(result.removed, 0);
+  assert.equal(result.text, "");
+
+  const { result: resultRm } = await run({ action: "remove-blank" }, "");
+  assert.equal(resultRm.lines, 0);
+  assert.equal(resultRm.linesOut, 0);
+  assert.equal(resultRm.removed, 0);
+  assert.equal(resultRm.text, "");
 });

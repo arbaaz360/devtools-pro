@@ -1,10 +1,11 @@
 import json
 import re
+import decimal
 
 fixtures = []
 
 def natural_key(s):
-    runs = re.findall(r'\d+|\D+', s)
+    runs = re.findall(r'[0-9]+|[^0-9]+', s)
     key = []
     for run in runs:
         if run.isdigit():
@@ -14,9 +15,9 @@ def natural_key(s):
     return tuple(key)
 
 def numeric_key(s):
-    m = re.match(r'^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)', s)
+    m = re.match(r'^\s*([-+]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][-+]?[0-9]+)?)', s)
     if m:
-        return (0, float(m.group(1)))
+        return (0, decimal.Decimal(m.group(1)))
     return (1, s)
 
 def case_insensitive_key(s):
@@ -52,7 +53,7 @@ def process(text, options):
     ending = detect_ending(text)
     has_trailing = text.endswith('\n') or text.endswith('\r')
     
-    lines = re.split(r'\r\n|\n|\r', text)
+    lines = re.split(r'\r\n|\n|\r', text) if text else []
     if has_trailing and lines:
         lines.pop()
     
@@ -66,13 +67,6 @@ def process(text, options):
         compare = options.get("compare", "natural")
         desc = options.get("order", "ascending") == "descending"
         
-        # Python's sort is stable. 
-        # When descending is true, we reverse the sort order but MUST preserve stability (equal keys keep original order).
-        # Python's `sorted(reverse=True)` does not preserve stability for equal keys (it reverses their order).
-        # Wait! Python's `sorted(reverse=True)` IS stable. Elements with equal keys keep their original order!
-        # Let's verify: sorted([(1, 'a'), (1, 'b')], key=lambda x: x[0], reverse=True) -> [(1, 'a'), (1, 'b')]
-        # So `sorted(reverse=True)` is stable in Python!
-        
         if compare == "natural":
             lines.sort(key=natural_key, reverse=desc)
         elif compare == "numeric":
@@ -83,12 +77,7 @@ def process(text, options):
             lines.sort(reverse=desc)
     
     out = ending.join(lines)
-    if has_trailing and (lines or action != "remove-blank"):
-        # if input was blank lines and we removed them, if lines is empty, does it keep trailing?
-        # "A final line ending in the input is kept, present or absent."
-        # However, if output has no lines and has_trailing, adding ending makes it 1 blank line. 
-        # Wait, if remove-blank is used and all lines are removed, output should be empty string!
-        # So we only add trailing if lines is not empty, OR if action is not remove-blank.
+    if has_trailing and lines:
         out += ending
         
     return out
@@ -118,10 +107,16 @@ add_fixture("code point surrogates desc", {"compare": "code-point", "order": "de
 # a2/a02/a10/a1b/10/9, and digit runs longer than 20 digits
 add_fixture("natural sort", {"compare": "natural"}, "a10\na02\na2\na1b\n10\n9")
 add_fixture("natural sort long digits", {"compare": "natural"}, "10000000000000000000000000001\n10000000000000000000000000000")
+add_fixture("natural sort non ascii digits", {"compare": "natural"}, "x10\nx٣\nx2")
 
 # signed, fractional and exponent numbers, plus lines with none
 add_fixture("numeric sort", {"compare": "numeric"}, "abc\n-1.5e2\n 42\n+0.5\nno number\n.9")
 add_fixture("numeric sort desc", {"compare": "numeric", "order": "descending"}, "abc\n-1.5e2\n 42\n+0.5\nno number\n.9")
+add_fixture("numeric exact 1", {"compare": "numeric"}, "123456789012345678901234567891\n123456789012345678901234567890")
+add_fixture("numeric exact 2", {"compare": "numeric"}, "0.10000000000000000001\n0.1")
+add_fixture("numeric exact 3", {"compare": "numeric"}, "1e-400\n0")
+add_fixture("numeric exact 4", {"compare": "numeric"}, "2e308\n1e309")
+add_fixture("numeric non ascii digits", {"compare": "numeric"}, "٣\n2\n10")
 
 # case variants for dedupe with and without ignore-case, and whitespace variants with ignore-whitespace
 add_fixture("dedupe default", {"action": "dedupe"}, "a\nA\n a \na")
@@ -135,6 +130,7 @@ add_fixture("remove blank trailing", {"action": "remove-blank"}, "a\n\n \n\t\n")
 
 # descending with ties (stability)
 add_fixture("descending stability", {"order": "descending", "compare": "numeric"}, "1 b\n1 a\n1 c")
+add_fixture("descending stability exact", {"order": "descending", "compare": "numeric"}, "0 b\n-0 a\n+0.0 c\n0e5 d")
 
 with open("plugins/lines/fixtures/test.json", "w", encoding="utf-8", newline="\n") as f:
     json.dump(fixtures, f, indent=2, ensure_ascii=False)

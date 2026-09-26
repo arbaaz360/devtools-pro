@@ -51,38 +51,13 @@ export function readOptions(options = {}) {
   };
 }
 
-async function readAllText(context) {
-  let chunks = [];
-  let totalLength = 0;
-  while (true) {
-    if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
-    const chunk = await context.read("input");
-    if (chunk === null) break;
-    chunks.push(chunk);
-    totalLength += chunk.byteLength;
-  }
-  if (totalLength === 0) return { text: "", inputBytes: 0 };
-  if (chunks.length === 1) {
-    const text = new TextDecoder("utf-8").decode(chunks[0]);
-    return { text, inputBytes: chunks[0].byteLength };
-  }
-  const all = new Uint8Array(totalLength);
-  let pos = 0;
-  for (const chunk of chunks) {
-    all.set(chunk, pos);
-    pos += chunk.byteLength;
-  }
-  const text = new TextDecoder("utf-8").decode(all);
-  return { text, inputBytes: totalLength };
-}
-
 function cmpCodePoint(a, b) {
   if (a === b) return 0;
   let i = 0, j = 0;
   while (i < a.length && j < b.length) {
     const ca = a.charCodeAt(i);
     const cb = b.charCodeAt(j);
-    
+
     let cpA = ca;
     let stepA = 1;
     if (ca >= 0xD800 && ca <= 0xDBFF && i + 1 < a.length) {
@@ -92,7 +67,7 @@ function cmpCodePoint(a, b) {
         stepA = 2;
       }
     }
-    
+
     let cpB = cb;
     let stepB = 1;
     if (cb >= 0xD800 && cb <= 0xDBFF && j + 1 < b.length) {
@@ -102,7 +77,7 @@ function cmpCodePoint(a, b) {
         stepB = 2;
       }
     }
-    
+
     if (cpA !== cpB) return cpA - cpB;
     i += stepA;
     j += stepB;
@@ -114,22 +89,75 @@ function cmpCaseInsensitive(a, b) {
   return cmpCodePoint(a.toLowerCase(), b.toLowerCase());
 }
 
-const numRegex = /^\s*([-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?)/;
+const numRegex = /^\s*([-+]?)((?:\d+(?:\.\d*)?|\.\d+))(?:[eE]([-+]?\d+))?/;
 function getNumericKey(s) {
-  const m = s.match(numRegex);
-  if (m) {
-    return { hasNum: true, val: parseFloat(m[1]) };
+  const match = s.match(numRegex);
+  if (!match) return { hasNum: false };
+  const sign = match[1] === '-' ? -1 : 1;
+  const numStr = match[2];
+  const expStr = match[3] || '0';
+
+  let intPart = '';
+  let fracPart = '';
+  const dotIndex = numStr.indexOf('.');
+  if (dotIndex === -1) {
+    intPart = numStr;
+  } else {
+    intPart = numStr.slice(0, dotIndex);
+    fracPart = numStr.slice(dotIndex + 1);
   }
-  return { hasNum: false };
+
+  intPart = intPart.replace(/^0+/, '');
+
+  let sigDigits = '';
+  let baseExp = 0n;
+
+  if (intPart.length > 0) {
+    sigDigits = intPart + fracPart;
+    baseExp = BigInt(intPart.length - 1);
+  } else {
+    const firstNonZero = fracPart.search(/[1-9]/);
+    if (firstNonZero === -1) {
+      return { hasNum: true, isZero: true, sign: 1 };
+    }
+    sigDigits = fracPart.slice(firstNonZero);
+    baseExp = BigInt(-firstNonZero - 1);
+  }
+
+  sigDigits = sigDigits.replace(/0+$/, '');
+
+  return {
+    hasNum: true,
+    isZero: false,
+    sign,
+    exp: baseExp + BigInt(expStr),
+    digits: sigDigits
+  };
 }
 
 function cmpNumeric(a, b) {
   const ka = getNumericKey(a);
   const kb = getNumericKey(b);
-  
+
   if (ka.hasNum && kb.hasNum) {
-    if (ka.val !== kb.val) return ka.val - kb.val;
-    return 0; // if numbers are equal, they remain stable
+    if (ka.isZero && kb.isZero) return 0;
+    if (ka.isZero) return kb.sign === 1 ? -1 : 1;
+    if (kb.isZero) return ka.sign === 1 ? 1 : -1;
+
+    if (ka.sign !== kb.sign) return ka.sign - kb.sign;
+
+    const signMult = ka.sign;
+
+    if (ka.exp !== kb.exp) return ka.exp < kb.exp ? -signMult : signMult;
+
+    const len = Math.max(ka.digits.length, kb.digits.length);
+    for (let i = 0; i < len; i++) {
+      const da = i < ka.digits.length ? ka.digits.charCodeAt(i) : 48; // '0'
+      const db = i < kb.digits.length ? kb.digits.charCodeAt(i) : 48;
+      if (da !== db) return (da - db) * signMult;
+    }
+
+    return 0; // if numbers are exactly equal, they remain stable
   }
   if (ka.hasNum && !kb.hasNum) return -1;
   if (!ka.hasNum && kb.hasNum) return 1;
@@ -144,20 +172,20 @@ function cmpNatural(a, b) {
   if (a === b) return 0;
   const runsA = splitNatural(a);
   const runsB = splitNatural(b);
-  
+
   const len = Math.min(runsA.length, runsB.length);
   for (let i = 0; i < len; i++) {
     const ra = runsA[i];
     const rb = runsB[i];
     if (ra === rb) continue;
-    
+
     const isDigitA = ra.charCodeAt(0) >= 48 && ra.charCodeAt(0) <= 57;
     const isDigitB = rb.charCodeAt(0) >= 48 && rb.charCodeAt(0) <= 57;
-    
+
     if (isDigitA && isDigitB) {
       const valA = ra.replace(/^0+/, '');
       const valB = rb.replace(/^0+/, '');
-      
+
       if (valA.length !== valB.length) return valA.length - valB.length;
       if (valA !== valB) return valA < valB ? -1 : 1;
       if (ra.length !== rb.length) return ra.length - rb.length;
@@ -175,9 +203,9 @@ function cmpNatural(a, b) {
 
 export async function execute(request, context) {
   if (context.cancellation.isCancelled()) throw new ProcessorCancelled();
-  
+
   const options = readOptions(request?.options);
-  
+
   let text = "";
   let inputBytes = 0;
   try {
@@ -191,7 +219,7 @@ export async function execute(request, context) {
       // no input
     } else throw e;
   }
-  
+
   if (inputBytes > context.limits.maxInputBytes) {
     throw new LineToolsError("lines.input-limit", `Input is too large`);
   }
@@ -204,7 +232,7 @@ export async function execute(request, context) {
     else if (m === '\n') lf++;
     else if (m === '\r') cr++;
   }
-  
+
   let lineEnding = "LF";
   let sep = '\n';
   if (crlf > lf && crlf > cr) {
@@ -214,7 +242,7 @@ export async function execute(request, context) {
     sep = '\r';
     lineEnding = "CR";
   }
-  
+
   // check trailing newline
   let hasTrailing = false;
   if (text.length > 0) {
@@ -224,8 +252,8 @@ export async function execute(request, context) {
     }
   }
 
-  let lines = text.split(/\r\n|\n|\r/);
-  if (hasTrailing) {
+  let lines = text.length === 0 ? [] : text.split(/\r\n|\n|\r/);
+  if (hasTrailing && lines.length > 0) {
     lines.pop(); // remove the empty string produced by trailing separator
   }
 
@@ -256,38 +284,32 @@ export async function execute(request, context) {
                       options.compare === "case-insensitive" ? cmpCaseInsensitive :
                       options.compare === "numeric" ? cmpNumeric :
                       cmpCodePoint;
-                      
+
     const orderMult = options.order === "descending" ? -1 : 1;
-    
+
     // Sort implementation allowing cancellation checks
-    // We map to wrapper to avoid sorting taking too long without cancellation checks
+    let checks = 0;
     const wrapper = lines.map((val, idx) => ({ val, idx }));
     wrapper.sort((a, b) => {
+      if (++checks % 65536 === 0 && context.cancellation.isCancelled()) {
+        throw new ProcessorCancelled();
+      }
       const c = compareFn(a.val, b.val);
       if (c !== 0) return c * orderMult;
       return a.idx - b.idx; // ensure absolute stability
     });
-    
+
     lines = wrapper.map(w => w.val);
   }
 
   const finalCount = lines.length;
   const removed = initialCount - finalCount;
-  
+
   let outText = lines.join(sep);
   if (hasTrailing && lines.length > 0) {
     outText += sep;
-  } else if (hasTrailing && lines.length === 0 && text.length > 0) {
-    // Edge case: if it was just blank lines and all removed, do we keep one trailing?
-    // "A final line ending in the input is kept, present or absent."
-    // If output is empty, should it have trailing newline? The prompt says "A final line ending is kept".
-    // But if there are no lines to append it to... we just output empty string? 
-    // We'll see from fixtures. Usually if text is empty, output is empty.
-    if (options.action !== "remove-blank") {
-      outText += sep;
-    }
   }
-  
+
   const outputBytes = new TextEncoder().encode(outText);
   if (outputBytes.length > context.limits.maxOutputBytes) {
     throw new LineToolsError("lines.output-limit", `Output would produce ${outputBytes.length.toLocaleString("en-US")} bytes, above the ${context.limits.maxOutputBytes.toLocaleString("en-US")} byte output limit; split the input or raise the limit`, { needed: outputBytes.length, limit: context.limits.maxOutputBytes });
