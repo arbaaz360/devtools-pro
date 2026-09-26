@@ -112,6 +112,8 @@ test("Over-limit result fails explicitly", async () => {
   const limits = { ...defaultLimits, maxOutputBytes: 10 };
   const input = new Uint8Array(10); // encode will be 20 bytes
   const { error } = await run({ mode: "encode" }, input, { limits });
-  assert.ok(error, "should fail on size limit");
-  assert.match(error.message, /exceeds maximum allowed size 10/);
+  assert.ok(error instanceof HexError, "should be a HexError");
+  assert.equal(error.code, "hex.output-limit");
+  assert.equal(error.diagnostic.needed, 20);
+  assert.equal(error.diagnostic.limit, 10);
 });

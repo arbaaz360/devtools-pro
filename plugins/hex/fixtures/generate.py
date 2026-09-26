@@ -98,7 +98,7 @@ add_fixture("error odd run end", {"mode": "decode"}, b"486", None, {"code": "hex
 add_fixture("decode non-utf8", {"mode": "decode"}, b"ff fe 00", bytes.fromhex("ff fe 00"))
 
 # Write the fixtures
-with open("plugins/hex/fixtures/test.json", "w", encoding="utf-8") as f:
+with open("plugins/hex/fixtures/test.json", "w", encoding="utf-8", newline="\n") as f:
     json.dump(fixtures, f, indent=2, ensure_ascii=False)
 
 print(f"Generated {len(fixtures)} fixtures")

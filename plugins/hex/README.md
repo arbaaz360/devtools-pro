@@ -1,4 +1,4 @@
-# Hex Text
+# Hex ↔ Text
 
 This package encodes text (its exact bytes) into hexadecimal and decodes hexadecimal back into bytes.
 

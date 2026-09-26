@@ -83,7 +83,7 @@ function hexEncode(bytes, options, context) {
   }
   
   if (outLen > context.limits.maxOutputBytes) {
-    throw new Error(`Output size ${outLen} exceeds maximum allowed size ${context.limits.maxOutputBytes}`);
+    throw new HexError("hex.output-limit", `Encoding would produce ${outLen.toLocaleString("en-US")} bytes, above the ${context.limits.maxOutputBytes.toLocaleString("en-US")} byte output limit; split the input or raise the limit`, null, { needed: outLen, limit: context.limits.maxOutputBytes });
   }
   
   const output = new Uint8Array(outLen);
@@ -190,7 +190,7 @@ function hexDecode(input, context) {
   }
   
   if (outPos > context.limits.maxOutputBytes) {
-    throw new Error(`Output size ${outPos} exceeds maximum allowed size ${context.limits.maxOutputBytes}`);
+    throw new HexError("hex.output-limit", `Decoding would produce ${outPos.toLocaleString("en-US")} bytes, above the ${context.limits.maxOutputBytes.toLocaleString("en-US")} byte output limit; split the input or raise the limit`, null, { needed: outPos, limit: context.limits.maxOutputBytes });
   }
   
   return temp.slice(0, outPos);
