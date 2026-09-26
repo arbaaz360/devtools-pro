@@ -20,7 +20,7 @@
       {"id":"ignore-case","type":"boolean","label":"Ignore Case","default":false,"persistence":"instance","sensitive":false},
       {"id":"ignore-whitespace","type":"boolean","label":"Ignore Whitespace","default":false,"persistence":"instance","sensitive":false}
     ],
-    "trigger":{"modes":["explicit","inputChange","optionsChange"],"debounceMs":"100"},
+    "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
     "limits":{"maxInputBytes":"4194304","maxOutputBytes":"4194304","maxChunkBytes":"4194304","deadlineMs":"2000"}
   }],
   "workspaces":[{"id":"lines","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
