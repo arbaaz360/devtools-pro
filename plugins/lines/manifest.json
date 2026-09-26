@@ -1,0 +1,30 @@
+{
+  "kind": "pluginManifest",
+  "apiVersion": "devtools.plugin/v2",
+  "id": "text.lines",
+  "version": "0.1.0",
+  "stateVersion": 1,
+  "title": "Line Tools",
+  "description": "Sorts, de-duplicates, reverses, and cleans the lines of a document.",
+  "tools": [{"id":"text.lines","title":"Line Tools","category":"text","operationIds":["text.lines"],"workspaceId":"lines"}],
+  "operations": [{
+    "id":"text.lines",
+    "title":"Line Tools",
+    "executor":{"kind":"javascriptWorker","id":"text.lines.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
+    "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
+    "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain"],"representations":["text","properties"],"sensitive":false,"exports":["copyText","save"]}],
+    "options":[
+      {"id":"action","type":"enum","label":"Action","default":"sort","choices":[{"id":"sort","label":"Sort"},{"id":"dedupe","label":"De-duplicate"},{"id":"reverse","label":"Reverse"},{"id":"remove-blank","label":"Remove blank lines"}],"persistence":"instance","sensitive":false},
+      {"id":"order","type":"enum","label":"Order","default":"ascending","choices":[{"id":"ascending","label":"Ascending"},{"id":"descending","label":"Descending"}],"persistence":"instance","sensitive":false},
+      {"id":"compare","type":"enum","label":"Compare","default":"natural","choices":[{"id":"natural","label":"Natural"},{"id":"code-point","label":"Code Point"},{"id":"case-insensitive","label":"Case Insensitive"},{"id":"numeric","label":"Numeric"}],"persistence":"instance","sensitive":false},
+      {"id":"ignore-case","type":"boolean","label":"Ignore Case","default":false,"persistence":"instance","sensitive":false},
+      {"id":"ignore-whitespace","type":"boolean","label":"Ignore Whitespace","default":false,"persistence":"instance","sensitive":false}
+    ],
+    "trigger":{"modes":["explicit","inputChange","optionsChange"],"debounceMs":"100"},
+    "limits":{"maxInputBytes":"4194304","maxOutputBytes":"4194304","maxChunkBytes":"4194304","deadlineMs":"2000"}
+  }],
+  "workspaces":[{"id":"lines","kind":"transform","bindings":[{"id":"input","component":"editor","inputPort":"input"},{"id":"result","component":"output","outputPort":"output"}],"commands":[],"presentationSettings":[]}],
+  "capabilities":[],
+  "settings":[],
+  "tests":{"requirementIds":[],"fixtures":[],"uiScenarios":[]}
+}

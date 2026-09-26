@@ -1,0 +1,149 @@
+[
+  {
+    "name": "empty input",
+    "options": {},
+    "input": "",
+    "output": ""
+  },
+  {
+    "name": "one line",
+    "options": {},
+    "input": "hello",
+    "output": "hello"
+  },
+  {
+    "name": "one line trailing",
+    "options": {},
+    "input": "hello\n",
+    "output": "hello\n"
+  },
+  {
+    "name": "mixed endings CRLF majority",
+    "options": {},
+    "input": "a\r\nb\r\nc\nd",
+    "output": "a\r\nb\r\nc\r\nd"
+  },
+  {
+    "name": "mixed endings CR majority",
+    "options": {},
+    "input": "a\rb\rc\n\r\nd",
+    "output": "\ra\rb\rc\rd"
+  },
+  {
+    "name": "mixed endings LF majority",
+    "options": {},
+    "input": "a\nb\nc\r\nd",
+    "output": "a\nb\nc\nd"
+  },
+  {
+    "name": "code point surrogates",
+    "options": {
+      "compare": "code-point"
+    },
+    "input": "😀\n｡",
+    "output": "｡\n😀"
+  },
+  {
+    "name": "code point surrogates desc",
+    "options": {
+      "compare": "code-point",
+      "order": "descending"
+    },
+    "input": "｡\n😀",
+    "output": "😀\n｡"
+  },
+  {
+    "name": "natural sort",
+    "options": {
+      "compare": "natural"
+    },
+    "input": "a10\na02\na2\na1b\n10\n9",
+    "output": "9\n10\na1b\na2\na02\na10"
+  },
+  {
+    "name": "natural sort long digits",
+    "options": {
+      "compare": "natural"
+    },
+    "input": "10000000000000000000000000001\n10000000000000000000000000000",
+    "output": "10000000000000000000000000000\n10000000000000000000000000001"
+  },
+  {
+    "name": "numeric sort",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "abc\n-1.5e2\n 42\n+0.5\nno number\n.9",
+    "output": "-1.5e2\n+0.5\n.9\n 42\nabc\nno number"
+  },
+  {
+    "name": "numeric sort desc",
+    "options": {
+      "compare": "numeric",
+      "order": "descending"
+    },
+    "input": "abc\n-1.5e2\n 42\n+0.5\nno number\n.9",
+    "output": "no number\nabc\n 42\n.9\n+0.5\n-1.5e2"
+  },
+  {
+    "name": "dedupe default",
+    "options": {
+      "action": "dedupe"
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\nA\n a "
+  },
+  {
+    "name": "dedupe ignore case",
+    "options": {
+      "action": "dedupe",
+      "ignore-case": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\n a "
+  },
+  {
+    "name": "dedupe ignore whitespace",
+    "options": {
+      "action": "dedupe",
+      "ignore-whitespace": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\nA"
+  },
+  {
+    "name": "dedupe both",
+    "options": {
+      "action": "dedupe",
+      "ignore-case": true,
+      "ignore-whitespace": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a"
+  },
+  {
+    "name": "remove blank",
+    "options": {
+      "action": "remove-blank"
+    },
+    "input": "a\n\n \n\t\nb",
+    "output": "a\nb"
+  },
+  {
+    "name": "remove blank trailing",
+    "options": {
+      "action": "remove-blank"
+    },
+    "input": "a\n\n \n\t\n",
+    "output": "a\n"
+  },
+  {
+    "name": "descending stability",
+    "options": {
+      "order": "descending",
+      "compare": "numeric"
+    },
+    "input": "1 b\n1 a\n1 c",
+    "output": "1 b\n1 a\n1 c"
+  }
+]
