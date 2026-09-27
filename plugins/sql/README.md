@@ -22,6 +22,7 @@ text means different things in different databases:
 
 **Beautify** restructures the token stream:
 - Trims redundant whitespace while preserving required spacing around keywords and operators.
+- Never removes whitespace the input had between two tokens: a pair the spacing rules do not name (`World!` then `second`, or a `#`, `@` or `!` between words) keeps a space. Layout closes a gap only after `(` or `[`, before `)`, `,` or `;`, and between a function or type name and its `(`. Line breaks may become spaces, and a space may become a line break.
 - Enforces consistent casing for SQL keywords (e.g., `UPPERCASE` or `lowercase`).
 - Structures queries with newlines after major clauses (`SELECT`, `FROM`, `WHERE`, etc.).
 - Applies indentation based on parentheses nesting and clause depth.
@@ -35,12 +36,17 @@ text means different things in different databases:
 
 ## Options
 
-| Option | Choices | Default | Meaning |
-|---|---|---|---|
-| `dialect` | `sql`, `mysql`, `mariadb`, `postgresql`, `plsql` | `sql` | SQL dialect for parsing quotes and comments. |
-| `keyword-case` | `upper`, `lower`, `preserve` | `upper` | Casing applied to identified SQL keywords. |
-| `indent` | `space-2`, `space-4`, `tab` | `space-2` | Indentation style. (Accepts `2` or `4` as aliases for backwards compatibility). |
-| `comma-position` | `end`, `start` | `end` | Comma placement in lists (after previous item or before next item). |
+| Option | Label | Operations | Choices | Default | Meaning |
+|---|---|---|---|---|---|
+| `dialect` | Dialect | Format, Minify | `sql`, `mysql`, `mariadb`, `postgresql`, `plsql` | `sql` | SQL dialect for parsing quotes and comments. |
+| `keyword-case` | Keyword case | Format | `upper`, `lower`, `preserve` | `upper` | Casing applied to identified SQL keywords. |
+| `indent` | Indentation | Format | `space-2`, `space-4`, `tab` | `space-2` | Indentation style. (Accepts `2` or `4` as aliases for backwards compatibility). |
+| `comma-position` | Comma position | Format | `end`, `start` | `end` | Comma placement in lists (after previous item or before next item). |
+
+The Minify operation declares only `dialect`: it prints every token as written, so keyword
+case, indentation and comma position never change its output (the test suite checks each
+of them at every value against every minify fixture). The processor still accepts all four
+ids for either operation.
 
 ## Output
 

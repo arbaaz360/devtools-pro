@@ -9,8 +9,8 @@
   "tools": [{
     "id": "media.qr-reader",
     "title": "QR Code Reader",
-    "category": "converter",
-    "description": "Reads a QR code out of an image and reports its decoded text.",
+    "category": "generate",
+    "description": "The text inside a QR code image",
     "searchAliases": ["qr", "qrcode", "reader", "scan", "decode", "barcode"],
     "operationIds": ["media.qr-reader"],
     "workspaceId": "qr-reader"
@@ -18,13 +18,13 @@
   "operations": [
     {
       "id": "media.qr-reader",
-      "title": "Read QR Code",
+      "title": "Read",
       "executor": { "kind": "javascriptWorker", "id": "media.qr-reader.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
       "inputs": [{ "id": "input", "label": "Image", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["image"], "mime": ["image/png", "image/jpeg", "image/webp"] }],
-      "outputs": [{ "id": "output", "label": "Decoded Text", "kind": "value", "multiplicity": "one", "mime": ["text/plain"], "representations": ["text", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
+      "outputs": [{ "id": "output", "label": "Decoded text", "kind": "value", "multiplicity": "one", "mime": ["text/plain"], "representations": ["text", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
       "options": [
         { "id": "invert", "type": "boolean", "label": "Invert", "default": false, "persistence": "instance", "sensitive": false },
-        { "id": "try-harder", "type": "boolean", "label": "Try Harder", "default": true, "persistence": "instance", "sensitive": false }
+        { "id": "try-harder", "type": "boolean", "label": "Try harder (slower)", "default": true, "persistence": "instance", "sensitive": false }
       ],
       "trigger": { "modes": ["explicit"], "debounceMs": "0" },
       "limits": { "maxInputBytes": "67108864", "maxOutputBytes": "65536", "maxChunkBytes": "65536", "deadlineMs": "5000" }

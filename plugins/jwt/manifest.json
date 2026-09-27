@@ -6,17 +6,17 @@
   "stateVersion": 1,
   "title": "JWT Decoder & Verifier",
   "description": "Decodes a JSON Web Token into header, payload and signature, verifies HS/RS/PS/ES signatures offline against a caller-supplied key, and reports claim validity (expiry, not-before) separately from signature validity.",
-  "tools": [{"id":"security.jwt","title":"JWT Decoder & Verifier","category":"security","operationIds":["security.jwt"],"workspaceId":"jwt"}],
+  "tools": [{"id":"security.jwt","title":"JWT Decoder & Verifier","category":"security","description":"Header, payload and signature of a JSON Web Token","operationIds":["security.jwt"],"workspaceId":"jwt"}],
   "operations": [{
     "id":"security.jwt",
-    "title":"Decode and verify a JSON Web Token",
+    "title":"Decode",
     "executor":{"kind":"javascriptWorker","id":"security.jwt.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
     "inputs":[{"id":"input","label":"Token","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
     "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["text/plain"],"representations":["properties","text"],"sensitive":false,"exports":["copyText","save"]}],
     "options":[
       {"id":"key","type":"string","label":"Key","default":"","persistence":"none","sensitive":true},
-      {"id":"secret-encoding","type":"enum","label":"Secret Encoding","default":"utf8","choices":[{"id":"utf8","label":"UTF-8"},{"id":"base64","label":"Base64"},{"id":"base64url","label":"Base64url"}],"persistence":"instance","sensitive":false},
-      {"id":"clock-tolerance-seconds","type":"integer","label":"Clock Tolerance (seconds)","default":"0","minimum":"0","persistence":"instance","sensitive":false}
+      {"id":"secret-encoding","type":"enum","label":"Secret encoding","default":"utf8","choices":[{"id":"utf8","label":"UTF-8"},{"id":"base64","label":"Base64"},{"id":"base64url","label":"Base64url"}],"persistence":"instance","sensitive":false},
+      {"id":"clock-tolerance-seconds","type":"integer","label":"Clock tolerance (seconds)","default":"0","minimum":"0","persistence":"instance","sensitive":false}
     ],
     "trigger":{"modes":["explicit","inputChange"],"debounceMs":"100"},
     "limits":{"maxInputBytes":"65536","maxOutputBytes":"1048576","maxChunkBytes":"1048576","deadlineMs":"1000"}

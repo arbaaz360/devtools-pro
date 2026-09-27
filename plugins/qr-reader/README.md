@@ -7,7 +7,7 @@ The engine decodes the image container (PNG/JPEG/WebP) before handing the proces
 ## Options
 
 * **`invert`** (boolean): Re-invert every RGB channel of the source pixels before decoding (alpha is left alone). Use this for a code that is genuinely white-on-dark; `jsQR`'s own automatic inversion (driven by `try-harder`) is a binarization-threshold flip, not a pixel-color flip, so a truly inverted image can still need this. Default: `false`.
-* **`try-harder`** (boolean): Passed to `jsQR` as `inversionAttempts: "attemptBoth"` when `true` (tries both normal and threshold-inverted binarization), or `"dontInvert"` when `false`. Default: `true`. Alias: `tryHarder`.
+* **`try-harder`** (boolean, labelled "Try harder (slower)"): Passed to `jsQR` as `inversionAttempts: "attemptBoth"` when `true` (tries both normal and threshold-inverted binarization), or `"dontInvert"` when `false`. Default: `true`. Alias: `tryHarder`.
 
 ## Output
 

@@ -161,7 +161,7 @@ Input edits, semantic options and algorithm changes invalidate execution results
 
 | Workspace | Required tool examples | Shared pieces |
 |---|---|---|
-| Single editor | Text editor, find/replace | One document model, search, undo, line/column, no empty result pane |
+| Single editor | Text Editor, Find & Replace | One document model, search, undo, line/column, no empty result pane |
 | Transform | JSON, encoders, formatters, YAML, SQL, JSX | Editable source, code result, diagnostics, operation and output-format controls |
 | Annotated editor | Regex, String Inspector | Source/selection, match navigation, annotation layers, tree/property/table views |
 | Linked fields | Timestamp, number bases, JWT | Labeled editors/values, conditional keys, field copy, guarded derived updates |
@@ -175,7 +175,10 @@ Visual and behavior invariants:
 
 1. Neutral charcoal surfaces and legible text; blue is reserved for focus/selection/actions. All shell and plugin UI uses central tokens; no plugin styles target global `body`, buttons or hidden rules. Content previews may show their document's own colors.
 2. Compact searchable left rail and command palette generated from the same catalog. Visible tool names describe implemented behavior. Unavailable operations explain the missing input/capability.
-3. Input actions (Clipboard, Clear, Open) belong with that input. There is no Sample action (removed 2026-09-27): canned text suits few tools, and an image tool cannot use it; format options and Copy/Save belong with the output. One primary control per command: no repeated Format/Minify/Validate dropdown plus identical button set.
+3. Input actions (Clipboard, Clear, Open) belong with that input, and only where there is one: a generator whose active operation declares no document input (UUID Generate, Example String Generator) shows no editor and no input actions, only the note that it is generated from the options; an image tool (decided by its input port's declared content, never its name) offers Open for an image instead of an editor. There is no Sample action (removed 2026-09-27): canned text suits few tools, and an image tool cannot use it; format options and Copy/Save belong with the output. One primary control per command: no repeated Format/Minify/Validate dropdown plus identical button set.
+   - Operation buttons appear only when they choose or start something: for a tool with two or more operations, or for a single operation that runs only on request (`explicit` without `inputChange`). A single operation that already runs as you type has no button.
+   - The result pane's subtitle says what produces the result: "Updates as you type" when the active operation runs on input, otherwise "Press <operation> to run", naming the on-request operations joined with "or" ("Press Format or Minify to run").
+   - An option whose `visible` rule fails for the tab's current values (over the defaults) has no control; one whose `enabled` rule fails is shown disabled. `required` is the processor's to enforce.
 4. Tool selection plus compatible input expresses intent for safe transforms. Auto-run after valid edits is debounced; don't interrupt IME composition. Generators, signing workflows, and privileged actions declare explicit triggers. Large work goes through the same asynchronous job service.
 5. Fast jobs do not flash a large progress panel. Show progress after a short delay (initial target 200 ms) in a fixed status-bar slot; slower jobs expose Cancel/details without resizing editors. Idle progress uses no permanent blank 52 px panel. Keep the last result marked stale until replaced; do not recreate editors on job events.
 6. Error, success and preview transitions preserve focus, caret, scroll, and pane geometry. A compact diagnostic anchor opens an error list on demand; diagnostics jump to source locations. Do not show the same error in multiple large banners.

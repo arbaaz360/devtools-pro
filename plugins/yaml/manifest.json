@@ -6,7 +6,7 @@
   "stateVersion": 1,
   "title": "YAML ↔ JSON",
   "description": "Converts a YAML document to JSON and JSON back to YAML with a hand-written, dependency-free parser for the supported YAML subset.",
-  "tools": [{ "id": "convert.yaml", "title": "YAML ↔ JSON", "category": "converter", "operationIds": ["convert.yaml-json", "convert.json-yaml"], "workspaceId": "yaml" }],
+  "tools": [{ "id": "convert.yaml", "title": "YAML ↔ JSON", "category": "convert", "description": "YAML to JSON, or JSON to YAML", "operationIds": ["convert.yaml-json", "convert.json-yaml"], "workspaceId": "yaml" }],
   "operations": [
     {
       "id": "convert.yaml-json",

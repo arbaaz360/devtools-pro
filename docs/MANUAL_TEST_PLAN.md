@@ -47,7 +47,7 @@ or the app cannot start. *major* = a tool or flow is unusable, no workaround.
 ### Vocabulary
 
 - **Engine** — where a tool runs. **Rust** tools are compiled into the app;
-  **package** tools run in a webview worker. The status bar says *Local engine*
+  **package** tools run in a webview worker. The status bar says *Local*
   either way; the split matters only when a case asks you to compare them.
 - **Tool id** — the dotted name (`text.case`), used in bug reports.
 - **Auto tools** re-run about a third of a second after you stop typing.
@@ -130,10 +130,10 @@ node -e "const c=require('crypto'),b=o=>Buffer.from(JSON.stringify(o)).toString(
 | ID | Steps | Expected |
 |---|---|---|
 | SMK-01 (suite) **[P1]** | Launch the app | A window titled *The DevTools Pro* opens within 10 s, dark theme, tool rail on the left, tab bar and workspace on the right. Nothing renders as an unstyled document |
-| SMK-02 (suite) **[P1]** | Look at the status bar | The engine dot is lit and reads *Local engine* (not *Browser preview*); the status text reads *Ready* |
+| SMK-02 (suite) **[P1]** | Look at the status bar | The engine dot is lit and reads *Local* (not *Browser preview*); the status text reads *Ready · Ctrl+N for a new document* while no document is open, and *Ready* once one is |
 | SMK-03 (suite) **[P1]** | Count the tools in the rail | Every group renders with a heading; record the total. CI's native smoke currently reports **32**. A number materially lower means package discovery failed |
 | SMK-04 **[P1]** | Press Ctrl+N, type `hello` | A tab appears, the editor accepts text, the status bar shows *Ln 1, Col 6* |
-| SMK-05 **[P1]** | Choose **JSON**, paste `{"b":1,"a":[1,2]}`, press **Format** | The result pane shows indented JSON and the state line reports success |
+| SMK-05 **[P1]** | Choose **JSON Formatter**, paste `{"b":1,"a":[1,2]}`, press **Format** | The result pane shows indented JSON and the state line reports success |
 | SMK-06 **[P1]** | Choose **String Case Converter**, type `userID_loaderHTTPServer v2Api`, set Target to `snake` | Result is `user_id_loader_http_server_v_2_api` (this is the value CI asserts) |
 | SMK-07 | Open the command palette (Ctrl+K) | The dialog opens, focus is in the search field, commands are listed |
 | SMK-08 **[P1]** | Close the window | The app exits within 3 s; no process named `devtools-desktop.exe` or orphaned `msedgewebview2.exe` remains (check Task Manager) |
@@ -155,14 +155,14 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-06 | Open `astral.txt` | Emoji, accents, CJK and RTL text render correctly, not as boxes or mojibake |
 | DOC-07 | Open `bom.txt` | The BOM does not appear as a visible character at the start of the text; the encoding indicator still reads UTF-8 |
 | DOC-08 | Open `crlf.txt`, then `lf.txt` | Both show three lines. Line endings are not doubled or shown as `^M` |
-| DOC-09 **[P1]** | Open `crlf.txt`, run any formatter, **Save result** to a new file, open it in a hex viewer | Line endings are consistent and intentional (all CRLF or all LF); no mixed `\r\r\n` |
+| DOC-09 **[P1]** | Open `crlf.txt`, run any formatter, **Save…** in the result pane to a new file, open it in a hex viewer | Line endings are consistent and intentional (all CRLF or all LF); no mixed `\r\r\n` |
 | DOC-10 | Open `binary.bin` | The app refuses gracefully with a readable message, or shows a binary/preview mode. It must not paste 4 KB of garbage into the editor and must not hang |
 | DOC-11 **[P1]** | Type in a tab, then press Ctrl+W | The *Save your changes?* dialog appears with Cancel / Discard / Save… |
 | DOC-12 **[P1]** | In that dialog press **Cancel** | The tab stays open with its text intact |
 | DOC-13 **[P1]** | Press Ctrl+W again, then **Discard** | The tab closes; no file was written |
 | DOC-14 **[P1]** | Press Ctrl+W on another dirty tab, then **Save…** | An untitled tab opens the Windows save dialog; saving writes the file and closes the tab, and cancelling the dialog leaves it open. A tab opened from a file is written back to that file and closes |
 | DOC-15 | Close a clean (unmodified) tab | It closes with no prompt |
-| DOC-16 | Close the last remaining tab | The app shows the empty state (*A place for your next idea*) and stays usable |
+| DOC-16 | Close the last remaining tab | The app shows the empty state (*No document open* · *Create a document or open a file, then choose a tool.*) and stays usable; the top bar reads *DevTools Pro* |
 | DOC-17 (suite) **[P1]** | Open a file, edit it, press Ctrl+S | No dialog: the file is written back in place, and the button reads **Save**. Reopening it shows the saved text |
 | DOC-18 | Ctrl+Shift+S (**Save as**), pick an existing file, then **cancel** Windows' *replace?* prompt | Nothing is written; the original file's hash is unchanged. Confirming instead replaces it |
 | DOC-19 | Save into the folder with the space and non-ASCII name | The file is written; its name and path are correct in Explorer |
@@ -184,6 +184,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | DOC-36 (suite) **[P1]** | Type in a tab, press Ctrl+W, and while *Save your changes?* is open press Ctrl+PageUp, Ctrl+PageDown, Ctrl+Tab, Ctrl+S, Ctrl+N | Nothing happens behind the dialog: the same tab stays active, no tab opens, nothing is saved. Cancel then leaves the tab open and unsaved |
 | DOC-37 (suite) **[P1]** | Open a file saved with a UTF-8 BOM and CRLF line ends, change one word, Ctrl+S; then a file with mostly CRLF and one LF | The first file keeps its BOM and every CRLF, and only the word changed. The second has CRLF throughout, and the *Saved* notice says so |
 | DOC-38 (suite) | Seventy times: new tab, type, close it, choose *Save…* and a new file name | Every save and close works; the host never reports the 64-document limit while only a tab or two is open |
+| DOC-39 (suite) | New tab, choose **UUID Generator**; open another new tab and choose **UUID Generator** there too; then close the first | The tabs read *UUID Generator* and *Text Editor*, then *UUID Generator* and *UUID Generator 2* (a number only when a second tab of that tool is open); the top bar shows the active tab's name. After the close, the tab left reads *UUID Generator* |
 | DOC-32 (suite) **[P1]** | Open a file, change it in Notepad and save there, then edit it in the app and press Ctrl+S | Refused: *changed on disk after it was opened … Use Save As*. Notepad's version is untouched. Ctrl+Shift+S, confirming the replace, overwrites it deliberately |
 
 ---
@@ -197,23 +198,24 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | EDT-03 **[P1]** | Type, then Ctrl+Z several times, then Ctrl+Y | Undo steps back through your edits; redo replays them. The result pane follows the restored text |
 | EDT-04 | Undo past the beginning, redo past the end | Nothing breaks; no exception, no cleared document |
 | EDT-05 | Paste 2 MB of text (`long-line.txt`) | The editor accepts it within a couple of seconds. If a preview notice appears, it says tools still process all bytes |
-| EDT-06 **[P1]** | With a large pasted input, run a tool | The tool processes the **whole** input, not the preview. Verify with a length-reporting tool (Text inspector) |
+| EDT-06 **[P1]** | With a large pasted input, run a tool | The tool processes the **whole** input, not the preview. Verify with a length-reporting tool (Text Inspector) |
 | EDT-07 | Copy text elsewhere, press the **Clipboard** quick action | The clipboard text is inserted at the caret / replaces the selection |
 | EDT-08 | Press **Clipboard** with an empty clipboard, and with an image on the clipboard | A readable message; no crash |
-| EDT-09 | Look at the input actions on any text tool | **Clipboard** and **Clear** only. There is no Sample button: it was removed on 2026-09-27, because canned text suits few tools and broke others (the QR Code Reader got text) |
+| EDT-09 | Look at the input actions on any text tool | **Clipboard** and **Clear** only. There is no Sample button: it was removed on 2026-09-27, because canned text suits few tools and broke others (the QR Code Reader got text). A generator whose operation reads no document (UUID **Generate**, Example String Generator) shows no editor at all: *Generated from the options above; there is no input.*, with neither action |
 | EDT-10 | Press **Clear** | The editor empties; the result pane clears or shows the empty state — it must not keep showing the previous result as current |
 | EDT-11 | Type into a very long single line (no newlines) | The editor stays responsive; horizontal behaviour (wrap or scroll) is consistent |
 | EDT-12 | Scroll to the middle of a long document, switch tabs, switch back | The scroll position and caret are preserved |
 | EDT-13 | Type continuously for ~10 s in an auto tool | No dropped characters, no caret jumps, no mid-typing result flicker that steals focus |
 | EDT-14 (suite) **[P1]** | Type into an auto tool and stop | The result refreshes on its own within ~1 s (debounce is ~350 ms) |
-| EDT-15 (suite) | Type into an explicit tool (CSS, XML) | The result does **not** appear until you press an operation button. JSON is a bundled Rust tool and runs as you type by design — that is not a failure of this case; any stale result is visibly marked stale rather than presented as current |
+| EDT-15 (suite) | Type into an explicit tool (CSS Formatter, XML Formatter) | The result does **not** appear until you press an operation button. JSON Formatter is a bundled Rust tool and runs as you type by design — that is not a failure of this case; any stale result is visibly marked stale rather than presented as current |
 | EDT-16 | Paste text containing a NUL byte or lone surrogate | Either sanitised or refused with a message; never a crash or a truncated-without-warning document |
 | EDT-17 | Open the image tool (**Image to Base64**) and open a PNG | The image renders in the input area as a picture, not as bytes |
 | EDT-18 | In an image tool, try to type in the input area | Typing is blocked or ignored cleanly; the app does not corrupt the image |
 | EDT-19 | Switch a tab from a text tool to an image tool and back | The text is not lost when returning to the text tool (or the loss is explicit and warned) |
-| EDT-20 | In **Diff & Compare**, put text only on the left | The footer explains that the right side is empty rather than showing a red error |
-| EDT-21 | In Diff & Compare, open a file into each side with the **Open file…** buttons | Each side loads independently; neither file is modified |
-| EDT-22 | In Diff & Compare, use Ctrl+Z inside the left editor | Undo applies to that editor |
+| EDT-20 | In **Text Diff**, put text only on the left | The footer explains that the right side is empty rather than showing a red error |
+| EDT-21 | In Text Diff, open a file into each side with the **Open file…** buttons | Each side loads independently; neither file is modified |
+| EDT-22 | In Text Diff, use Ctrl+Z inside the left editor | Undo applies to that editor |
+| EDT-26 (suite) **[P1]** | With no document open, choose **QR Code Reader**; then, in a tab holding text, choose it again | With nothing open it asks for an image, and the image opens in QR Code Reader with **Read** available. In the text tab the editor gives way to *This tab does not contain an image. Open a PNG or JPEG image to use QR Code Reader.* with **Open compatible file…**, and **Read** is disabled — never an enabled button that fails with *not a supported image* |
 | EDT-23 | Resize the window narrow (row D) while typing | The editor stays usable; no controls fall off the edge or overlap |
 | EDT-24 | Drag the splitter between document and result; then use it with the keyboard (focus it, arrows, Home, End) | The panes resize smoothly, arrows nudge, Home ≈ 28% and End ≈ 72%; the layout never collapses to zero width |
 | EDT-25 | Zoom the OS display scale from 100% to 150% while the app is open | The layout reflows; text stays crisp and nothing is clipped |
@@ -224,18 +226,18 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 
 | ID | Steps | Expected |
 |---|---|---|
-| NAV-01 | Read the rail top to bottom | Tools are grouped under headings; every entry has a name and an icon; no entry is blank or `undefined` |
+| NAV-01 | Read the rail top to bottom | Groups in this order: WORKSPACE, FORMAT, CONVERT, ENCODE, TEXT, WEB & SECURITY, GENERATE; tools by name inside each. Every entry has a name, a one-line description and its own glyph; no entry is blank, `undefined` or a ◇ placeholder |
 | NAV-02 (suite) | Type `json` in the search box | Matching tools remain, others hide. Clearing restores the full list |
 | NAV-03 | Search for a name that does not exist | An empty list or an explicit "no matches" state — not a broken rail |
 | NAV-04 | Search by a word from a tool's description or alias (e.g. `svg`, `qr`, `timestamp`) | Sensible matches appear. Record any tool you cannot find by an obvious word |
 | NAV-05 | Collapse the sidebar with the collapse button | The rail collapses, the workspace widens, the button's label flips to expand |
 | NAV-06 | Expand it again | The rail returns with the same scroll position |
-| NAV-07 | Select a tool for the active tab | The tool header (icon, group eyebrow, title) and the window's title area update; the options shown are that tool's options |
+| NAV-07 | Select a tool for the active tab | The tool header (icon, group eyebrow, title, and the tool's description beneath) updates, and the top bar shows the tab's name; the options shown are that tool's options |
 | NAV-08 (suite) **[P1]** | Switch tools within one tab, keeping the same text | The text is preserved; the previous tool's result is cleared or marked stale — never shown as the new tool's output |
 | NAV-09 | Ctrl+K, type part of a tool name, press Enter | The first match runs: that tab switches to the tool |
 | NAV-10 | Ctrl+K, navigate with ↓/↑, press Enter | Selection moves; Enter applies the highlighted command |
 | NAV-11 | Ctrl+K, press Escape | The dialog closes and focus returns to where it was |
-| NAV-12 | Ctrl+K with three tabs open | Tool commands are listed per tab (`Tool · tab name`), and choosing one switches to that tab |
+| NAV-12 (suite) | Ctrl+K with three tabs open | *New document*, *Open file*, *Save*, *Save as…*; then *Switch to <tab>* once per open tab; then every tool exactly once, in rail order. Choosing a tool applies it to the active tab (or a new tab when none is open) — never a tool × tab list |
 | NAV-13 | Open the palette, type a query matching nothing | An empty list; Enter does nothing harmful |
 | NAV-14 | Use only the keyboard to reach and select a tool from the rail | Tab/arrow navigation reaches rail entries; Enter or Space selects |
 | NAV-15 | Select a generator (**UUID**, **Unix Timestamp**, **Example String**) on an empty tab | It runs without any input and produces output — these tools must not demand text first |
@@ -246,7 +248,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 
 | ID | Steps | Expected |
 |---|---|---|
-| OPT-01 (suite) **[P1]** | For each tool, read its options against the table in section 8 | Every declared option is present, labelled in words (not raw ids), with its documented default preselected |
+| OPT-01 (suite) **[P1]** | For each tool, read its options against the table in section 8 | Every declared option is present, labelled in words (not raw ids), with its documented default preselected — except an option the current mode ignores, which is hidden (OPT-22). A tool with a single operation that runs as you type shows no operation button |
 | OPT-02 | Change an enum option (e.g. Indentation) | The result re-runs (auto tools) or the button re-runs with the new value (explicit tools); the output visibly reflects the change |
 | OPT-03 | Toggle a boolean option | Same as OPT-02, in both directions |
 | OPT-04 | Type into a string option (Regex pattern, Find query, Component name) | The value is used; leading/trailing spaces are preserved unless the tool documents trimming |
@@ -256,7 +258,9 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | OPT-08 | Change options, switch to another tab and back | The options you set are still there |
 | OPT-09 | Change options, switch tool away and back | Options reset to defaults or restore your values — either is acceptable, but it must be consistent and never a mix of the two |
 | OPT-10 | Open two tabs with the same tool and different options | The two tabs do not share option values |
-| OPT-11 **[P1]** | Run a multi-operation tool (JSON: Format / Minify / Validate; CSS, XML, SQL, JS: Beautify / Minify) | Each operation button appears exactly once, and each produces its own distinct result |
+| OPT-11 **[P1]** | Run a multi-operation tool (JSON Formatter: Format / Minify / Validate; CSS, XML, SQL, JavaScript and HTML Formatter: Format / Minify) | Each operation button appears exactly once, and each produces its own distinct result |
+| OPT-21 (suite) | Look at the operation buttons of **Line Tools**, **Text Inspector**, **CSS Formatter** and **QR Code Reader**, and at the result pane's subtitle | Buttons show only for two or more operations or for one that runs on request: none for Line Tools or Text Inspector, *Format* and *Minify* for CSS Formatter, *Read* for QR Code Reader. The subtitle reads *Updates as you type* for a tool that runs as you type, *Press Format or Minify to run* for CSS Formatter |
+| OPT-22 (suite) | **Hex ↔ Text**: switch Mode from Encode to Decode and back | Decode hides *Case*, *Separator* and *Bytes per line*, which it ignores; Encode shows them again. Other tools do the same for their mode-specific options (section 8) |
 | OPT-12 | Press an operation button twice quickly | The second run supersedes the first; you never see two results interleaved or a stuck progress bar |
 | OPT-13 | Start a slow run (format `big.json`) and watch the status bar | The progress panel appears with a phase and a progress bar; it disappears when the run finishes |
 | OPT-14 **[P1]** | During a slow run press **Cancel** | The run stops within ~2 s, the status says so, and no partial result is presented as complete |
@@ -276,14 +280,14 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-01 **[P1]** | Run any successful operation | The result state line says it succeeded, and the output area shows the output |
 | RES-02 (suite) **[P1]** | Run an operation that fails (invalid JSON) | A clear error naming *what* is wrong and *where* (line/column where applicable). The output area stays empty — no blank "success" |
 | RES-03 (suite) | After a failure, fix the input and re-run | The error clears completely; no stale error text remains beside the good result |
-| RES-04 | Look at the metrics row after a run | Metrics (sizes, counts, durations) are plausible and labelled. Record anything that is always zero |
+| RES-04 | Look at the metrics line after a run | One line, `In 29 B · Out 40 B · 1 ms` (no *Out* when there is no output document); plausible values. Whether a file's bytes or the text was read is the first line of **Operation details**. Record anything that is always zero |
 | RES-05 | Expand **Operation details** | Structured detail about the run is shown; it is readable, not raw JSON with escaped quotes |
-| RES-06 **[P1]** | Press **Copy complete result**, paste into Notepad | The **entire** result is pasted, not the visible preview. Compare lengths for a large result |
+| RES-06 **[P1]** | Press **Copy**, paste into Notepad | The **entire** result is pasted, not the visible preview. Compare lengths for a large result |
 | RES-07 **[P1]** | With a large (truncated) result, click in the output, Ctrl+A, Ctrl+C, paste | You get the complete result, not the truncated preview |
-| RES-08 (suite) **[P1]** | Press **Save result**, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
+| RES-08 (suite) **[P1]** | Press **Save…** in the result pane, accept the suggested name | The file saves with a sensible extension for the type (`.json`, `.html`, `.css`, `.js`, `.xml`, `.yaml`, `.sql`, `.md`, `.svg`, `.txt`) and opens correctly in its native app |
 | RES-09 (suite) | Save a result over an existing file and confirm the overwrite | The file is replaced; cancelling the prompt leaves it untouched. A result can never be saved over a file open in a tab, including its own source |
-| RES-10 (suite) **[P1]** | Press **Open result** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
-| RES-11 | Chain three tools with Open result (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
+| RES-10 (suite) **[P1]** | Press **Open as tab** | The result opens as the input of a tab, so you can chain tools. The original tab keeps its own content |
+| RES-11 | Chain three tools with Open as tab (e.g. YAML→JSON, then JSON Format, then Hash) | Each step receives the previous step's complete output |
 | RES-12 (suite) | Press **Hide result**, then **Show result** | The result pane collapses and returns, with the result intact |
 | RES-13 | Collapse the result with the ›/‹ button in the pane header | Same behaviour; the button's tooltip flips |
 | RES-14 (suite) | Run a tool whose output is JSON (**JSON Format**, **URL Parser**, **YAML to JSON**) and press **Tree** | The result is walkable: expandable nodes with type and size, and each row's path can be copied |
@@ -295,20 +299,20 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | RES-16 **[P1]** | In the Markdown/HTML preview, click the `https://example.com` link | Nothing navigates the app away; at most it opens your browser. The app window must never become a web page |
 | RES-17 **[P1]** | Preview HTML containing `<script>alert(1)</script>` and `<img src=x onerror=alert(1)>` | No alert dialog appears. Record whether the content is stripped or just inert |
 | RES-18 | Preview HTML referencing a remote image (`<img src="https://example.com/x.png">`) | The preview does not fetch it (watch the network) or the failure is silent — either way, no console errors that break the pane |
-| RES-19 **[P1]** | Run **QR Code** on `https://example.com` | An actual QR image renders in the result. Scan it with a phone: it resolves to `https://example.com` |
+| RES-19 **[P1]** | Run **QR Code Generator** on `https://example.com` | An actual QR image renders in the result. Scan it with a phone: it resolves to `https://example.com` |
 | RES-20 | Save the QR result | The saved `.svg` opens in a browser and shows the same code with its white quiet-zone border intact |
 | RES-21 (suite) **[P1]** | Run **Regular Expression Tester** with pattern `\d{4}` on text containing years | Matches are highlighted **in the input editor** at the right positions, and listed in the result |
 | RES-22 | With the regex tool, scroll the input | The highlights stay aligned with the text as it scrolls |
 | RES-23 | Change the regex so nothing matches | Highlights clear; the result says zero matches rather than showing the last run's matches |
 | RES-24 **[P1]** | Run **Image to Base64** on the PNG, then **Base64 to Image** on the result | The round trip reproduces the same image; the decoded preview shows a picture, not bytes |
-| RES-25 | Run **Diff & Compare** on two similar texts | Differences are presented as readable hunks with line context; identical texts report "no differences" plainly |
+| RES-25 | Run **Text Diff** on two similar texts | Differences are presented as readable hunks with line context; identical texts report "no differences" plainly |
 | RES-26 | Make the result pane very narrow, then very wide | Content reflows; no horizontal scrollbar hiding content permanently; no overlap |
 | RES-27 | Produce a result of several MB (format `big.json`) | The pane stays responsive; scrolling the output does not freeze the UI for more than ~1 s |
 | RES-28 | Produce a result larger than the result limit | A message naming the limit appears. Copy/Save either work on the complete payload or are clearly disabled |
 | RES-29 | Run a tool that produces no output for empty input | A neutral empty state, not a success claim and not an error, unless the tool documents empty as an error (QR does) |
 | RES-30 | Switch tabs while a result is displayed | Each tab shows its own result immediately; no flash of another tab's result |
-| RES-31 (suite) | Run **CSS → Beautify**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
-| RES-32 (suite) **[P1]** | Run **QR Code**, press **Copy image**, paste into Paint or a chat box, and scan the pasted code with a phone | A sharp QR picture pastes (not SVG text), and it scans to the input. **Copy SVG** still copies the markup |
+| RES-31 (suite) | Run **CSS Formatter → Format**, then edit the CSS without pressing anything. Also: change an option instead of editing; and cancel a long run | The old result stays, labelled **Out of date — run to update**, never "Updating…" when nothing is running. Copy and Save are hidden until it is run again |
+| RES-32 (suite) **[P1]** | Run **QR Code Generator**, press **Copy image**, paste into Paint or a chat box, and scan the pasted code with a phone | A sharp QR picture pastes (not SVG text), and it scans to the input. **Copy SVG** still copies the markup |
 | RES-33 (suite) | Run **Base64 to Image** on a PNG, press **Copy image**, paste into Paint | The same picture, same size, same colours |
 
 ---
@@ -331,7 +335,7 @@ checks each time — record a pass/fail per tool per check in the matrix.
 | TB-09 | CRLF input does not produce mixed or doubled line endings |
 | TB-10 | The documented error case produces a readable message and an empty output |
 | TB-11 | Oversized input produces the documented limit message |
-| TB-12 | Copy complete result, Save result and Open result all work for this tool |
+| TB-12 | Copy, Save… and Open as tab all work for this tool |
 
 **Coverage matrix** — copy this and fill it in:
 
@@ -350,7 +354,7 @@ Options listed here are what the tool declares; TB-03 checks them against the
 UI. *Limit* is the declared maximum input; *deadline* is the declared time
 budget for one run.
 
-### TL-JSON — JSON · `structured.json` · Rust · STRUCTURED DATA
+### TL-JSON — JSON Formatter · `structured.json` · Rust · FORMAT
 Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 
 | # | Input | Action | Expected |
@@ -366,7 +370,7 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 | 09 | `[]`, `{}`, `null`, `"str"`, `42` | Validate | Each is accepted as valid JSON |
 | 10 | file with BOM | Format | Accepted or a clear error; not a silent wrong parse |
 
-### TL-CSV — CSV inspector · `structured.csv` · Rust
+### TL-CSV — CSV Inspector · `structured.csv` · Rust
 | # | Input | Expected |
 |---|---|---|
 | 01 | `a,b\n1,2\n3,4` | Row and column counts correct |
@@ -374,13 +378,14 @@ Operations: Format, Minify, Validate. No options. Limit 64 MiB, deadline 5 s.
 | 03 | Ragged rows (3 columns then 2) | Reported, not silently padded |
 | 04 | Semicolon-delimited data | Either detected or reported as one column — record the behaviour |
 
-### TL-INSPECT — Text inspector · `text.inspect` · Rust · **known parity gap**
+### TL-INSPECT — Text Inspector · `text.inspect` · Rust · **known parity gap**
 | # | Input | Expected |
 |---|---|---|
 | 01 | `Hello ✓` | Character count 7, byte count 9 (UTF-8), one line |
 | 02 | `astral.txt` | Counts distinguish code points from UTF-16 units; the emoji with a ZWJ is counted consistently and the rule is stated |
 | 03 | `crlf.txt` | Line count 3 regardless of CRLF |
 | 04 | — | Compare every reported field against the DU-22 screenshot; list what is missing. This tool is known to be unaudited for parity |
+| 05 (suite) | Four lines, `one` `two` `three` `four`, no final newline | The findings are listed in the output area as key and value (*lines* 4 among them), with nested values such as the line endings indented beneath their key — never *Review the operation details* |
 
 ### TL-CASE — String Case Converter · `text.case` · package · auto
 Options: target (camel, pascal, snake, kebab, screaming-kebab, constant), acronyms (`ID,API,DB,URL,HTTP`), preserve-acronyms. Limit 1 MiB.
@@ -421,8 +426,8 @@ Operations: **Generate** (version v1/v3/v4/v5, namespace, name, count 1–100, c
 | 06 | case upper/lower | Output case follows the option |
 | 07 | Put a v1 UUID in the editor and press **Decode** | Timestamp, variant and version reported |
 | 08 | Press **Decode** with `not-a-uuid` in the editor | Readable error |
-| 09 (suite) **[P1]** | With **Generate** selected, type anything in the editor; then press **Generate** | Typing does nothing: the generated value stays, with no error, no "Updating…", and Copy still works. The press gives a new value |
-| 10 (suite) | Put the v5 value from 04 in the editor and press **Decode**; then replace it with `f47ac10b-58cc-4372-a567-0e02b2c3d479` | Version 5 reported; after the edit it decodes again on its own and reports version 4 |
+| 09 (suite) **[P1]** | Type anything in a tab, then choose **UUID Generator** (Generate); later press **Generate** | Generate reads no document, so no editor shows: *Generated from the options above; there is no input.* The text stays in the tab, unread: the value stays, with no error, no "Updating…", and Copy still works. The press gives a new value |
+| 10 (suite) | Press **Decode** (the editor appears), put the v5 value from 04 in it; then replace it with `f47ac10b-58cc-4372-a567-0e02b2c3d479` | Version 5 reported; after the edit it decodes again on its own and reports version 4 |
 
 ### TL-B64TEXT — Base64 Text · `encoding.base64-text` · package · auto
 Options: mode (encode, decode), variant (standard, url), padding (required, omit, optional), error-policy (strict, tolerant, replace). Limit 2 MiB.
@@ -506,13 +511,13 @@ Option: case. Limit 64 MiB, deadline 10 s.
 | 04 | the PNG fixture | Matches `certutil -hashfile <png> SHA256` |
 | 05 | case option upper | Hex digits uppercase, same value |
 | 06 | 64 MiB file | Completes within the deadline or reports the limit; record the time |
-| 07 (suite) **[P1]** | Open a file of the bytes `EF BB BF 68 65 6C 6C 6F` (a UTF-8 BOM, then `hello`) without editing; then type in it | Unedited: 8 bytes in, SHA-256 `7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862` (`certutil -hashfile`), and **Read: the file's bytes**. Edited: the digest of the typed text in UTF-8, and **Read: the text, as UTF-8** |
+| 07 (suite) **[P1]** | Open a file of the bytes `EF BB BF 68 65 6C 6C 6F` (a UTF-8 BOM, then `hello`) without editing; then type in it | Unedited: 8 bytes in, SHA-256 `7489ebbcc2a00056ddaaaac190bce473e5c03696ea1bd8ed83cf59a174283862` (`certutil -hashfile`), and Operation details begins **Read: the file's bytes**. Edited: the digest of the typed text in UTF-8, and **Read: the text, as UTF-8** |
 
 ### TL-BASE64IMG — Image to Base64 / Base64 to Image · `encoding.image-base64`, `encoding.base64-image` · Rust
 | # | Steps | Expected |
 |---|---|---|
 | 01 | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
-| 02 | Copy complete result → decode it | The same image comes back; visually identical |
+| 02 | Copy the result → decode it | The same image comes back; visually identical |
 | 03 | Decode an invalid Base64 string | Readable error, no broken-image placeholder claiming success |
 | 04 | Decode a data URI with the wrong MIME | Either honoured or reported; not a silent mismatch |
 | 05 | Encode a JPEG and a large PNG (>5 MB) | Works or reports a limit |
@@ -577,12 +582,12 @@ Operations: YAML to JSON, JSON to YAML. Options: indent, sort-keys (YAML→JSON)
 | 08 | YAML `.inf`, `.nan`, `~`, `null` | Handled per the README; record what each becomes |
 | 09 | JSON with a very deep nesting (200 levels) | Either converts or reports a depth limit; no stack crash |
 
-### TL-XML — XML · `format.xml` · package · explicit
-Operations: Beautify, Minify. Options: indent (sp2, sp4, tab), preserve-comments, collapse-empty. Limit 16 MiB.
+### TL-XML — XML Formatter · `format.xml` · package · explicit
+Operations: Format, Minify. Options: indent (sp2, sp4, tab), preserve-comments, collapse-empty. Limit 16 MiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `sample.xml` | Beautify indents the tree; the declaration is preserved |
+| 01 (suite) | `sample.xml` | Format indents the tree; the declaration is preserved |
 | 02 | same | Minify removes insignificant whitespace only |
 | 03 | preserve-comments off | `<!-- -->` removed; on, kept |
 | 04 | collapse-empty on/off | `<empty/>` vs `<empty></empty>` |
@@ -590,23 +595,23 @@ Operations: Beautify, Minify. Options: indent (sp2, sp4, tab), preserve-comments
 | 06 | Unclosed tag | Readable error naming the position |
 | 07 | Attributes with single vs double quotes and entities | Preserved or normalised consistently |
 
-### TL-HTMLFMT — HTML Beautify/Minify · `format.html` · package
+### TL-HTMLFMT — HTML Formatter · `format.html` · package
 Options: indent, preserve-comments, wrap-attributes (auto, force), indent-inner-html. Limit 16 MiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `sample.html` | Beautify produces readable indented markup |
+| 01 (suite) | `sample.html` | Format produces readable indented markup |
 | 02 | same | Minify collapses whitespace but does not break `<pre>` or `<textarea>` content |
 | 03 | inline `<script>` and `<style>` | Content is not mangled |
 | 04 | wrap-attributes force on a tag with many attributes | One attribute per line |
 | 05 | Malformed HTML (`<div><p></div>`) | Best-effort output or a clear message — never silently dropped content |
 
-### TL-CSS — CSS · `format.css` · package · explicit
+### TL-CSS — CSS Formatter · `format.css` · package · explicit
 Options: indent (sp2, sp4, tab), preserve-comments, blank-line-between-rules. Limit 16 MiB.
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `sample.css` | Beautify: one declaration per line, normalised selector spacing |
+| 01 (suite) | `sample.css` | Format: one declaration per line, normalised selector spacing |
 | 02 | same | Minify: no spaces around `{`, `:`, `;`; last `;` optional but consistent |
 | 03 | preserve-comments off/on | `/* note */` dropped / kept |
 | 04 | blank-line-between-rules on/off | Blank line between rules appears/disappears |
@@ -619,14 +624,14 @@ Options (beautify): indent (space-2, space-4, tab), brace-style, preserve-newlin
 
 | # | Input | Expected |
 |---|---|---|
-| 01 | `sample.js` | Beautify produces conventionally formatted JS |
+| 01 | `sample.js` | Format produces conventionally formatted JS |
 | 02 | brace-style collapse / expand / end-expand | Brace placement follows the option |
 | 03 | max-preserve-newlines 0 vs 10 | Blank-line runs collapse or survive |
 | 04 | Minify with `/*! license */` and `// note` | License comment kept (preserve-comments=license), others dropped; with `none`, all dropped |
 | 05 (suite) **[P1]** | Minify `a = b / c / d; x = /b[/]c/g; s = "/*";` | Division stays division, the regex literal survives, the string is untouched |
 | 06 **[P1]** | Minify `function f(){ return\nvalue }` and `y\n++z` | The newlines that ASI depends on are preserved |
 | 07 | Nested template literals `` `a${`b${c}`}` `` | Preserved exactly |
-| 08 | Minify then Beautify (chain with Open result) | Semantically the same code; record any difference |
+| 08 | Minify then Format (chain with Open as tab) | Semantically the same code; record any difference |
 | 09 | Unterminated string / template / comment | Documented error, readable |
 
 ### TL-SQL — SQL Formatter · `format.sql` · package
@@ -634,7 +639,7 @@ Options: dialect (sql, mysql, mariadb, postgresql, plsql), keyword-case, indent,
 
 | # | Input | Expected |
 |---|---|---|
-| 01 (suite) | `sample.sql` | Beautify: clauses on their own lines, joins readable |
+| 01 (suite) | `sample.sql` | Format: clauses on their own lines, joins readable |
 | 02 | keyword-case upper / lower / preserve | `SELECT` vs `select` vs as written |
 | 03 | comma-position end / start | Commas trail / lead |
 | 04 | dialect postgresql with `::text` cast and `$$` block | Not mangled |
@@ -668,7 +673,7 @@ Operations: Preview Markdown, Preview HTML. Markdown options: gfm, breaks, theme
 | 07 | Very long document (2 MB of markdown) | Renders or reports the limit; UI stays responsive |
 | 08 | Switch to the code representation | The generated HTML source is available and copyable |
 
-### TL-QR — QR Code · `media.qr` · package · auto
+### TL-QR — QR Code Generator · `media.qr` · package · auto
 Options: error-correction (L, M, Q, H), cell-size (1–40), margin (0–16), version (0–40). Input limit 2953 bytes.
 
 | # | Input | Expected |
@@ -684,7 +689,7 @@ Options: error-correction (L, M, Q, H), cell-size (1–40), margin (0–16), ver
 | 09 | `日本語のテキスト` | Encodes as bytes; scanning returns the same text |
 | 10 | Save the SVG and open it in a browser | Identical rendering; `width`/`height` match the viewBox scale |
 
-### TL-DIFF — Diff & Compare · `text.compare` · Rust · two inputs
+### TL-DIFF — Text Diff · `text.compare` · Rust · two inputs
 Options: newline (preserve, lf, crlf, ignore), context-lines (0–64).
 
 | # | Input | Expected |
@@ -727,9 +732,9 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | 02 | same | Python requests output is valid Python with the same semantics |
 | 03 | `curl` with `-u user:pass` and cookies | Credentials appear in the generated code (and are not silently dropped) |
 | 04 | Multiline `curl` with `\` continuations | Parsed as one command |
-| 05 | Not a curl command | Readable error |
+| 05 (suite) | Convert a real command, then replace it with `hello`; then with a command again | `hello` is refused in the result pane: *● Paste a cURL command that starts with curl.* in place of the old result (no *Updating…*, no Copy, not repeated under the editor). A command again converts as usual |
 
-### TL-EDITOR — Text editor · `editor.text`
+### TL-EDITOR — Text Editor · `editor.text`
 | # | Steps | Expected |
 |---|---|---|
 | 01 | Select the editor tool | Single-pane layout, no result pane demanded |
@@ -775,7 +780,7 @@ Options: category (paragraph, sentence, word, title, first-name, last-name, full
 | ROB-13 | Paste HTML from Word/Outlook (rich text on the clipboard) | Plain text is inserted; no hidden markup corrupting the tool |
 | ROB-14 | Use the app while another instance is running | Both work; saving in one does not corrupt the other's file |
 | ROB-15 | Lock the workstation mid-run, unlock | The run completed or is cancellable; nothing is wedged |
-| ROB-16 | Sleep/resume the machine with the app open | The app recovers; the engine dot still reads *Local engine* |
+| ROB-16 | Sleep/resume the machine with the app open | The app recovers; the engine dot still reads *Local* |
 | ROB-17 | Change the OS display scale while a run is in flight | No crash; layout reflows afterwards |
 | ROB-18 | Disconnect the network entirely | Every tool still works — nothing depends on the internet |
 | ROB-19 | Run with a restricted (non-admin) user account | No permission prompts; the app works |
@@ -856,7 +861,7 @@ a fix was lost.
 | REG-10 | Dirty tab replaced by a dropped file | DOC-27 |
 | REG-11 | CRLF handling differed between Windows and CI | DOC-08, DOC-09, TB-09 |
 | REG-12 | Hash algorithms available in the package but not the UI | TL-HASH-02 — record exactly which algorithms the UI offers |
-| REG-13 (suite) | Options were taken from the first operation, so an option declared on a later one was unreachable | JavaScript Formatter: Beautify does not offer *Preserve comments* and Minify does |
+| REG-13 (suite) | Options were taken from the first operation, so an option declared on a later one was unreachable | JavaScript Formatter: Format does not offer *Preserve comments* and Minify does |
 | REG-14 (suite) | The same option id with different choices per operation: the UI offered a value the operation rejects | JSON to YAML offers only `space2`/`space4`, and choosing the last one runs cleanly |
 
 ---

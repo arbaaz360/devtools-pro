@@ -22,13 +22,29 @@ const MIN_SAFE = -9007199254740991n;
 const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const encoder = new TextEncoder();
 
+/**
+ * The message a person reads: the diagnostic's own text, then its line and column once
+ * they are known. The code is a separate field, and a position that has not been
+ * resolved is left out rather than printed as null.
+ */
+export function describeDiagnostic(diagnostic) {
+  const known = Number.isInteger(diagnostic.line) && Number.isInteger(diagnostic.column);
+  return known ? `${diagnostic.message} at line ${diagnostic.line}, column ${diagnostic.column}` : diagnostic.message;
+}
+
 export class YamlError extends Error {
   constructor(diagnostic) {
-    const where = diagnostic.offset === null || diagnostic.offset === undefined ? "" : ` at line ${diagnostic.line}, column ${diagnostic.column} (byte ${diagnostic.offset})`;
-    super(`${diagnostic.code}: ${diagnostic.message}${where}`);
+    super(describeDiagnostic(diagnostic));
     this.name = "YamlError";
     this.code = diagnostic.code;
     this.diagnostic = diagnostic;
+  }
+
+  /** Resolves line and column against the input (a failure is thrown before they are known) and restates the message with them. */
+  locate(bytes) {
+    resolvePositions(bytes, 0, [this.diagnostic]);
+    this.message = describeDiagnostic(this.diagnostic);
+    return this;
   }
 }
 
@@ -355,7 +371,13 @@ class Parser {
     if (this.isSequenceMarker(line)) return this.parseSequence(col);
     const colon = this.findKeyColon(line, line.contentStart);
     if (colon >= 0) return this.parseMapping(col);
-    return this.parseInlineNode(this.li, line.contentStart, col);
+    // A plain scalar continues on every later line indented past its parent's column
+    // (YAML 1.2 §7.3.3, s-flow-line-prefix(n)), not past its own: at the top level the
+    // parent's column is -1, so `a\nb\n` is the one scalar "a b". Block scalars keep
+    // measuring from their own column.
+    const byte = this.bytes[line.contentStart];
+    const bound = byte === 0x7c || byte === 0x3e ? col : minIndent - 1;
+    return this.parseInlineNode(this.li, line.contentStart, bound);
   }
 
   parseMapping(col) {
@@ -770,12 +792,18 @@ export function parseYamlDocument(bytes, check) {
   const value = inlineStart ? parser.parseInlineNode(inlineStart.line, inlineStart.offset, 0) : parser.parseNode(0);
   parser.skipBlank();
   const after = parser.current();
+  let ended = false;
   if (after) {
     const text = utf8.decode(bytes.subarray(after.contentStart, after.end)).trimEnd();
-    if (text === "...") { parser.li += 1; parser.skipBlank(); }
+    if (text === "...") { parser.li += 1; parser.skipBlank(); ended = true; }
   }
   const trailing = parser.current();
-  if (trailing) fail("yaml.multiple-documents", trailing.start, trailing.end, "input contains more than one YAML document; only a single document is supported");
+  if (trailing) {
+    // Only a document marker, or anything after an explicit `...` end, starts another
+    // document. Any other line the top-level node did not take is simply out of place.
+    if (ended || parser.isDocMarker(trailing)) fail("yaml.multiple-documents", trailing.start, trailing.end, "input contains more than one YAML document; only a single document is supported");
+    fail("yaml.unexpected-token", trailing.contentStart, trailing.end, `unexpected content after the top-level ${value.t === "map" ? "mapping" : value.t === "seq" ? "sequence" : "value"}`);
+  }
   return { value, keys: parser.keys, items: parser.items, maxDepth: computeMaxDepth(value), diagnostics: parser.diagnostics };
 }
 
@@ -875,7 +903,8 @@ function parseJsonDocument(bytes, check) {
   try {
     scanDocument(bytes, 0, bytes.length, [builder], check);
   } catch (error) {
-    if (error instanceof JsonError) { resolvePositions(bytes, 0, [error.diagnostic]); throw error; }
+    // plugins/json builds its message before the position is known; restate it once it is, in this package's form.
+    if (error instanceof JsonError) { resolvePositions(bytes, 0, [error.diagnostic]); error.message = describeDiagnostic(error.diagnostic); throw error; }
     throw error;
   }
   if (builder.root === undefined) builder.root = { t: "null" };
@@ -1060,7 +1089,7 @@ async function runYamlToJson(context, options) {
   try {
     parsed = parseYamlDocument(bytes, check);
   } catch (error) {
-    if (error instanceof YamlError) resolvePositions(bytes, 0, [error.diagnostic]);
+    if (error instanceof YamlError) error.locate(bytes);
     throw error;
   }
   const out = [];

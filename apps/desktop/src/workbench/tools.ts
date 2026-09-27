@@ -1,10 +1,13 @@
 import type { FileDocument, Format, ToolManifest } from "../bridge";
 import type { OptionSpec } from "../../../../packages/plugin-contract/ts/generated.ts";
 import type { TabState } from "./state";
+import { groupFor, initials } from "../plugins/describe.ts";
 
 export interface ToolDefinition {
   id: string;
   label: string;
+  /** What the tool does, in one line: the rail and tool-header subtitle. */
+  description: string;
   group: string;
   icon: string;
   defaultOperation: string;
@@ -63,6 +66,7 @@ const op = (id: string, label: string) => ({ id, label });
 const define = (
   id: string,
   label: string,
+  description: string,
   group: string,
   icon: string,
   input: ToolDefinition["input"],
@@ -72,6 +76,7 @@ const define = (
 ): ToolDefinition => ({
   id,
   label,
+  description,
   group,
   icon,
   input,
@@ -81,31 +86,35 @@ const define = (
   auto: operations.length > 0,
   compare,
 });
+// Names, groups, descriptions and glyphs follow docs/RELEASE_UI_SPEC.md; package tools
+// take theirs from their manifests (plugins/describe.ts).
 export const editor = define(
   "editor.text",
-  "Text editor",
+  "Text Editor",
+  "A plain text document with no tool attached",
   "WORKSPACE",
-  "Aa",
+  "✎",
   "bytes",
   [],
 );
 export const bundledTools: readonly ToolDefinition[] = [
   editor,
-  define("structured.json", "JSON", "STRUCTURED DATA", "{}", "text", [
+  define("structured.json", "JSON Formatter", "Format, minify or validate JSON", "FORMAT", "{}", "text", [
     op("format", "Format"),
     op("minify", "Minify"),
     op("inspect", "Validate"),
   ]),
-  define("structured.csv", "CSV inspector", "STRUCTURED DATA", "▦", "text", [
+  define("structured.csv", "CSV Inspector", "Rows, columns and delimiter of a CSV document", "FORMAT", "▤", "text", [
     op("inspect", "Inspect"),
   ]),
-  define("text.inspect", "Text inspector", "TEXT & ENCODING", "Aa", "text", [
+  define("text.inspect", "Text Inspector", "Bytes, characters, lines, words and line endings", "TEXT", "¶", "text", [
     op("inspect", "Inspect"),
   ]),
   define(
     "encoding.image-base64",
     "Image to Base64",
-    "TEXT & ENCODING",
+    "A PNG or JPEG as a Base64 string or data URI",
+    "ENCODE",
     "▧",
     "image",
     [op("encode", "Encode")],
@@ -114,16 +123,18 @@ export const bundledTools: readonly ToolDefinition[] = [
   define(
     "encoding.base64-image",
     "Base64 to Image",
-    "TEXT & ENCODING",
-    "▧",
+    "A Base64 string or data URI back to an image",
+    "ENCODE",
+    "◧",
     "text",
     [op("decode", "Decode")],
   ),
   define(
     "text.json-string",
-    "JSON escape / unescape",
-    "TEXT & ENCODING",
-    "{}",
+    "JSON String Escape / Unescape",
+    "Text as a JSON string literal, and back",
+    "ENCODE",
+    '""',
     "text",
     [op("escape", "Escape"), op("unescape", "Unescape")],
   ),
@@ -131,57 +142,57 @@ export const bundledTools: readonly ToolDefinition[] = [
     ...define(
       "text.find-replace",
       "Find & Replace",
-      "TEXT & ENCODING",
+      "Find text in the document and replace it",
+      "TEXT",
       "⌕",
       "text",
       [op("find", "Find"), op("replace", "Replace")],
     ),
     auto: false,
   },
-  define("encoding.hash", "Hash generator", "TEXT & ENCODING", "#", "bytes", [
+  define("encoding.hash", "Hash Generator", "SHA-256 and SHA-512 digests of text or a file", "ENCODE", "#", "bytes", [
     op("sha256", "SHA-256"),
     op("sha512", "SHA-512"),
   ]),
-  define("text.url", "URL encode / decode", "TEXT & ENCODING", "%", "text", [
+  define("text.url", "URL Encode / Decode", "Percent-encode text, or decode it", "ENCODE", "%", "text", [
     op("encode", "Encode"),
     op("decode", "Decode"),
   ]),
 
   define(
     "text.unicode",
-    "Unicode escape / unescape",
-    "TEXT & ENCODING",
-    "U",
+    "Unicode Escape / Unescape",
+    "\\uXXXX escapes for non-ASCII text, and back",
+    "ENCODE",
+    "U+",
     "text",
     [op("encode", "Escape"), op("decode", "Unescape")],
   ),
   define(
     "text.compare",
-    "Diff & Compare",
-    "COMPARE",
+    "Text Diff",
+    "Line-by-line differences between two texts",
+    "TEXT",
     "⇄",
     "text",
     [op("compare", "Compare")],
     { newline: "preserve", contextLines: 3 },
     true,
   ),
-  define("web.curl-code", "cURL to Code", "WEB & API", "↗", "text", [
+  define("web.curl-code", "cURL to Code", "A cURL command as JavaScript fetch or Python requests", "CONVERT", "$", "text", [
     op("fetch", "JavaScript fetch"),
     op("python", "Python requests"),
   ]),
 ];
 function manifestTool(manifest: ToolManifest): ToolDefinition {
-  const input: ToolDefinition["input"] = manifest.inputKinds.includes("bytes")
-    ? manifest.id.includes("image") || /image/i.test(manifest.label)
-      ? "image"
-      : "bytes"
-    : "text";
-  const group = manifest.group ?? (manifest.id.split(".")[0] === "structured"
-    ? "STRUCTURED DATA"
-    : manifest.id.includes("compare")
-      ? "COMPARE"
-      : "PLUGINS");
-  const icon = manifest.icon ?? (manifest.renderer === "binary" ? "▧" : manifest.renderer === "diff" ? "⇄" : "◇");
+  // What the input port declares decides an image tool; the tool's name has no say.
+  const input: ToolDefinition["input"] = manifest.inputContent === "image"
+    ? "image"
+    : manifest.inputKinds.includes("bytes")
+      ? "bytes"
+      : "text";
+  const group = manifest.group ?? groupFor(undefined, manifest.id.split(".")[0]) ?? "CONVERT";
+  const icon = manifest.icon ?? initials(manifest.label);
   // A v1 manifest declares no per-operation policy: leave those fields off entirely
   // so such a tool keeps the catalog's own `auto` flag rather than an empty policy.
   const operations: ToolOperationDefinition[] = manifest.operations.map((operation) => ({
@@ -196,6 +207,7 @@ function manifestTool(manifest: ToolManifest): ToolDefinition {
   return {
     id: manifest.id,
     label: manifest.label,
+    description: manifest.description ?? "",
     group,
     icon,
     input,
@@ -266,7 +278,7 @@ export function validation(
   if (tool.id === "web.curl-code") {
     const text = (tab.text ?? tab.source?.preview ?? "").trim();
     if (text && !/^curl(?:\s|$)/i.test(text))
-      return "Paste a cURL command beginning with curl. Images and other document formats cannot be converted into a request.";
+      return "Paste a cURL command that starts with curl.";
   }
   return null;
 }

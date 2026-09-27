@@ -10,7 +10,8 @@
     {
       "id": "text.html",
       "title": "HTML Escape / Unescape",
-      "category": "converter",
+      "category": "encode",
+      "description": "HTML character references such as &amp; and &#233;, and back",
       "operationIds": [
         "text.html"
       ],
@@ -19,7 +20,8 @@
     {
       "id": "text.json-string",
       "title": "JSON String Escape / Unescape",
-      "category": "converter",
+      "category": "encode",
+      "description": "Text as a JSON string literal, and back",
       "operationIds": [
         "text.json-string"
       ],
@@ -28,7 +30,8 @@
     {
       "id": "text.backslash",
       "title": "Backslash Escape / Unescape",
-      "category": "converter",
+      "category": "encode",
+      "description": "Backslash sequences such as \\n and \\\", and back",
       "operationIds": [
         "text.backslash"
       ],
@@ -38,7 +41,7 @@
   "operations": [
     {
       "id": "text.html",
-      "title": "HTML character references",
+      "title": "Convert",
       "executor": {
         "kind": "javascriptWorker",
         "id": "text.escaping.processor",
@@ -222,11 +225,11 @@
           "choices": [
             {
               "id": "text",
-              "label": "Text"
+              "label": "In text"
             },
             {
               "id": "attribute",
-              "label": "Attribute"
+              "label": "In an attribute"
             }
           ],
           "persistence": "instance",
@@ -261,7 +264,7 @@
     },
     {
       "id": "text.json-string",
-      "title": "JSON string literal",
+      "title": "Convert",
       "executor": {
         "kind": "javascriptWorker",
         "id": "text.escaping.processor",
@@ -373,7 +376,7 @@
     },
     {
       "id": "text.backslash",
-      "title": "Backslash sequences",
+      "title": "Convert",
       "executor": {
         "kind": "javascriptWorker",
         "id": "text.escaping.processor",

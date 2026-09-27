@@ -11,6 +11,19 @@ The tool supports four primary operations on the lines of the input text:
 - **Reverse**: Reverses the order of all lines in the document.
 - **Remove blank lines**: Removes any line that is empty or contains only whitespace characters.
 
+## Options
+
+| Id | Label | Values (default first) | Shown when |
+|---|---|---|---|
+| `action` | Action | `sort`, `dedupe`, `reverse`, `remove-blank` | always |
+| `order` | Order | `ascending`, `descending` | `action` is `sort` |
+| `compare` | Compare | `natural`, `code-point`, `case-insensitive`, `numeric` | `action` is `sort` |
+| `ignore-case` | Ignore case | `false`, `true` | `action` is `dedupe` |
+| `ignore-whitespace` | Ignore surrounding whitespace | `false`, `true` | `action` is `dedupe` |
+
+The processor reads each option only for the action above, so hiding it elsewhere hides nothing
+that has an effect. `ignoreCase` and `ignoreWhitespace` are accepted as aliases.
+
 ## Sorting Comparisons
 
 When using the **Sort** action, four comparison methods are available:

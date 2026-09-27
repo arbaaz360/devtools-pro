@@ -9,7 +9,7 @@
 | `mode` | `encode`, `decode` | `encode` | Direction. |
 | `variant` | `standard`, `url` | `standard` | Alphabet, see below. Decode accepts only the selected alphabet. |
 | `padding` | `required`, `optional`, `omit` | `required` | Padding policy, see below. |
-| `error-policy` | `strict`, `tolerant`, `replace` | `strict` | Whitespace, non-canonical bits and invalid UTF-8 handling. `errorPolicy` is accepted as an alias. |
+| `error-policy` | `strict`, `tolerant`, `replace` | `strict` | Whitespace, non-canonical bits and invalid UTF-8 handling. `errorPolicy` is accepted as an alias. Shown only when `mode` is `decode`. |
 
 Unknown choices fail with `invalid-option` naming the option and the allowed values.
 

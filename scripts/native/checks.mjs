@@ -129,6 +129,25 @@ const NATIVE_IDS = new Set([
   "text.json-string", "encoding.hash", "text.find-replace",
 ]);
 
+/**
+ * Whether an option's control should show under these values, from its manifest `rules`
+ * alone: every `visible` rule's condition holds. Written here from the contract, not
+ * taken from the shell, so the check and the app cannot share a mistake.
+ */
+function visibleUnder(option, values) {
+  const holds = (condition) => {
+    if (condition.kind === "all") return condition.conditions.every(holds);
+    if (condition.kind === "any") return condition.conditions.some(holds);
+    if (condition.kind === "not") return !holds(condition.condition);
+    const current = values[condition.optionId];
+    if (condition.operator === "isSet") return current !== undefined && current !== null && current !== "";
+    const same = (value) => String(current) === String(value);
+    if (condition.operator === "in") return Array.isArray(condition.value) && condition.value.some(same);
+    return condition.operator === "notEquals" ? !same(condition.value) : same(condition.value);
+  };
+  return (option.rules ?? []).filter((rule) => rule.effect === "visible").every((rule) => holds(rule.when));
+}
+
 /** Every package tool as its manifest declares it, keyed by the title in the rail. */
 function declaredTools() {
   const declared = new Map();
@@ -141,11 +160,17 @@ function declaredTools() {
       if (NATIVE_IDS.has(tool.id)) continue;
       declared.set(tool.title, {
         id: tool.id,
-        operations: operations.map((operation) => ({
-          id: operation.id,
-          title: operation.title,
-          options: (operation.options ?? []).map((option) => option.label),
-        })),
+        operations: operations.map((operation) => {
+          const defaults = Object.fromEntries((operation.options ?? []).map((option) => [option.id, option.default]));
+          return {
+            id: operation.id,
+            title: operation.title,
+            // Runs as you type: with no sibling operation it has no button to press.
+            auto: (operation.trigger?.modes ?? []).includes("inputChange"),
+            // The controls a fresh tab shows: those the defaults do not make irrelevant.
+            options: (operation.options ?? []).filter((option) => visibleUnder(option, defaults)).map((option) => option.label),
+          };
+        }),
       });
     }
   }
@@ -167,7 +192,11 @@ export const checks = [
     smoke: true,
     async run({ page }) {
       const engine = (await page.locator("#engine-status").innerText()).trim();
-      return verdict(/local engine/i.test(engine), `engine reads "${engine}"`);
+      // With no document open the idle line also says how to start one.
+      const tabs = await page.locator(".tab-wrap").count();
+      const status = (await page.locator("#status").innerText()).trim();
+      const ready = tabs ? "Ready" : "Ready · Ctrl+N for a new document";
+      return verdict(engine === "Local" && status === ready, `engine reads "${engine}"; status "${status}" with ${tabs} tabs`);
     },
   },
   {
@@ -175,7 +204,7 @@ export const checks = [
     smoke: true,
     async run({ page, state }) {
       state.tools = await page.locator(".tool-item strong").allTextContents();
-      const missing = ["JSON", "String Case Converter", "Diff & Compare", "QR Code", "Regular Expression Tester"]
+      const missing = ["JSON Formatter", "String Case Converter", "Text Diff", "QR Code Generator", "Regular Expression Tester"]
         .filter((name) => !state.tools.includes(name));
       return verdict(!missing.length, missing.length
         ? `the rail is missing ${missing.join(", ")}; it lists ${state.tools.length}: ${state.tools.join(" | ")}`
@@ -185,29 +214,35 @@ export const checks = [
   {
     // Every option and operation a manifest declares is reachable, and no operation
     // button is offered twice. This is what made JS minify's Preserve comments
-    // unreachable and had JSON to YAML offering a choice it rejects.
+    // unreachable and had JSON to YAML offering a choice it rejects. An option its
+    // rules hide under the defaults is expected hidden; a single operation that runs
+    // as you type is expected to have no button.
     id: "OPT-01",
     async run({ driver, state }) {
       const declared = declaredTools();
       const problems = [];
       let inspected = 0;
       for (const name of state.tools ?? []) {
-        if (name === "Text editor") continue;
+        if (name === "Text Editor") continue;
         const spec = declared.get(name);
         if (!spec) continue;   // bundled Rust tools have no v2 manifest
         inspected += 1;
         await driver.newTab();
         await driver.selectTool(name);
-        try { await driver.setInput("a"); } catch { /* compare and image workspaces have no plain editor */ }
+        try { await driver.setInput("a"); } catch { /* compare, image and generator workspaces have no plain editor */ }
         const operations = await driver.readOperations();
         const duplicates = operations.filter((label, index) => operations.indexOf(label) !== index);
         if (duplicates.length) problems.push(`${name}: duplicate operation button ${duplicates.join(", ")}`);
+        const buttons = spec.operations.length > 1 || !spec.operations[0]?.auto;
+        if (!buttons && operations.length) problems.push(`${name}: one operation that runs as you type, yet buttons ${operations.join(", ")}`);
         for (const operation of spec.operations) {
-          if (!operations.includes(operation.title)) {
+          if (buttons && !operations.includes(operation.title)) {
             problems.push(`${name}: no button for operation "${operation.title}"`);
             continue;
           }
-          await driver.runOperation(operation.title);
+          // Pressing switches operations; a lone operation's options are already on screen,
+          // and an image tool's button is rightly disabled in this text tab.
+          if (spec.operations.length > 1) await driver.runOperation(operation.title);
           await sleep(220);
           const shown = (await driver.readOptions()).map((option) => option.label);
           const missing = operation.options.filter((label) => !shown.includes(label));
@@ -265,12 +300,12 @@ export const checks = [
     id: "EDT-15",
     async run({ driver }) {
       await driver.newTab();
-      await driver.selectTool("CSS");
+      await driver.selectTool("CSS Formatter");
       await driver.setInput(".a{color:red}");
       await sleep(2000);
       const idle = await driver.readResult();
       if (idle.output) return { status: "fail", note: `CSS declares trigger ["explicit"] and ran anyway: ${idle.output.slice(0, 80)}` };
-      await driver.runOperation("Beautify");
+      await driver.runOperation("Format");
       const pressed = await driver.settle(Buffer.byteLength(".a{color:red}"), { changedFrom: idle.signature });
       return verdict(pressed.output.includes("color"), `waited for its button, then produced ${JSON.stringify(pressed.output.slice(0, 60))}`);
     },
@@ -278,7 +313,7 @@ export const checks = [
   {
     id: "RES-02",
     async run({ driver }) {
-      const result = await driver.tool("JSON", { text: '{"a": }', operation: "Format" });
+      const result = await driver.tool("JSON Formatter", { text: '{"a": }', operation: "Format" });
       const message = result.error || result.state;
       return verdict(Boolean(message) && !result.output, `reported ${JSON.stringify(message.slice(0, 90))} and left the output empty`);
     },
@@ -287,7 +322,7 @@ export const checks = [
     id: "RES-03",
     async run({ driver }) {
       await driver.newTab();
-      await driver.selectTool("JSON");
+      await driver.selectTool("JSON Formatter");
       await driver.setInput('{"a": }');
       await driver.runOperation("Format");
       const bad = await driver.settle(Buffer.byteLength('{"a": }'));
@@ -319,10 +354,10 @@ export const checks = [
       const before = digest(file);
       await driver.newTab();
       await driver.openPath(file);
-      await driver.selectTool("JSON");
+      await driver.selectTool("JSON Formatter");
       await driver.runOperation("Format");
       await driver.settle();
-      await driver.selectTool("Hash generator");
+      await driver.selectTool("Hash Generator");
       await driver.runOperation("SHA-256");
       await driver.settle();
       const after = digest(file);
@@ -488,7 +523,7 @@ export const checks = [
     id: "RES-08",
     async run({ driver, page }) {
       const target = freshFile("saved-result.json");
-      await driver.tool("JSON", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
+      await driver.tool("JSON Formatter", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
       await driver.presetDialogPaths([target]);
       const save = page.locator("#save-result");
       if (await save.isHidden()) return { status: "fail", note: "Save result is not offered for a successful result" };
@@ -507,7 +542,7 @@ export const checks = [
     id: "RES-09",
     async run({ driver, page }) {
       const target = freshFile("replaced-result.json", "old contents that must go\n");
-      await driver.tool("JSON", { text: '{"replaced":true}', operation: "Format" });
+      await driver.tool("JSON Formatter", { text: '{"replaced":true}', operation: "Format" });
       await driver.presetDialogPaths([target]);
       await page.locator("#save-result").click();
       const replaced = await driver.until(() => read(target) !== "old contents that must go\n");
@@ -554,7 +589,7 @@ export const checks = [
     // plan: a structured result has to be readable, not one unwrapped line.
     id: "RES-14",
     async run({ driver, page }) {
-      await driver.tool("JSON", { text: "{\"store\":{\"book\":[{\"title\":\"Sayings\",\"price\":8.95},{\"title\":\"Moby Dick\",\"price\":8.99}],\"bicycle\":{\"color\":\"red\"}}}", operation: "Format" });
+      await driver.tool("JSON Formatter", { text: "{\"store\":{\"book\":[{\"title\":\"Sayings\",\"price\":8.95},{\"title\":\"Moby Dick\",\"price\":8.99}],\"bicycle\":{\"color\":\"red\"}}}", operation: "Format" });
       const toggle = page.locator("#view-tree");
       if (await toggle.isHidden()) return { status: "fail", note: "a JSON result offered no tree view" };
       await toggle.click();
@@ -587,7 +622,7 @@ export const checks = [
     // 9007199254740993 is not a double, and 1e400 is not Infinity.
     id: "RES-14c",
     async run({ driver, page }) {
-      await driver.tool("JSON", { text: '{"id":9007199254740993,"overflow":1e400}', operation: "Format" });
+      await driver.tool("JSON Formatter", { text: '{"id":9007199254740993,"overflow":1e400}', operation: "Format" });
       const text = await driver.fullResult();
       await page.locator("#view-tree").click();
       const shown = await driver.until(async () => {
@@ -611,7 +646,7 @@ export const checks = [
     id: "RES-14d",
     async run({ driver, page }) {
       const ids = Array.from({ length: 5_000 }, (_, id) => ({ id }));
-      await driver.tool("JSON", { text: JSON.stringify(ids), operation: "Minify" });
+      await driver.tool("JSON Formatter", { text: JSON.stringify(ids), operation: "Minify" });
       await page.locator("#view-tree").click();
       await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 0);
       await page.locator("#tree-path").fill("$[*].id");
@@ -670,7 +705,7 @@ export const checks = [
   {
     id: "TL-HASH-01",
     async run({ driver }) {
-      const result = await driver.tool("Hash generator", { text: "hello", operation: "SHA-256" });
+      const result = await driver.tool("Hash Generator", { text: "hello", operation: "SHA-256" });
       const body = result.output || result.structured;
       return verdict(body.toLowerCase().includes(sha256("hello")), `node computes ${sha256("hello").slice(0, 20)}…; the app shows ${body.replace(/\s+/g, " ").slice(0, 90)}`);
     },
@@ -683,9 +718,10 @@ export const checks = [
       const bytes = Buffer.from([0xef, 0xbb, 0xbf, 0x68, 0x65, 0x6c, 0x6c, 0x6f]);
       const file = freshFile("bom-hello.txt");
       writeFileSync(file, bytes);
+      // Which reading it was is the first line of Operation details.
       const readRow = () => page.evaluate(() => {
-        const term = [...document.querySelectorAll("#result-metrics dt")].find((dt) => dt.textContent.trim() === "Read");
-        return term?.nextElementSibling?.textContent.trim() ?? null;
+        const line = (document.querySelector("#result-summary")?.textContent ?? "").split(String.fromCharCode(10))[0] ?? "";
+        return line.startsWith("Read: ") ? line.slice("Read: ".length).trim() : null;
       });
       const before = (await driver.readResult()).signature;
       await driver.openPath(file, "encoding.hash");
@@ -745,7 +781,7 @@ export const checks = [
       // [key, text that finds its row, its value]. The newline key's path is pasted into a
       // one-line box, which drops a raw newline: only an escaped one survives.
       const cases = [[`a${bs}b`, `a${bs}b`, "42"], [`it's${bs}x`, `it's${bs}x`, "7"], ["line\nbreak", "break", "9"]];
-      await driver.tool("JSON", { text: JSON.stringify(Object.fromEntries(cases.map(([key, , value]) => [key, Number(value)]))), operation: "Minify" });
+      await driver.tool("JSON Formatter", { text: JSON.stringify(Object.fromEntries(cases.map(([key, , value]) => [key, Number(value)]))), operation: "Minify" });
       await page.locator("#view-tree").click();
       await driver.until(async () => (await page.locator("#tree-body .tree-node").count()) > 1);
       const results = [];
@@ -935,7 +971,7 @@ export const checks = [
     id: "TL-NUMBASE-01",
     async run({ driver }) {
       // Exercises the option controls too: the defaults would answer this one by accident.
-      const result = await driver.tool("Number Base Converter", { text: "ff", options: { "From Base": "16", "To Base": "2" } });
+      const result = await driver.tool("Number Base Converter", { text: "ff", options: { "From base": "16", "To base": "2" } });
       const body = (result.output || "") + " " + (await driver.fullResult());
       return verdict(body.includes((255).toString(2)), `0xff in base 2 is ${(255).toString(2)}; result: ${body.replace(/\s+/g, " ").slice(0, 110)}`);
     },
@@ -943,7 +979,7 @@ export const checks = [
   {
     id: "TL-URL-01",
     async run({ driver }) {
-      const result = await driver.tool("URL encode / decode", { text: "https://example.com/search?q=hello world", operation: "Encode" });
+      const result = await driver.tool("URL Encode / Decode", { text: "https://example.com/search?q=hello world", operation: "Encode" });
       return verdict(/hello(%20|\+)world/.test(result.output), `got ${JSON.stringify(result.output.slice(0, 80))}`);
     },
   },
@@ -951,7 +987,7 @@ export const checks = [
     id: "TL-JSON-01",
     smoke: true,
     async run({ driver }) {
-      const result = await driver.tool("JSON", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
+      const result = await driver.tool("JSON Formatter", { text: '{"b":1,"a":[1,2]}', operation: "Format" });
       let same = false;
       try { same = JSON.stringify(JSON.parse(result.output)) === JSON.stringify({ b: 1, a: [1, 2] }); } catch { /* not JSON */ }
       return verdict(same && result.output.includes("\n"), same ? "re-parses to the same value and is indented" : `output: ${result.output.slice(0, 80)}`);
@@ -961,7 +997,7 @@ export const checks = [
     id: "TL-JSON-06",
     async run({ driver }) {
       const big = "123456789012345678901234567890";
-      const result = await driver.tool("JSON", { text: `{"n":${big}}`, operation: "Format" });
+      const result = await driver.tool("JSON Formatter", { text: `{"n":${big}}`, operation: "Format" });
       return verdict(result.output.includes(big), `a 30-digit integer is ${result.output.includes(big) ? "preserved exactly" : `changed: ${result.output.slice(0, 80)}`}`);
     },
   },
@@ -1030,20 +1066,24 @@ export const checks = [
     id: "TL-UUID-09",
     async run({ driver, page }) {
       // DU-10: typing beside Generate used to run it, and every keystroke failed with
-      // "UUID must be canonical". Nothing should happen now, so there is no change to
-      // wait for: give a run longer than its debounce to show itself, and look for any sign.
+      // "UUID must be canonical". Generate reads no document, so since the release UI it
+      // shows no editor at all (B12); a tab that already holds text keeps it, unread.
       await driver.newTab();
+      await driver.setInput("not a uuid");
       await driver.selectTool("UUID Generator");
       const generated = await driver.settle(0);
       const first = generated.output.trim();
-      if (!UUID_V4.test(first)) return verdict(false, `selecting Generate gave "${first}" (error "${generated.error}")`);
-      await driver.setInput("not a uuid");
+      if (!UUID_V4.test(first)) return verdict(false, `selecting Generate beside text gave "${first}" (error "${generated.error}")`);
+      const editor = await page.locator("#preview").isVisible();
+      const message = (await page.locator("#input-message-text").innerText()).trim();
+      if (editor || message !== "Generated from the options above; there is no input.")
+        return verdict(false, `Generate shows ${editor ? "an editor" : "no editor"} and the input message "${message}"`);
       const disturbed = await driver.until(async () => {
         const now = await driver.readResult();
         return now.error || now.signature !== generated.signature ? now : null;
       }, { timeout: 2500 });
-      if (disturbed) return verdict(false, `typing beside Generate changed the result to "${disturbed.state}" (error "${disturbed.error}")`);
-      if (!(await page.locator("#copy-result").isVisible())) return verdict(false, "typing beside Generate hid Copy on the value it generated");
+      if (disturbed) return verdict(false, `the text beside Generate changed the result to "${disturbed.state}" (error "${disturbed.error}")`);
+      if (!(await page.locator("#copy-result").isVisible())) return verdict(false, "Copy is not offered on the value Generate produced");
       // AST-013: a visible button is not a working one. Press it, and read what reached
       // the system clipboard through .NET; then open the value as a tab.
       clearClipboard();
@@ -1074,8 +1114,9 @@ export const checks = [
       await driver.newTab();
       await driver.selectTool("UUID Generator");
       const generated = await driver.settle(0);
-      await driver.setInput(five);
+      // Decode reads the document, so pressing it brings the editor back.
       await driver.runOperation("Decode");
+      await driver.setInput(five);
       const decoded = await driver.settle(five.length, { changedFrom: generated.signature });
       const first = await driver.fullResult();
       if (decoded.error || !reports(first, 5)) return verdict(false, `Decode of ${five}: ${decoded.error || first.slice(0, 160)}`);
@@ -1088,16 +1129,16 @@ export const checks = [
   {
     id: "RES-31",
     async run({ driver, page }) {
-      // A kept result that nothing is about to replace must say so. CSS Beautify runs only
+      // A kept result that nothing is about to replace must say so. CSS Format runs only
       // when pressed, so after an edit the old result is out of date, not updating.
       const css = "a{color:red}";
       await driver.newTab();
-      await driver.selectTool("CSS");
+      await driver.selectTool("CSS Formatter");
       await driver.setInput(css);
       const before = (await driver.readResult()).signature;
-      await driver.runOperation("Beautify");
+      await driver.runOperation("Format");
       const done = await driver.settle(Buffer.byteLength(css), { changedFrom: before });
-      if (done.error || done.timedOut) return verdict(false, `Beautify did not complete: ${done.error || "timed out"}`);
+      if (done.error || done.timedOut) return verdict(false, `Format did not complete: ${done.error || "timed out"}`);
       await driver.setInput("a{color:blue}");
       const relabelled = await driver.until(async () => {
         const now = await driver.readResult();
@@ -1105,7 +1146,7 @@ export const checks = [
       }, { timeout: 3000 });
       const state = relabelled?.state ?? done.state;
       const copyHidden = await page.locator("#copy-result").isHidden();
-      return verdict(/Out of date/.test(state) && !/Updating/.test(state) && copyHidden, `after an edit Beautify will not act on, the result reads "${state}", Copy ${copyHidden ? "hidden" : "shown"}`);
+      return verdict(/Out of date/.test(state) && !/Updating/.test(state) && copyHidden, `after an edit Format will not act on, the result reads "${state}", Copy ${copyHidden ? "hidden" : "shown"}`);
     },
   },
   {
@@ -1144,7 +1185,7 @@ export const checks = [
   {
     id: "TL-PREVIEW-01",
     async run({ driver, page }) {
-      await driver.tool("Markdown & HTML Preview", { text: "# Title\n\nSome **bold** text and a [link](https://example.com).\n", operation: "Preview Markdown" });
+      await driver.tool("Markdown & HTML Preview", { text: "# Title\n\nSome **bold** text and a [link](https://example.com).\n", operation: "Markdown" });
       const frames = await page.locator("#result-media iframe").count();
       return verdict(frames > 0, frames > 0 ? "rendered in a sandboxed frame" : "no preview frame appeared");
     },
@@ -1165,7 +1206,7 @@ export const checks = [
   {
     id: "TL-QR-01",
     async run({ driver }) {
-      const result = await driver.tool("QR Code", { text: "https://example.com" });
+      const result = await driver.tool("QR Code Generator", { text: "https://example.com" });
       return verdict(result.mediaTag === "IMG" && /svg/i.test(result.mediaSrc), `result media is ${result.mediaTag || "absent"}`);
     },
   },
@@ -1175,7 +1216,7 @@ export const checks = [
     id: "RES-32",
     async run({ driver, page }) {
       const text = `https://example.com/copied-${Date.now()}`;
-      await driver.tool("QR Code", { text });
+      await driver.tool("QR Code Generator", { text });
       const button = page.locator("#copy-image");
       if (await button.isHidden()) return verdict(false, "Copy image is not offered for a QR code");
       clearClipboard();
@@ -1215,7 +1256,7 @@ export const checks = [
     id: "TL-DIFF-01",
     async run({ driver, page }) {
       await driver.newTab();
-      await driver.selectTool("Diff & Compare");
+      await driver.selectTool("Text Diff");
       const before = (await driver.readResult()).signature;
       await page.locator("#compare-left").fill("alpha\nbravo\ncharlie\n");
       await page.locator("#compare-right").fill("alpha\nbravo CHANGED\ncharlie\n");
@@ -1230,7 +1271,7 @@ export const checks = [
       // AST-017: "has a newline and says color" passed broken output. The webview's own CSS
       // parser (CSSOM) reads input and output; beautifying must leave the same rules.
       const css = ".a{color:red;background:#fff}  .b , .c{margin:0 auto}";
-      const result = await driver.tool("CSS", { text: css, operation: "Beautify" });
+      const result = await driver.tool("CSS Formatter", { text: css, operation: "Format" });
       const rules = (text) => page.evaluate((source) => {
         const sheet = new CSSStyleSheet();
         sheet.replaceSync(source);
@@ -1247,7 +1288,7 @@ export const checks = [
       // Division, a regex literal, a string containing a comment opener and a kept
       // licence comment: the four the tokenizer got wrong before AG-115 round two.
       const source = 'a = b / c / d; x = /b[/]c/g; s = "/*"; /*! keep */ const t = 1;';
-      const result = await driver.tool("JavaScript Formatter", { text: source, operation: "Minify JavaScript" });
+      const result = await driver.tool("JavaScript Formatter", { text: source, operation: "Minify" });
       const dense = result.output.replace(/\s+/g, "");
       return verdict(dense.includes("a=b/c/d") && dense.includes("/b[/]c/g") && dense.includes('s="/*"') && result.output.includes("/*!"),
         `minified: ${result.output.slice(0, 110)}`);
@@ -1262,13 +1303,13 @@ export const checks = [
       await driver.selectTool("JavaScript Formatter");
       await driver.setInput("const a = 1; // note");
       const beautify = (await driver.readOptions()).map((option) => option.label);
-      await driver.runOperation("Minify JavaScript");
+      await driver.runOperation("Minify");
       const minify = (await driver.until(async () => {
         const labels = (await driver.readOptions()).map((option) => option.label);
         return labels.join("|") === beautify.join("|") ? null : labels;
       })) ?? beautify;
       return verdict(minify.includes("Preserve comments") && !beautify.includes("Preserve comments"),
-        `Beautify offers [${beautify.join(", ")}], Minify offers [${minify.join(", ")}]`);
+        `Format offers [${beautify.join(", ")}], Minify offers [${minify.join(", ")}]`);
     },
   },
   {
@@ -1292,7 +1333,7 @@ export const checks = [
   {
     id: "TL-XML-01",
     async run({ driver }) {
-      const result = await driver.tool("XML", { text: '<?xml version="1.0"?><root><item id="1"><name>a</name></item><empty/></root>', operation: "Beautify" });
+      const result = await driver.tool("XML Formatter", { text: '<?xml version="1.0"?><root><item id="1"><name>a</name></item><empty/></root>', operation: "Format" });
       return verdict(result.output.includes("\n") && result.output.includes("<name>a</name>"), `output: ${result.output.replace(/\s+/g, " ").slice(0, 90)}`);
     },
   },
@@ -1302,7 +1343,7 @@ export const checks = [
       // AST-017: "contains SELECT and a newline" passed broken output. SQLite runs both the
       // query and its formatted version over the same rows; the answers must match.
       const query = "select a.id, b.name from users a join orders b on b.user_id=a.id where a.active=1";
-      const result = await driver.tool("SQL Formatter", { text: query, operation: "Beautify SQL" });
+      const result = await driver.tool("SQL Formatter", { text: query, operation: "Format" });
       const db = new DatabaseSync(":memory:");
       db.exec("create table users(id integer, active integer); create table orders(user_id integer, name text);"
         + "insert into users values (1,1),(2,0),(3,1); insert into orders values (1,'a'),(2,'b'),(3,'c'),(3,'d');");
@@ -1346,7 +1387,7 @@ export const checks = [
       // both; the elements and attributes must match, and the text too once whitespace
       // runs are collapsed (so "Hello <b>" losing its space would still fail).
       const html = "<div><p>Hello <b>world</b></p></div>";
-      const result = await driver.tool("HTML Beautify/Minify", { text: html, operation: "Beautify" });
+      const result = await driver.tool("HTML Formatter", { text: html, operation: "Format" });
       const shape = (text) => page.evaluate((source) => {
         const body = new DOMParser().parseFromString(source, "text/html").body;
         const elements = [...body.querySelectorAll("*")].map((node) => `${node.tagName}[${[...node.attributes].map((a) => `${a.name}=${a.value}`).sort()}]`);
@@ -1364,6 +1405,170 @@ export const checks = [
       await sleep(400);
       const body = await driver.fullResult();
       return verdict(/@/.test(body), `category email produced: ${body.slice(0, 100)}`);
+    },
+  },
+
+  // ---- the release UI conventions (docs/RELEASE_UI_SPEC.md)
+  {
+    // A9: document commands, one "Switch to" per open tab, and each tool once, applied
+    // to the active tab: not every tool times every tab.
+    id: "NAV-12",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(1);
+      while ((await page.locator("#tabs .tab").count()) < 3) await driver.newTab();
+      const tabs = (await page.locator("#tabs .tab-name").allTextContents()).map((name) => name.trim());
+      const rail = (await page.locator(".tool-item strong").allTextContents()).map((name) => name.trim());
+      await page.locator("#preview").focus();
+      await page.keyboard.press("Control+k");
+      await driver.until(async () => (await page.locator("#command-list button").count()) > 0);
+      const commands = (await page.locator("#command-list button").allTextContents()).map((label) => label.trim());
+      await page.locator("#palette-search").fill("String Case Converter");
+      await page.keyboard.press("Enter");
+      const applied = await driver.until(async () => (await page.locator("#active-tool-title").innerText()).trim() === "String Case Converter");
+      const after = await page.locator("#tabs .tab").count();
+      const ok = JSON.stringify(commands.slice(0, 4)) === JSON.stringify(["New document", "Open file", "Save", "Save as…"])
+        && JSON.stringify(commands.slice(4, 4 + tabs.length)) === JSON.stringify(tabs.map((name) => `Switch to ${name}`))
+        && JSON.stringify(commands.slice(4 + tabs.length)) === JSON.stringify(rail)
+        && !!applied && after === tabs.length;
+      return verdict(ok, `${commands.length} commands for ${tabs.length} tabs and ${rail.length} tools (want ${4 + tabs.length + rail.length}); first after the tabs: ${JSON.stringify(commands.slice(4 + tabs.length, 7 + tabs.length))}; a tool from the palette ${applied ? "applied to the active tab" : "did not apply"}, tabs ${tabs.length} -> ${after}`);
+    },
+  },
+  {
+    // B13: an untitled tab is named after its tool, counted per tool; the top bar names it.
+    id: "DOC-39",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(0);
+      const names = async () => (await page.locator("#tabs .tab-name").allTextContents()).map((name) => name.trim());
+      await driver.newTab();
+      await driver.selectTool("UUID Generator");
+      await driver.newTab();
+      const first = await names();
+      await driver.selectTool("UUID Generator");
+      const second = await names();
+      const title = (await page.locator(".app-title").innerText()).trim();
+      await page.locator(".tab-close").first().click();
+      await driver.until(async () => (await page.locator("#tabs .tab").count()) === 1);
+      const third = await names();
+      const ok = JSON.stringify(first) === JSON.stringify(["UUID Generator", "Text Editor"])
+        && JSON.stringify(second) === JSON.stringify(["UUID Generator", "UUID Generator 2"])
+        && title === "UUID Generator 2" && JSON.stringify(third) === JSON.stringify(["UUID Generator"]);
+      return verdict(ok, `${JSON.stringify(first)} -> ${JSON.stringify(second)} (top bar "${title}") -> after closing the first ${JSON.stringify(third)}`);
+    },
+  },
+  {
+    // A1: QR Code Reader is an image tool because its input port declares image content.
+    // With nothing open it asks for an image and opens it in itself; in a text tab it says
+    // it needs an image, and Read cannot be pressed.
+    id: "EDT-26",
+    async run({ driver, page }) {
+      await driver.closeExtraTabs(0);
+      const png = freshFile("reader-input.png", pngOf(8, 8, () => [255, 255, 255, 255]));
+      await driver.presetDialogPaths([png]);
+      await driver.selectTool("QR Code Reader");
+      const opened = await driver.until(async () => (await page.locator("#source-name").innerText()).trim() === "reader-input.png");
+      const fromEmpty = {
+        tool: (await page.locator("#active-tool-title").innerText()).trim(),
+        image: await page.locator("#input-image").isVisible(),
+        read: await page.locator(".toolbar-actions button", { hasText: /^Read$/ }).isEnabled().catch(() => false),
+      };
+      await driver.presetDialogPaths([]);
+      await driver.newTab();
+      await driver.setInput("some text");
+      await driver.selectTool("QR Code Reader");
+      const editor = await page.locator("#preview").isVisible();
+      const message = (await page.locator("#input-message-text").innerText()).trim();
+      const offer = await page.locator("#input-open-compatible").isVisible();
+      const read = page.locator(".toolbar-actions button", { hasText: /^Read$/ });
+      const readShown = await read.isVisible(), readEnabled = readShown && (await read.isEnabled());
+      const ok = !!opened && fromEmpty.tool === "QR Code Reader" && fromEmpty.image && fromEmpty.read
+        && !editor && message === "This tab does not contain an image. Open a PNG or JPEG image to use QR Code Reader." && offer && readShown && !readEnabled;
+      return verdict(ok, `from no document: ${opened ? `opened in ${fromEmpty.tool}, image ${fromEmpty.image ? "shown" : "missing"}, Read ${fromEmpty.read ? "enabled" : "disabled"}` : "no image tab"}; in a text tab: editor ${editor ? "shown" : "hidden"}, "${message}", open button ${offer ? "offered" : "missing"}, Read ${readShown ? (readEnabled ? "enabled" : "disabled") : "absent"}`);
+    },
+  },
+  {
+    // B5: a button chooses between operations or starts one that waits to be asked; a
+    // single operation that runs as you type has none. The result subtitle says which.
+    id: "OPT-21",
+    async run({ driver, page }) {
+      const subtitle = async () => (await page.locator("#result-subtitle").innerText()).trim();
+      await driver.tool("Line Tools", { text: "b\na\n" });
+      const lines = { buttons: await driver.readOperations(), subtitle: await subtitle() };
+      await driver.tool("Text Inspector", { text: "abc" });
+      const inspector = await driver.readOperations();
+      await driver.tool("CSS Formatter", { text: "a{color:red}", operation: "Format" });
+      const css = { buttons: await driver.readOperations(), subtitle: await subtitle() };
+      await driver.newTab();
+      await driver.selectTool("QR Code Reader");
+      const reader = await driver.readOperations();
+      const ok = !lines.buttons.length && lines.subtitle === "Updates as you type" && !inspector.length
+        && JSON.stringify(css.buttons) === JSON.stringify(["Format", "Minify"]) && css.subtitle === "Press Format or Minify to run"
+        && JSON.stringify(reader) === JSON.stringify(["Read"]);
+      return verdict(ok, `Line Tools [${lines.buttons}] "${lines.subtitle}"; Text Inspector [${inspector}]; CSS Formatter [${css.buttons}] "${css.subtitle}"; QR Code Reader [${reader}]`);
+    },
+  },
+  {
+    // B6: options the current mode ignores are hidden, by the manifest's rules. The
+    // expectation is computed from the manifest here, then held to the spec's own list.
+    id: "OPT-22",
+    async run({ driver }) {
+      const manifest = JSON.parse(readFileSync(resolve(root, "plugins", "hex", "manifest.json"), "utf8"));
+      const options = manifest.operations[0].options;
+      const defaults = Object.fromEntries(options.map((option) => [option.id, option.default]));
+      const expected = (mode) => options.filter((option) => visibleUnder(option, { ...defaults, mode })).map((option) => option.label);
+      await driver.newTab();
+      await driver.selectTool("Hex ↔ Text");
+      await driver.setInput("hi");
+      const labels = async () => (await driver.readOptions()).map((option) => option.label);
+      const encode = await labels();
+      await driver.setOption("Mode", "decode");
+      const decode = await driver.until(async () => {
+        const now = await labels();
+        return now.length !== encode.length ? now : null;
+      }) ?? encode;
+      await driver.setOption("Mode", "encode");
+      const back = await labels();
+      const hidden = ["Case", "Separator", "Bytes per line"];
+      const ok = JSON.stringify(encode) === JSON.stringify(expected("encode")) && JSON.stringify(decode) === JSON.stringify(expected("decode"))
+        && hidden.every((label) => encode.includes(label) && !decode.includes(label)) && JSON.stringify(back) === JSON.stringify(encode);
+      return verdict(ok, `encode [${encode.join(", ")}]; decode [${decode.join(", ")}] (manifest: [${expected("decode").join(", ")}]); back to encode [${back.join(", ")}]`);
+    },
+  },
+  {
+    // A7: an inspection has no output document; its findings are listed in the output
+    // area, and nothing sends the reader to "Operation details" for them.
+    id: "TL-INSPECT-05",
+    async run({ driver, page }) {
+      const text = ["one", "two", "three", "four"].join(String.fromCharCode(10));
+      const result = await driver.tool("Text Inspector", { text });
+      const rows = await page.locator("#result-structured .summary-row").evaluateAll((items) =>
+        items.map((row) => `${row.querySelector("dt")?.textContent ?? ""}: ${row.querySelector("dd")?.textContent ?? ""}`));
+      const shown = await page.locator("#result-structured").isVisible();
+      const message = await page.locator("#result-status-message").isVisible();
+      const lines = `lines: ${text.split(String.fromCharCode(10)).length}`;
+      return verdict(!result.error && shown && !message && rows.includes(lines),
+        `${shown ? "listed in the output area" : "no list in the output area"}${message ? ", with a status message" : ""}: ${rows.slice(0, 6).join(" | ")}`);
+    },
+  },
+  {
+    // A10: text that is not a cURL command is refused in the result pane: the reason, not
+    // a stale result, and never "Updating…".
+    id: "TL-CURL-05",
+    async run({ driver, page }) {
+      const done = await driver.tool("cURL to Code", { text: "curl https://example.com/first", operation: "JavaScript fetch" });
+      if (!done.output.includes("example.com/first")) return verdict(false, `a real command gave ${JSON.stringify(done.output.slice(0, 80))} (${done.error || done.state})`);
+      await driver.setInput("hello");
+      const reason = "● Paste a cURL command that starts with curl.";
+      const refused = await driver.until(async () => (await page.locator("#result-state").innerText()).trim() === reason);
+      await sleep(800);
+      const state = (await page.locator("#result-state").innerText()).trim();
+      const output = await page.locator("#result-output").isVisible();
+      const copy = await page.locator("#copy-result").isVisible();
+      const footer = await page.locator("#error").isVisible();
+      await driver.setInput("curl https://example.com/second");
+      await driver.runOperation("JavaScript fetch");
+      const next = await driver.settle(undefined, { changedFrom: done.signature });
+      const ok = !!refused && state === reason && !output && !copy && !footer && next.output.includes("example.com/second");
+      return verdict(ok, `refused with "${state}"; output ${output ? "still shown" : "hidden"}, Copy ${copy ? "shown" : "hidden"}, footer ${footer ? "repeats it" : "quiet"}; fixed input gave ${JSON.stringify(next.output.slice(0, 50))}`);
     },
   },
   {

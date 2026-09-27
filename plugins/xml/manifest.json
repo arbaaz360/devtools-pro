@@ -6,11 +6,11 @@
   "stateVersion": 1,
   "title": "XML Beautifier / Minifier",
   "description": "Beautifies or minifies XML with a tolerant tokenizer that reports well-formedness problems as diagnostics instead of failing.",
-  "tools": [{ "id": "format.xml", "title": "XML", "category": "converter", "operationIds": ["beautify", "minify"], "workspaceId": "xml" }],
+  "tools": [{ "id": "format.xml", "title": "XML Formatter", "category": "format", "description": "Beautify or minify XML", "operationIds": ["beautify", "minify"], "workspaceId": "xml" }],
   "operations": [
     {
       "id": "beautify",
-      "title": "Beautify",
+      "title": "Format",
       "executor": { "kind": "javascriptWorker", "id": "format.xml.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
       "inputs": [{ "id": "input", "label": "XML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
       "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["application/xml"], "language": "xml", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
@@ -30,7 +30,6 @@
       "inputs": [{ "id": "input", "label": "XML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"] }],
       "outputs": [{ "id": "output", "label": "Result", "kind": "artifact", "multiplicity": "one", "mime": ["application/xml"], "language": "xml", "representations": ["code", "properties", "annotations"], "sensitive": false, "exports": ["copyText", "save"] }],
       "options": [
-        { "id": "indent", "type": "enum", "label": "Indent", "default": "sp2", "choices": [{ "id": "sp2", "label": "2 spaces" }, { "id": "sp4", "label": "4 spaces" }, { "id": "tab", "label": "Tab" }], "persistence": "instance", "sensitive": false },
         { "id": "preserve-comments", "type": "boolean", "label": "Preserve comments", "default": true, "persistence": "instance", "sensitive": false },
         { "id": "collapse-empty", "type": "boolean", "label": "Collapse empty elements", "default": true, "persistence": "instance", "sensitive": false },
         { "id": "trim-text", "type": "boolean", "label": "Trim text in elements (changes values)", "default": false, "persistence": "instance", "sensitive": false }

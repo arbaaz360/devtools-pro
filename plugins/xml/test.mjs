@@ -10,6 +10,7 @@ const decoder = new TextDecoder();
 const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const fixture = async (name) => JSON.parse(await readFile(new URL(`./fixtures/${name}.json`, import.meta.url), "utf8"));
 const diagShape = ({ code, severity, message, offset, end, line, column }) => ({ code, severity, message, offset, end, line, column });
+const manifest = JSON.parse(await readFile(new URL("./manifest.json", import.meta.url), "utf8"));
 
 /** Runs one operation through the public SDK context; asserts source immutability and artifact completeness. */
 async function run(operationId, input, { limits, cancellation = new CancellationToken(), reader, options = {} } = {}) {
@@ -61,6 +62,28 @@ for (const item of await fixture("minify")) {
     assert.equal(result.value.operation, "minify");
   });
 }
+
+// The shell sends only the ids an operation declares, so minify runs without
+// `indent`; at every non-default value it must leave every minify fixture's pinned
+// output unchanged, or hiding it would hide a real setting.
+test("minify declares preserve-comments, collapse-empty and trim-text; the dropped indent never changes minify output", async () => {
+  const beautifyOptions = manifest.operations.find((op) => op.id === "beautify").options;
+  const minifyOptions = manifest.operations.find((op) => op.id === "minify").options;
+  assert.deepEqual(minifyOptions.map((option) => option.id), ["preserve-comments", "collapse-empty", "trim-text"]);
+  const dropped = beautifyOptions.filter((option) => !minifyOptions.some((kept) => kept.id === option.id));
+  assert.deepEqual(dropped.map((option) => option.id), ["indent"]);
+  const variants = dropped.flatMap((option) => option.type === "boolean"
+    ? [{ [option.id]: !option.default }]
+    : option.choices.filter((choice) => choice.id !== option.default).map((choice) => ({ [option.id]: choice.id })));
+  for (const item of await fixture("minify")) {
+    const declaredOnly = Object.fromEntries(minifyOptions.map((option) => [option.id, item.options[option.id] ?? option.default]));
+    assert.equal((await expectOk("minify", item.input, { options: declaredOnly })).text, item.output, `${item.name}: declared options only`);
+    for (const variant of variants) {
+      const result = await expectOk("minify", item.input, { options: { ...declaredOnly, ...variant } });
+      assert.equal(result.text, item.output, `${item.name}: ${JSON.stringify(variant)} must not change minify output`);
+    }
+  }
+});
 
 // ---------------------------------------------------------------------------
 // Round trip: beautify -> minify -> beautify is byte-identical for every

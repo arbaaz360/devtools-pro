@@ -5,7 +5,7 @@ Converts identifier-style text between cases, line by line, with configurable ac
 ## Features
 
 - Supported targets: `camelCase`, `PascalCase`, `snake_case`, `kebab-case`, `SCREAMING-KEBAB`, `CONSTANT_CASE`.
-- Configurable acronym preservation (e.g. `ID`, `API`, `DB`, `URL`, `HTTP`).
+- Configurable acronym preservation (e.g. `ID`, `API`, `DB`, `URL`, `HTTP`): the `preserve-acronyms` checkbox ("Preserve acronyms", default on) comes first, and the `acronyms` list beneath it is shown only while it is on.
 - Acronyms keep their uppercase form in `camel` and `pascal` (`userID`, `UserID`), and are lowercased in `snake` and `kebab`.
 - When acronym preservation is disabled, acronyms are treated as ordinary words (`userId`).
 - Converts line by line independently, preserving leading and trailing whitespace exactly.

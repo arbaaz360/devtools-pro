@@ -70,7 +70,7 @@ const checks = [
     id: "REL-03",
     async run({ driver, page }) {
       const html = `<h1>Release sandbox</h1><img src="${endpoint}/image"><script>fetch("${endpoint}/script")</script>`;
-      const result = await driver.tool("Markdown & HTML Preview", { text: html, operation: "Preview HTML" });
+      const result = await driver.tool("Markdown & HTML Preview", { text: html, operation: "HTML" });
       const frame = page.locator("#result-media iframe");
       const sandbox = await frame.getAttribute("sandbox").catch(() => null);
       const heading = await driver.until(async () => {
@@ -89,7 +89,7 @@ const checks = [
     id: "REL-04",
     async run({ driver }) {
       const source = { name: "release", items: [1, 2, 3], nested: { ok: true } };
-      const result = await driver.tool("JSON", { text: JSON.stringify(source), operation: "Format" });
+      const result = await driver.tool("JSON Formatter", { text: JSON.stringify(source), operation: "Format" });
       let parsed = null;
       try { parsed = JSON.parse(result.output); } catch { /* reported below */ }
       return verdict(JSON.stringify(parsed) === JSON.stringify(source) && result.output.includes("\n"),

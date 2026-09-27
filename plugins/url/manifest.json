@@ -7,13 +7,13 @@
   "title": "URL Utilities",
   "description": "Encode and decode URL components, or parse query parameters from text and full URLs.",
   "tools": [
-    {"id":"text.url","title":"URL Encode / Decode","category":"converter","operationIds":["url.transform"],"workspaceId":"url-transform","searchAliases":["percent encoding","form encoding"]},
-    {"id":"web.url-parser","title":"URL Parser","category":"converter","operationIds":["url.parse-query"],"workspaceId":"query-parser","searchAliases":["query string parser","URL query"]}
+    {"id":"text.url","title":"URL Encode / Decode","category":"encode","description":"Percent-encode text, or decode it","operationIds":["url.transform"],"workspaceId":"url-transform","searchAliases":["percent encoding","form encoding"]},
+    {"id":"web.url-parser","title":"URL Parser","category":"web","description":"The query parameters of a URL, as JSON","operationIds":["url.parse-query"],"workspaceId":"query-parser","searchAliases":["query string parser","URL query"]}
   ],
   "operations": [
     {
       "id":"url.transform",
-      "title":"Encode or decode URL text",
+      "title":"Convert",
       "executor":{"kind":"javascriptWorker","id":"web.url.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"percent-encoding","cancellation":"cooperative"},
       "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
       "outputs":[{"id":"output","kind":"artifact","multiplicity":"one","representations":["text","properties"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
@@ -26,7 +26,7 @@
     },
     {
       "id":"url.parse-query",
-      "title":"Parse URL query",
+      "title":"Parse",
       "executor":{"kind":"javascriptWorker","id":"web.url.processor","version":"0.1.0","engine":"whatwg-url","engineVersion":"1","syntax":"application/x-www-form-urlencoded","cancellation":"cooperative"},
       "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
       "outputs":[{"id":"output","kind":"report","multiplicity":"one","representations":["code","tree","properties"],"language":"json","sensitive":false,"exports":["copyText","save"]}],

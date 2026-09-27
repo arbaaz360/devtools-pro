@@ -9,9 +9,9 @@ The input text is encoded as its real UTF-8 bytes before it reaches the vendored
 ## Options
 
 * **`error-correction`** (enum): The error correction level. Allowed values: `L`, `M`, `Q`, `H`. Default: `M`. Aliases: `errorCorrection`.
-* **`cell-size`** (integer): The size of each QR code module in pixels. Allowed values: 1–40. Default: `8`. Aliases: `cellSize`.
+* **`cell-size`** (integer, labelled "Cell size (px)"): The size of each QR code module in pixels. Allowed values: 1–40. Default: `8`. Aliases: `cellSize`.
 * **`margin`** (integer): The size of the quiet zone around the QR code in modules. Allowed values: 0–16. Default: `4`.
-* **`version`** (integer): The QR code version (size). Allowed values: 0–40. Default: `0` (automatic minimum version to fit the data).
+* **`version`** (integer, labelled "Version (0 = automatic)"): The QR code version (size). Allowed values: 0–40. Default: `0` (automatic minimum version to fit the data).
 
 ## Output
 

@@ -38,13 +38,12 @@ export function driver(page) {
       mediaTag: media && !media.hidden ? (media.querySelector("img, iframe")?.tagName ?? "empty") : "",
       mediaSrc: media?.querySelector("img")?.src?.slice(0, 120) ?? "",
       highlights: document.querySelectorAll("#editor-highlight mark").length,
-      // The input size of the run on screen, from its own <dd>. The metrics' joined text
-      // runs together ("Input9 BOutput12 B"), which a text search misread, and a size
-      // that is never read never disagrees. Exact only in bytes; a rounded KB is null.
+      // The input size of the run on screen, from the start of its metrics line
+      // ("In 9 B · Out 12 B · 1 ms"): a size that is never read never disagrees.
+      // Exact only in bytes; a rounded KB is null.
       inputBytes: (() => {
         if (!shown) return null;
-        const term = [...document.querySelectorAll("#result-metrics dt")].find((dt) => dt.textContent.trim() === "Input");
-        const match = /^([\d,]+)\s*B$/.exec(term?.nextElementSibling?.textContent.trim() ?? "");
+        const match = /^In ([\d,]+) B /.exec(document.querySelector("#result-metrics")?.textContent.trim() ?? "");
         return match ? Number(match[1].replace(/,/g, "")) : null;
       })(),
       signature: [
