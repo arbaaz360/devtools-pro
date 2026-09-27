@@ -236,10 +236,17 @@ function Get-PacketBranch($packet) {
   if ($m.Success) { return $m.Groups[1].Value }
   return $null
 }
+# A GitHub timestamp as UTC. ConvertFrom-Json already turns ISO strings into UTC
+# DateTimes; round-tripping one through [datetime]::Parse re-reads its text as local
+# time and shifts it by the machine's offset (5h30 here), which hid review nudges.
+function ConvertTo-UtcTime($value) {
+  if ($value -is [datetime]) { return $value.ToUniversalTime() }
+  return [datetimeoffset]::Parse("$value", [cultureinfo]::InvariantCulture).UtcDateTime
+}
 function Get-BranchCommitDate($branch) {
   $out = gh api "repos/$repo/branches/$branch" --jq '.commit.commit.committer.date' 2>&1 | Out-String
   if ($LASTEXITCODE -ne 0 -or $out -notmatch '\d{4}-\d{2}-\d{2}T') { return $null }
-  return [datetime]::Parse($out.Trim()).ToUniversalTime()
+  return ConvertTo-UtcTime $out.Trim()
 }
 
 # No pull request yet: remind a stopped agent, at most once every 30 minutes.
@@ -316,7 +323,7 @@ function Test-InFlight($state) {
 # at most once every 30 minutes.
 function Send-ReviewNudge($state, $pr, $verdict) {
   if ($state.nudgedAt -and ((Get-Date) - [datetime]$state.nudgedAt) -lt [timespan]::FromMinutes(30)) { return }
-  $reviewed = [datetime]::Parse($verdict.created_at).ToUniversalTime()
+  $reviewed = ConvertTo-UtcTime $verdict.created_at
   if (((Get-Date).ToUniversalTime() - $reviewed) -lt [timespan]::FromMinutes(60)) { return }
   $branch = gh pr view $pr.number --repo $repo --json headRefName --jq .headRefName 2>$null
   $pushed = if ($branch) { Get-BranchCommitDate $branch } else { $null }
