@@ -12,7 +12,7 @@ async function newText(page, text) {
   await page.locator('#preview').fill(text);
 }
 async function completed(page) {
-  await expect(page.locator('#result-state')).toContainText('Completed successfully');
+  await expect(page.locator('#result-state')).toContainText('✓ Done');
   await expect(page.locator('#result-state')).not.toContainText('Updating');
 }
 

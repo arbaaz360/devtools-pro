@@ -158,8 +158,12 @@ function declaredTools() {
     for (const tool of manifest.tools ?? []) {
       const operations = (manifest.operations ?? []).filter((operation) => (tool.operationIds ?? []).includes(operation.id));
       if (NATIVE_IDS.has(tool.id)) continue;
+      const workspace = (manifest.workspaces ?? []).find((item) => item.id === tool.workspaceId);
       declared.set(tool.title, {
         id: tool.id,
+        // A generator is laid out as a form (DESIGN_SYSTEM.md): its operations are a switch
+        // and one button runs the chosen one.
+        kind: workspace?.kind ?? "transform",
         operations: operations.map((operation) => {
           const defaults = Object.fromEntries((operation.options ?? []).map((option) => [option.id, option.default]));
           return {
@@ -233,8 +237,17 @@ export const checks = [
         const operations = await driver.readOperations();
         const duplicates = operations.filter((label, index) => operations.indexOf(label) !== index);
         if (duplicates.length) problems.push(`${name}: duplicate operation button ${duplicates.join(", ")}`);
-        const buttons = spec.operations.length > 1 || !spec.operations[0]?.auto;
-        if (!buttons && operations.length) problems.push(`${name}: one operation that runs as you type, yet buttons ${operations.join(", ")}`);
+        const form = spec.kind === "generator";
+        const buttons = !form && (spec.operations.length > 1 || !spec.operations[0]?.auto);
+        if (form) {
+          // The form: a switch with every operation when there are two or more, and one
+          // button, named for the operation it runs.
+          const segments = (await driver.page.locator("#operation-switch .segment").allTextContents()).map((label) => label.trim());
+          const expected = spec.operations.length > 1 ? spec.operations.map((operation) => operation.title) : [];
+          if (JSON.stringify(segments) !== JSON.stringify(expected)) problems.push(`${name}: the form's switch offers [${segments}], want [${expected}]`);
+          if (operations.length !== 1 || !spec.operations.some((operation) => operation.title === operations[0]))
+            problems.push(`${name}: the form has buttons [${operations}], want one that runs an operation`);
+        } else if (!buttons && operations.length) problems.push(`${name}: one operation that runs as you type, yet buttons ${operations.join(", ")}`);
         for (const operation of spec.operations) {
           if (buttons && !operations.includes(operation.title)) {
             problems.push(`${name}: no button for operation "${operation.title}"`);
@@ -1074,10 +1087,12 @@ export const checks = [
       const generated = await driver.settle(0);
       const first = generated.output.trim();
       if (!UUID_V4.test(first)) return verdict(false, `selecting Generate beside text gave "${first}" (error "${generated.error}")`);
+      // The generator is a form: no editor, no document field while Generate reads none.
       const editor = await page.locator("#preview").isVisible();
-      const message = (await page.locator("#input-message-text").innerText()).trim();
-      if (editor || message !== "Generated from the options above; there is no input.")
-        return verdict(false, `Generate shows ${editor ? "an editor" : "no editor"} and the input message "${message}"`);
+      const form = await page.locator("#generator-form").isVisible();
+      const field = await page.locator("#generator-document").isVisible();
+      if (editor || field || !form)
+        return verdict(false, `Generate shows ${editor ? "an editor" : "no editor"}, ${form ? "its form" : "no form"}${field ? " with a document field" : ""}`);
       const disturbed = await driver.until(async () => {
         const now = await driver.readResult();
         return now.error || now.signature !== generated.signature ? now : null;
@@ -1445,7 +1460,8 @@ export const checks = [
       const first = await names();
       await driver.selectTool("UUID Generator");
       const second = await names();
-      const title = (await page.locator(".app-title").innerText()).trim();
+      // The document is named once, by its tab.
+      const title = (await page.locator(".tab-wrap.active .tab-name").innerText()).trim();
       await page.locator(".tab-close").first().click();
       await driver.until(async () => (await page.locator("#tabs .tab").count()) === 1);
       const third = await names();

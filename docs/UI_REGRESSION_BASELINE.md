@@ -20,17 +20,29 @@ The Playwright suite builds and serves the actual Vite bundle. It runs every sce
 - native drag/drop event routing without replacing a dirty tab;
 - image-only actions, top-aligned media, neutral dark surfaces and control bounds.
 
-The look those scenarios render is [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md): flat graphite
-surfaces on a four-step ladder with hairline edges (no gradients, bevels, glows or chrome
-shadows; one shadow, under a dialog), one steel accent, type from an 11/12/13/14 px scale,
-controls 26 px and toolbar buttons 24 px on a 4 px grid. The neutral-surface check reads
-`body`, `.sidebar` and `.statusbar` at `--chrome` `#202124` and `.editor-host` at `--well`
-`#151618`: every channel below 48, channels within 8 of each other. The control-bounds
-check measures each rendered control in the Document header rather than its wrappers:
-`.input-controls` and `.format-control` are `display: contents`, so their controls share
-the header's rows and edges, and a wrapper has no box of its own to measure.
+The look those scenarios render is [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), second iteration:
+a title row that holds the tabs, a toolbar block (the tool, its operation buttons, and an
+options row only when there are options), caption rows instead of pane headers, one
+result state line (`✓ Done · 31 B · 4 ms`), no pane footers, a slim status bar, and a
+workspace laid out for each kind of tool (a generator is a form, an image tool a drop
+card, a comparison two captioned sources over the diff). Type is 12/13/14/15 px with
+13.5 px code; controls are 28 px. The suite reads it this way:
 
-`release.spec.mjs` holds the release UI conventions of [RELEASE_UI_SPEC.md](RELEASE_UI_SPEC.md): the wordmark and *Commands* button with no ⌘, the single *Local only* statement and the *Ready* status; the rail's fixed group order, sorted names, one drawn icon per tool (none generic, no two alike) and one description, which is the row's tooltip rather than a second line; per-tool tab names and the top bar's document name; a palette that lists each tool once; QR Code Reader as an image tool; operation buttons only where they choose or start something; option rules (Hex decode hides what it ignores); inspection findings as a key/value list; a cURL refusal in place of a stale result; the one-line metrics and plain action names; generators without an editor; *Match case*; and the size of an unsaved document.
+- The neutral-surface check reads `body`, `.sidebar` and `.statusbar` at `--chrome`
+  `#202124` and `.editor-host` at `--well` `#151618`: every channel below 48, channels
+  within 8 of each other.
+- The control-bounds check measures the caption rows' actions against their row and the
+  toolbar's operations and secondary actions against the toolbar block.
+- Elements a person no longer sees keep their ids for the scripts and are asserted as
+  hidden: the centre title (`.app-title`; the tab names the document), the group eyebrow
+  (`#active-tool-label`; the rail's heading says it), the metrics strip (`#result-metrics`;
+  the state line says it), the pane footer (`#preview-limit`, `#encoding`). The compare
+  gate is read from the output area, which a comparison shows from the start.
+- A generator's form moves the editor (its document field), the options and the
+  operation button into itself; `release.spec.mjs` checks that they are the same elements
+  and that the editor goes back when the tool changes.
+
+`release.spec.mjs` holds the release UI conventions of [RELEASE_UI_SPEC.md](RELEASE_UI_SPEC.md): the wordmark and *Commands* button with no ⌘, the single *Local only* statement and the *Ready* status; the rail's fixed group order, sorted names, one drawn icon per tool (none generic, no two alike) and one description, which is the row's tooltip rather than a second line; per-tool tab names, with the active tab naming the document; a palette that lists each tool once; QR Code Reader as an image tool; operation buttons only where they choose or start something; option rules (Hex decode hides what it ignores); inspection findings as a key/value list; a cURL refusal in place of a stale result; the one state line and plain action names; generators as a form, with the document a field only when read; *Match case*; and the size of an unsaved document.
 
 The harness mocks only the Tauri invoke/event/dialog/clipboard boundary. Its app code, reducer, controller, DOM, CSS and result renderers are real. `apps/desktop/tests/native-mock.mjs` deliberately records the boundary distinction so a passing browser test cannot be mistaken for host or codec validation.
 

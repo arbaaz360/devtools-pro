@@ -40,8 +40,11 @@ import {
   validation,
   type ToolDefinition,
   optionSchemaFor,
+  operationOf,
   readsDocument,
   runsAutomatically,
+  workspaceKind,
+  type WorkspaceKind,
 } from "./workbench/tools";
 import { WorkerEngine } from "./plugins/engine";
 import { GROUP_ORDER, optionPresentation } from "./plugins/describe";
@@ -320,6 +323,12 @@ function renderTabs() {
     item.append(button, close);
     root.append(item);
   }
+  // The strip shares the title row with the wordmark and the global controls, so it can
+  // overflow; the active tab stays in view, where it opens into the toolbar.
+  const active = root.querySelector<HTMLElement>(".tab-wrap.active");
+  if (active && active.offsetLeft < root.scrollLeft) root.scrollLeft = active.offsetLeft;
+  else if (active && active.offsetLeft + active.offsetWidth > root.scrollLeft + root.clientWidth)
+    root.scrollLeft = active.offsetLeft + active.offsetWidth - root.clientWidth;
 }
 function renderTools() {
   const nav = $(".tool-nav");
@@ -385,7 +394,9 @@ let renderedAnnotationsKey = "";
 function renderEditorAnnotations(tab: TabState, input: HTMLTextAreaElement, text: string) {
   const layer = $("#editor-highlight");
   const annotations = tab.result && !tab.resultStale && tab.result.event.ok ? (tab.result.event.annotations ?? []) : [];
-  const show = annotations.length > 0 && tab.text !== null;
+  // The layer sits over the editor; a generator's document field has no layer beneath it.
+  const inEditor = input.parentElement?.id === "editor-host";
+  const show = annotations.length > 0 && tab.text !== null && inEditor;
   const key = show ? `${tab.id}:${tab.result?.event.jobId}:${text.length}` : "";
   if (key === renderedAnnotationsKey && show === !layer.hidden) return;
   renderedAnnotationsKey = key;
@@ -406,6 +417,47 @@ function syncOverlay(source: HTMLElement, layer: HTMLElement) {
 }
 syncOverlay($("#preview"), $("#editor-highlight"));
 syncOverlay($("#result-output"), $("#result-highlight"));
+/* ------------------------------------------------------- Workspace kinds */
+/**
+ * A generator's document field: what it is called and what it expects. The document is
+ * the tab's own text; this only names it.
+ */
+const DOCUMENT_FIELDS: Record<string, { label: string; placeholder: string; multiline?: boolean }> = {
+  "identity.uuid": { label: "UUID", placeholder: "Paste a UUID to decode" },
+  "time.unix": { label: "Timestamp or date", placeholder: "Empty means now · e.g. 1700000000" },
+  "media.qr": { label: "Text", placeholder: "Text or a URL to encode", multiline: true },
+};
+const EDITOR_PLACEHOLDER = "Type or paste here…";
+/** Tools whose text output is a list of named values, shown as a properties list. */
+const PROPERTIES_OUTPUT = new Set(["time.unix"]);
+/**
+ * Lay the workspace out for its kind. A generator's form borrows the editor (as its
+ * document field), the options row and the operations: the same elements, so every
+ * handler, id and test hook keeps working, placed where a generator needs them.
+ * Elements move only when the kind changes, so typing never loses focus.
+ */
+function placeWorkspace(kind: WorkspaceKind | "none") {
+  const form = $("#generator-form");
+  const field = $("#generator-document");
+  const input = $("#preview");
+  const options = $(".format-control");
+  const actions = $(".toolbar-actions");
+  const generator = kind === "generator";
+  if (generator) {
+    if (input.parentElement !== field) field.append(input);
+    if (options.parentElement !== form) form.append(options);
+    if (actions.parentElement !== form) form.append(actions);
+  } else {
+    const host = $("#editor-host");
+    if (input.parentElement !== host) host.insertBefore(input, $("#input-image-wrap"));
+    const header = $(".tool-header");
+    if (options.parentElement !== header) header.append(options);
+    const row = $(".tool-row");
+    if (actions.parentElement !== row) row.insertBefore(actions, $(".tool-header-actions"));
+  }
+  form.hidden = !generator;
+  $("#document-panel").dataset.kind = kind;
+}
 function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".format-control");
   const optionsKey = `${tab.id}:${tab.toolId}:${tab.operation}:${JSON.stringify(tab.options)}:${tool?.id === "text.find-replace" ? tab.revision : ""}`;
@@ -676,9 +728,12 @@ function compareSideView(tab: TabState, side: CompareSide, meta: CompareMeta): C
     dirty,
     text,
     readOnly,
+    // An empty side says "No source"; its size would only repeat that.
     meta: readOnly && tab.source
       ? `${bytes(tab.source.size)} · read-only preview`
-      : `${lines} line${lines === 1 ? "" : "s"} · ${bytes(size)}`,
+      : text
+        ? `${lines} line${lines === 1 ? "" : "s"} · ${bytes(size)}`
+        : "",
     issue: source.issue,
   };
 }
@@ -813,14 +868,26 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
   // A generator whose operation reads no document (UUID Generate) has nothing to edit;
   // the tab keeps its text for an operation that does read it (UUID Decode).
   const generated = !!tool && !tool.compare && !imageInput && !binaryInput && !readsDocument(tool, tab.operation);
+  const kind = workspaceKind(tool);
+  // A generator's form holds the document as a field when its operation reads one.
+  const form = kind === "generator" && !imageInput && !binaryInput;
   const quickActions = $(".input-quick-actions") as HTMLElement;
   empty.hidden = true;
-  $("#editor-host").hidden = !!tool?.compare;
+  $("#editor-host").hidden = !!tool?.compare || form;
   wrap.hidden = !imageInput;
   input.hidden =
     imageInput || binaryInput || !!tool?.compare || imageTool || generated;
-  message.hidden = !(binaryInput || (imageTool && !imageInput) || generated);
-  quickActions.hidden = imageTool || binaryInput || !!tool?.compare || generated;
+  message.hidden = !(binaryInput || (imageTool && !imageInput) || (generated && !form));
+  // The image card is the whole pane until there is an image to show.
+  message.classList.toggle("image-card", imageTool && !imageInput);
+  quickActions.hidden = imageTool || binaryInput || !!tool?.compare || generated || form;
+  const field = DOCUMENT_FIELDS[tool?.id ?? ""];
+  $("#generator-document").hidden = !form || generated;
+  $("#generator-document-label").textContent = field?.label ?? "Input";
+  input.classList.toggle("single-line", form && !field?.multiline);
+  input.classList.toggle("field-text", form && !!field?.multiline);
+  const placeholder = form ? (field?.placeholder ?? EDITOR_PLACEHOLDER) : EDITOR_PLACEHOLDER;
+  if (input.placeholder !== placeholder) input.placeholder = placeholder;
   openCompatible.hidden = true;
   // The image a tool asks for opens in that tool, not in whichever tool images default to.
   openCompatible.onclick = () => void controller.chooseFile(imageTool ? tool?.id : undefined);
@@ -828,12 +895,16 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
     messageText.textContent =
       "Binary file · Choose a compatible tool such as Hash Generator. Text editing is unavailable for this file.";
   else if (imageTool && !imageInput) {
+    // A blank tab is waiting for its image; a tab that already holds something else says what.
+    const blank = !tab.source && !tab.text;
     const detected = tab.source?.contentKind === "text"
       ? `This tab contains ${tab.source.format.toUpperCase()} text.`
       : "This tab does not contain an image.";
-    messageText.textContent = `${detected} Open a PNG or JPEG image to use ${tool?.label}.`;
+    messageText.textContent = blank
+      ? "Drop a PNG or JPEG image here, or open one."
+      : `${detected} Open a PNG or JPEG image to use ${tool?.label}.`;
     openCompatible.hidden = false;
-  } else if (generated) {
+  } else if (generated && !form) {
     messageText.textContent = "Generated from the options above; there is no input.";
   } else if (imageInput && !tab.image) {
     messageText.textContent = tab.imageError ?? "Loading image preview…";
@@ -868,6 +939,12 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
     input.onselect = () => updateCaretStatus(tab);
     input.onkeyup = () => updateCaretStatus(tab);
     input.onclick = () => updateCaretStatus(tab);
+    // A one-line field runs its operation on Enter, as a form's text box does.
+    input.onkeydown = (event) => {
+      if (event.key !== "Enter" || !input.classList.contains("single-line") || event.shiftKey || event.ctrlKey || event.altKey) return;
+      event.preventDefault();
+      $<HTMLButtonElement>(".toolbar-actions .primary-button")?.click();
+    };
     input.onpaste = (event) => {
       const text = event.clipboardData?.getData("text/plain");
       if (text === undefined) return;
@@ -888,16 +965,21 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
       });
     };
   }
-  $("#preview-heading").textContent = tool?.compare
-    ? "Sources"
-    : tab.text !== null
-      ? "Document"
-      : "Input";
+  // The plain editor's text is the document itself, not a tool's input.
+  $("#preview-heading").textContent = tool?.compare ? "Sources" : kind === "editor" ? "Document" : "Input";
+  // The caption's note says only what the tab and the status bar do not: an image's file,
+  // a preview that is not the whole document, an import under way.
   $("#preview-meta").textContent = tool?.compare
-    ? "Left and right stay separate · Files remain unchanged"
-    : tab.source
-      ? `${bytes(tab.source.size)} · ${tab.source.mime ?? tab.source.format.toUpperCase()}`
-      : "Unsaved document";
+    ? ""
+    : tab.phase === "importing"
+      ? "Importing the pasted input…"
+      : imageInput && tab.source
+        ? `${tab.name} · ${bytes(tab.source.size)}`
+        : tab.pasted && tab.text === null
+          ? `Preview of ${bytes(tab.source?.size)} pasted input · Ctrl+A then paste to replace`
+          : tab.text === null && tab.source
+            ? `Read-only preview · ${bytes(tab.source.size)}`
+            : "";
   const limit = $("#preview-limit");
   const status = tool?.compare ? compareStatus(tab) : null;
   limit.classList.toggle("compare-gate", status?.tone === "compare-gate");
@@ -944,10 +1026,40 @@ function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
   if (actionsKey === renderedActionsKey) return;
   renderedActionsKey = actionsKey;
   host.innerHTML = "";
+  const switcher = $("#operation-switch");
+  switcher.replaceChildren();
+  switcher.hidden = true;
   if (!tool?.operations.length) return;
   if (tool.id === "text.find-replace") return;
+  const busy = tab.phase === "queued" || tab.phase === "importing" || tab.phase === "running";
+  if (workspaceKind(tool) === "generator") {
+    // A generator's form: its operations as a switch at the top when it has two, and
+    // one full-width button at the end that runs the chosen one.
+    if (tool.operations.length > 1) {
+      switcher.hidden = false;
+      for (const operation of tool.operations) {
+        const segment = document.createElement("button");
+        segment.type = "button";
+        segment.className = "segment";
+        segment.textContent = operation.label;
+        segment.setAttribute("aria-pressed", String(operation.id === tab.operation));
+        segment.onclick = () => {
+          if (operation.id !== tab.operation) controller.options(tab.id, operation.id, { ...tab.options });
+        };
+        switcher.append(segment);
+      }
+    }
+    const active = operationOf(tool, tab.operation);
+    const run = document.createElement("button");
+    run.type = "button";
+    run.className = "primary-button";
+    run.textContent = active?.label ?? "Generate";
+    run.disabled = tab.phase === "importing" || !!validation(tab, tool);
+    run.onclick = () => controller.options(tab.id, active?.id ?? tab.operation, { ...tab.options }, true);
+    host.append(run);
+    return;
+  }
   if (tool.compare) {
-    const busy = tab.phase === "queued" || tab.phase === "importing" || tab.phase === "running";
     const swap = document.createElement("button");
     swap.type = "button";
     swap.className = "outline-button";
@@ -1120,7 +1232,9 @@ function renderResult(tab: TabState) {
   const empty = $("#result-empty");
   const content = $("#result-content");
   const tool = controller.toolDefinition(tab.toolId);
-  $("#result-subtitle").textContent = resultSubtitle(tab, tool);
+  const kind = workspaceKind(tool);
+  // A generator's form already says how it runs: its button is the only way.
+  $("#result-subtitle").textContent = kind === "generator" ? "" : resultSubtitle(tab, tool);
   const refused = refusal(tab, tool);
   const hideActions = () => {
     for (const id of ["#copy-result", "#copy-image", "#open-result", "#save-result"]) $(id).hidden = true;
@@ -1130,23 +1244,24 @@ function renderResult(tab: TabState) {
     renderedResult = null;
     renderedStaleNote = "";
     hideActions();
+    $("#result-views").hidden = true;
     empty.hidden = true;
     content.hidden = false;
     const stateNode = $("#result-state");
     stateNode.className = "result-state failed";
     stateNode.textContent = `● ${refused}`;
-    $("#result-metrics").hidden = true;
+    $("#result-output-meta").textContent = "";
     $(".result-details").hidden = true;
     $(".result-preview-block").hidden = true;
     return;
   }
-  $("#result-metrics").hidden = false;
   $(".result-details").hidden = false;
   $(".result-preview-block").hidden = false;
   if (!result) {
     renderedResult = null;
     renderedStaleNote = "";
     hideActions();
+    $("#result-views").hidden = true;
     $("#result-highlight").hidden = true;
     $("#result-status-message").hidden = true;
     empty.hidden = false;
@@ -1172,10 +1287,13 @@ function renderResult(tab: TabState) {
       title.textContent = "Running…";
       text.textContent = "The result appears here when the run finishes.";
     } else {
+      const run = operationOf(tool ?? editor, tab.operation)?.label;
       title.textContent = "No result yet";
-      text.textContent = tool?.operations.length
-        ? `${resultSubtitle(tab, tool)}.`
-        : "Choose a tool to see its result here.";
+      text.textContent = kind === "generator"
+        ? `Press ${run ?? "Generate"} to see the result here.`
+        : tool?.operations.length
+          ? `${resultSubtitle(tab, tool)}.`
+          : "Choose a tool to see its result here.";
     }
     return;
   }
@@ -1191,11 +1309,16 @@ function renderResult(tab: TabState) {
   const event = result.event;
   const stateNode = $("#result-state");
   const readable = event.ok && !result.previewError;
-  stateNode.className = `result-state ${readable ? "ok" : event.cancelled ? "cancelled" : "failed"}`;
+  stateNode.className = `result-state ${readable ? "ok" : event.cancelled ? "cancelled" : "failed"}${tab.resultStale ? " stale" : ""}`;
+  // One line says how the run went: its outcome, what it produced and how long it took.
+  const produced = [
+    ...(typeof event.outputBytes === "number" && event.outputBytes > 0 ? [bytes(event.outputBytes)] : []),
+    `${event.elapsedMs} ms`,
+  ].join(" · ");
   stateNode.textContent = result.previewError
     ? `Could not load result: ${result.previewError}`
     : event.ok
-    ? "✓ Completed successfully"
+    ? `✓ Done · ${produced}`
     : event.cancelled
       ? "○ Cancelled"
       : `● ${friendlyError(tab, event)}`;
@@ -1219,6 +1342,7 @@ function renderResult(tab: TabState) {
   const highlight = $("#result-highlight");
   const statusMessage = $("#result-status-message");
   const framed = event.ok && event.renderer === "preview";
+  $("#results-heading").textContent = framed ? "Preview" : "Output";
   const vector = event.ok && event.renderer === "svg";
   const binary = !!result.image || framed || vector;
   let diff = false;
@@ -1248,7 +1372,12 @@ function renderResult(tab: TabState) {
     event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
   // An inspection (Text Inspector, CSV Inspector, JSON Validate) has no output document:
   // its findings are the output, listed where an output would be.
-  const findings = noOutput ? summaryEntries(event.summary) : [];
+  // A converter whose output is a set of named values (the timestamp's readings) reads
+  // best as the same properties list; its text stays behind Copy, Open as tab and Save.
+  const listed = !noOutput && !binary && !diff && event.ok && !result.truncated && PROPERTIES_OUTPUT.has(tab.toolId)
+    ? summaryEntries(result.text).filter(([key]) => key)
+    : [];
+  const findings = noOutput ? summaryEntries(event.summary) : listed;
   if (findings.length) {
     structured.classList.add("summary-result");
     structured.append(summaryList(findings));
@@ -1320,23 +1449,21 @@ function renderResult(tab: TabState) {
   if (showTree && parsed.ok) renderTree(tab.id, parsed.value);
   else $("#tree-body").replaceChildren();
 
-  $(".result-code").hidden = !readable || binary || diff || noOutput || showTree;
+  $(".result-code").hidden = !readable || binary || diff || noOutput || showTree || listed.length > 0;
   statusMessage.hidden = !noOutput || findings.length > 0;
   statusMessage.textContent = noOutput && !findings.length
     ? "✓ Operation completed without a generated output document."
     : "";
   if (noOutput) output.hidden = true;
   if (output.value !== result.text) output.value = result.text;
-  output.wrap = result.text.length > 2_000 ? "soft" : "off";
-  $("#result-output-meta").textContent =
-    result.previewError ??
-    (result.truncated
-      ? `Preview: ${bytes(new TextEncoder().encode(result.text).length)} of ${bytes(event.outputBytes)} · Copy button or Ctrl+A/Ctrl+C copies complete result`
-      : noOutput
-        ? ""
-        : event.ok
-          ? "Complete result"
-          : "No result");
+  // A generator's values and a very long result wrap; code keeps its lines.
+  output.wrap = kind === "generator" || result.text.length > 2_000 ? "soft" : "off";
+  // Only a partial view needs saying; a complete result is the normal case.
+  const partial = result.truncated && !result.previewError;
+  $("#result-output-meta").textContent = partial
+    ? `Showing ${bytes(new TextEncoder().encode(result.text).length)} of ${bytes(event.outputBytes)}`
+    : "";
+  $("#result-output-meta").title = partial ? "Copy, Open as tab and Save… use the complete result" : "";
   $("#copy-result").hidden =
     tab.resultStale || !event.ok || !!result.image || !result.text;
   $("#copy-result").textContent = event.renderer === "svg" ? "Copy SVG" : "Copy";
@@ -1385,8 +1512,11 @@ function renderWorkspaceLayout(tab: TabState | undefined, tool: ToolDefinition |
   if (tab && (hasResult || refused)) shownFor.set(tab.id, tab.toolId);
   const kept = !!meta?.hadResult || (!!tab && shownFor.has(tab.id));
   // The result pane appears with the first result and then stays, so clearing
-  // a side while comparing does not bounce the editors between two heights.
-  const showResult = !!tab && (hasResult || kept) && !collapsedResults.has(tab.id);
+  // a side while comparing does not bounce the editors between two heights. A generator
+  // and a comparison have their output area from the start: it is half of the tool.
+  const kind = workspaceKind(tool);
+  const always = !!tab && (kind === "generator" || kind === "compare");
+  const showResult = !!tab && (hasResult || kept || always) && !collapsedResults.has(tab.id);
   workspace.classList.toggle("compare-layout", compare);
   workspace.style.setProperty("--split-position", `${Math.round((compare ? compareSplitRatio : splitRatio) * 100)}%`);
   workspace.classList.toggle("result-absent", !showResult);
@@ -1395,7 +1525,8 @@ function renderWorkspaceLayout(tab: TabState | undefined, tool: ToolDefinition |
   splitter.hidden = !showResult;
   splitter.setAttribute("aria-orientation", splitIsVertical() ? "horizontal" : "vertical");
   const toggle = $("#result-toggle") as HTMLButtonElement;
-  toggle.hidden = !(hasResult || kept);
+  // A generator's output is half of the tool; there is nothing to gain by hiding it.
+  toggle.hidden = !(hasResult || kept || always) || kind === "generator";
   toggle.textContent = showResult ? "Hide result" : "Show result";
   toggle.setAttribute("aria-expanded", String(showResult));
   const collapse = $("#result-collapse") as HTMLButtonElement;
@@ -1409,6 +1540,14 @@ function render() {
   renderTabs();
   renderTools();
   const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
+  placeWorkspace(tab ? workspaceKind(tool) : "none");
+  // With no document the empty workspace says everything; the toolbar and the status
+  // bar's document details wait for one.
+  $(".tool-header").hidden = !tab;
+  // Line, column, encoding and size describe a document in an editor; a generator's form
+  // and an image have none of those.
+  const kind = workspaceKind(tool);
+  $("#status-context").hidden = !tab || kind === "generator" || kind === "image";
   $(".app-title").textContent = tab ? displayTabName(tab) : "DevTools Pro";
   $("#document-panel").classList.toggle(
     "single-pane",
@@ -1480,6 +1619,9 @@ function render() {
     $("#tool-source").hidden = true;
     $(".format-control").replaceChildren();
     $(".toolbar-actions").replaceChildren();
+    $("#operation-switch").replaceChildren();
+    renderedOptionsKey = "";
+    renderedActionsKey = "";
     $("#empty-state").hidden = false;
     $("#preview").hidden = true;
     $("#input-image-wrap").hidden = true;
@@ -1914,7 +2056,12 @@ const removeDragOver = () => dropTarget.classList.remove("drag-over");
 async function dropPaths(paths: readonly string[]) {
   removeDragOver();
   try {
-    if (paths.length) await controller.openPaths(paths);
+    // The image card says "drop an image here": one image dropped on it opens in its tool.
+    const tab = activeTab(state);
+    const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
+    const waiting = !!tool && workspaceKind(tool) === "image" && tab?.source?.contentKind !== "image";
+    if (waiting && paths.length === 1 && /\.(png|jpe?g|webp)$/i.test(paths[0]!)) await controller.openPath(paths[0]!, tool!.id);
+    else if (paths.length) await controller.openPaths(paths);
   } finally {
     removeDragOver();
   }

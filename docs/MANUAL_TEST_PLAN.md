@@ -201,7 +201,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | EDT-06 **[P1]** | With a large pasted input, run a tool | The tool processes the **whole** input, not the preview. Verify with a length-reporting tool (Text Inspector) |
 | EDT-07 | Copy text elsewhere, press the **Clipboard** quick action | The clipboard text is inserted at the caret / replaces the selection |
 | EDT-08 | Press **Clipboard** with an empty clipboard, and with an image on the clipboard | A readable message; no crash |
-| EDT-09 | Look at the input actions on any text tool | **Clipboard** and **Clear** only. There is no Sample button: it was removed on 2026-09-27, because canned text suits few tools and broke others (the QR Code Reader got text). A generator whose operation reads no document (UUID **Generate**, Example String Generator) shows no editor at all: *Generated from the options above; there is no input.*, with neither action |
+| EDT-09 | Look at the input actions on any text tool | **Clipboard** and **Clear** only. There is no Sample button: it was removed on 2026-09-27, because canned text suits few tools and broke others (the QR Code Reader got text). A generator is a form, not an editor: when its operation reads no document (UUID **Generate**, Example String Generator) the form has no document field, and neither action shows |
 | EDT-10 | Press **Clear** | The editor empties; the result pane clears or shows the empty state — it must not keep showing the previous result as current |
 | EDT-11 | Type into a very long single line (no newlines) | The editor stays responsive; horizontal behaviour (wrap or scroll) is consistent |
 | EDT-12 | Scroll to the middle of a long document, switch tabs, switch back | The scroll position and caret are preserved |
@@ -426,7 +426,7 @@ Operations: **Generate** (version v1/v3/v4/v5, namespace, name, count 1–100, c
 | 06 | case upper/lower | Output case follows the option |
 | 07 | Put a v1 UUID in the editor and press **Decode** | Timestamp, variant and version reported |
 | 08 | Press **Decode** with `not-a-uuid` in the editor | Readable error |
-| 09 (suite) **[P1]** | Type anything in a tab, then choose **UUID Generator** (Generate); later press **Generate** | Generate reads no document, so no editor shows: *Generated from the options above; there is no input.* The text stays in the tab, unread: the value stays, with no error, no "Updating…", and Copy still works. The press gives a new value |
+| 09 (suite) **[P1]** | Type anything in a tab, then choose **UUID Generator** (Generate); later press **Generate** | Generate reads no document, so the form shows no editor and no document field. The text stays in the tab, unread: the value stays, with no error, no "Updating…", and Copy still works. The press gives a new value |
 | 10 (suite) | Press **Decode** (the editor appears), put the v5 value from 04 in it; then replace it with `f47ac10b-58cc-4372-a567-0e02b2c3d479` | Version 5 reported; after the edit it decodes again on its own and reports version 4 |
 
 ### TL-B64TEXT — Base64 Text · `encoding.base64-text` · package · auto

@@ -15,7 +15,7 @@ async function newText(page, text) {
   if (text !== undefined) await page.locator('#preview').fill(text);
 }
 async function completed(page) {
-  await expect(page.locator('#result-state')).toContainText('Completed successfully');
+  await expect(page.locator('#result-state')).toContainText('✓ Done');
   await expect(page.locator('#result-state')).not.toContainText('Updating');
 }
 const tabNames = (page) => page.locator('#tabs .tab-name').allTextContents();
@@ -34,10 +34,12 @@ test('chrome: a wordmark and a Commands button, one privacy statement, and a rea
   await expect(page.locator('#empty-state h3')).toHaveText('No document open');
   await expect(page.locator('.input-quick-actions'), 'no document, nothing to paste into or clear').toBeHidden();
   await expect(page.locator('#empty-state p').first()).toHaveText('Create a document or open a file, then choose a tool.');
-  await expect(page.locator('.app-title')).toHaveText('DevTools Pro');
+  // The document's name is said once, by its tab; the title row repeats nothing.
+  await expect(page.locator('.app-title')).toBeHidden();
+  await expect(page.getByRole('tab')).toHaveCount(0);
   await newText(page);
   await expect(page.locator('#status')).toHaveText('Ready');
-  await expect(page.locator('.app-title')).toHaveText('Text Editor');
+  await expect(page.locator('.tab-wrap.active .tab-name')).toHaveText('Text Editor');
   await page.keyboard.press('Control+w');
   await expect(page.locator('#status')).toHaveText('Ready · Ctrl+N for a new document');
 });
@@ -86,7 +88,9 @@ test('the tool header and the rail say what the tool does', async ({ page, host 
   void host;
   await newText(page, 'hello');
   await chooseTool(page, 'Base64 Text');
-  await expect(page.locator('#active-tool-label')).toHaveText('ENCODE');
+  // The group is the rail's heading; the toolbar does not repeat it.
+  await expect(page.locator('#active-tool-label')).toBeHidden();
+  await expect(page.locator('.tool-group', { has: page.locator('.tool-item.active') }).locator('.group-label')).toHaveText('ENCODE');
   await expect(page.locator('#active-tool-title')).toHaveText('Base64 Text');
   await expect(page.locator('#active-tool-subtitle')).toHaveText('Encode text as Base64, or decode Base64 to text');
   await chooseTool(page, 'JSON Formatter');
@@ -94,7 +98,7 @@ test('the tool header and the rail say what the tool does', async ({ page, host 
   await expect(page.locator('.tool-item.active')).toHaveAttribute('title', 'Format, minify or validate JSON');
 });
 
-test('tab names count per tool, and the top bar names the active document', async ({ page, host }) => {
+test('tab names count per tool, and the active tab names the document', async ({ page, host }) => {
   void host;
   await newText(page);
   await chooseTool(page, 'UUID Generator');
@@ -102,10 +106,10 @@ test('tab names count per tool, and the top bar names the active document', asyn
   expect(await tabNames(page)).toEqual(['UUID Generator', 'Text Editor']);
   await chooseTool(page, 'UUID Generator');
   expect(await tabNames(page)).toEqual(['UUID Generator', 'UUID Generator 2']);
-  await expect(page.locator('.app-title')).toHaveText('UUID Generator 2');
+  await expect(page.locator('.tab-wrap.active .tab-name')).toHaveText('UUID Generator 2');
   await page.locator('.tab-close').first().click();
   expect(await tabNames(page)).toEqual(['UUID Generator']);
-  await expect(page.locator('.app-title')).toHaveText('UUID Generator');
+  await expect(page.locator('.tab-wrap.active .tab-name')).toHaveText('UUID Generator');
 });
 
 test('the palette lists document commands, each open tab, and each tool once', async ({ page, host }) => {
@@ -200,8 +204,9 @@ test('an inspection lists its findings in the output area', async ({ page, host 
   await expect(page.locator('#result-structured')).toBeVisible();
   await expect(page.locator('#result-status-message')).toBeHidden();
   await expect(page.locator('#results-heading')).toBeVisible();
-  // No output document, so no Out in the one metrics line.
-  await expect(page.locator('#result-metrics')).toHaveText(/^In 18 B · \d+ ms$/);
+  // No output document, so the one state line gives only the time.
+  await expect(page.locator('#result-state')).toHaveText(/^✓ Done · \d+ ms$/);
+  await expect(page.locator('#result-metrics')).toBeHidden();
 });
 
 test('a tool gated by validation shows the reason as its result, never a stale one', async ({ page, host }) => {
@@ -225,39 +230,60 @@ test('a tool gated by validation shows the reason as its result, never a stale o
   await expect(page.locator('#result-output')).toHaveValue('await fetch("https://example.com/b");');
 });
 
-test('the result pane: one metrics line, plain action names, one OUTPUT label', async ({ page, host }) => {
+test('the result pane: one state line, plain action names, one OUTPUT caption', async ({ page, host }) => {
   host.openPaths.push('fixture.json');
   await page.locator('#open-file').click();
   await completed(page);
-  const size = host.files.get('fixture.json').bytes.length;
-  await expect(page.locator('#result-metrics')).toHaveText(new RegExp(`^In ${size} B · Out \\d+ B · \\d+ ms$`));
+  // Outcome, output size and time on one line; no separate metrics strip.
+  await expect(page.locator('#result-state')).toHaveText(/^✓ Done · \d+ B · \d+ ms$/);
+  await expect(page.locator('#result-metrics')).toBeHidden();
   await expect(page.locator('#copy-result')).toHaveText('Copy');
   await expect(page.locator('#open-result')).toHaveText('Open as tab');
   await expect(page.locator('#save-result')).toHaveText('Save…');
   await expect(page.locator('.output-controls .small-badge')).toHaveCount(0);
-  await expect(page.locator('.result-preview-heading .section-label')).toHaveText('OUTPUT');
+  await expect(page.locator('.results-pane h2')).toHaveCount(1);
+  await expect(page.locator('#results-heading')).toHaveText('Output');
+  await expect(page.locator('#results-heading')).toHaveCSS('text-transform', 'uppercase');
   await expect(page.locator('#result-subtitle')).toHaveText('Updates as you type');
 });
 
-test('a generator whose operation reads no document shows no editor', async ({ page, host }) => {
+test('a generator is a form: its operations switch, the document is a field only when read, one button runs it', async ({ page, host }) => {
   void host;
   await newText(page, 'kept for Decode');
   await chooseTool(page, 'UUID Generator');
   await completed(page);
   await expect(page.locator('#result-output')).toHaveValue(/^[0-9a-f]{8}-[0-9a-f]{4}-4/);
+  // Generate reads no document: the form has no document field and there is no editor.
+  await expect(page.locator('#generator-form')).toBeVisible();
   await expect(page.locator('#preview')).toBeHidden();
-  await expect(page.locator('#input-message-text')).toHaveText('Generated from the options above; there is no input.');
+  await expect(page.locator('#editor-host')).toBeHidden();
   await expect(page.locator('.input-quick-actions')).toBeHidden();
+  await expect(page.locator('#operation-switch .segment')).toHaveText(['Generate', 'Decode']);
+  await expect(page.locator('#operation-switch .segment[aria-pressed="true"]')).toHaveText('Generate');
+  // The options are the form's fields, labels above; the toolbar has no options row or operations.
+  await expect(page.locator('#generator-form .format-control').getByLabel('Version')).toBeVisible();
+  await expect(page.locator('.tool-header .format-control')).toHaveCount(0);
+  await expect(page.locator('.tool-header .toolbar-actions')).toHaveCount(0);
+  await expect(page.locator('#generator-form .toolbar-actions button')).toHaveText(['Generate']);
+  // Decode reads the document: it becomes the form's first field, still the tab's text.
   await page.getByRole('button', { name: 'Decode', exact: true }).click();
-  await expect(page.locator('#preview')).toBeVisible();
+  await expect(page.locator('#generator-document')).toBeVisible();
+  await expect(page.locator('#generator-document-label')).toHaveText('UUID');
+  await expect(page.locator('#generator-document #preview')).toBeVisible();
   await expect(page.locator('#preview')).toHaveValue('kept for Decode');
-  await expect(page.locator('.input-quick-actions')).toBeVisible();
+  await expect(page.locator('#generator-form .toolbar-actions button')).toHaveText(['Decode']);
+  // Leaving the generator puts the editor back where it was.
+  await chooseTool(page, 'Text Inspector');
+  await expect(page.locator('#editor-host #preview')).toBeVisible();
+  await expect(page.locator('#preview')).toHaveValue('kept for Decode');
 });
 
 test('Find & Replace says Match case; document size counts an unsaved text in UTF-8', async ({ page, host }) => {
   void host;
-  await expect(page.locator('#source-size')).toHaveText('—');
+  // With no document the status bar has no document details; with one, its size in UTF-8.
+  await expect(page.locator('#status-context')).toBeHidden();
   await newText(page, 'héllo');
+  await expect(page.locator('#source-size')).toBeVisible();
   await expect(page.locator('#source-size')).toHaveText('6 B');
   await chooseTool(page, 'Find & Replace');
   const checks = await page.locator('.format-control label.check-option').allTextContents();
