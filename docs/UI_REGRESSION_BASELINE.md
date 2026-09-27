@@ -9,16 +9,18 @@ pnpm --dir apps/desktop build
 pnpm --dir apps/desktop test:ui
 ```
 
-The Playwright suite builds and serves the actual Vite bundle. It runs the same eight scenarios at 1440×900, 1024×720 with 1.5× scale, and 3440×1400:
+The Playwright suite builds and serves the actual Vite bundle. It runs every scenario at 1440×900, 1024×720 with 1.5× scale, and 3440×1400. The workbench scenarios:
 
 - blank tab typing, full editor surface, command palette focus return and save flow;
-- JSON format/minify/validate, exclusive result surfaces and no duplicate operation controls;
+- JSON Formatter format/minify/validate, exclusive result surfaces, no duplicate operation controls, and a validation's findings listed in the output area;
 - PNG → Base64 → complete clipboard → PNG, including an output larger than the 64 KiB preview;
 - three independent tabs with different tools and drafts;
 - fast-job progress delay, slow-job Cancel, caret/scroll preservation and pane geometry;
 - invalid JSON diagnostics without an empty result editor;
 - native drag/drop event routing without replacing a dirty tab;
 - image-only actions, top-aligned media, neutral dark surfaces and control bounds.
+
+`release.spec.mjs` holds the release UI conventions of [RELEASE_UI_SPEC.md](RELEASE_UI_SPEC.md): the wordmark and *Commands* button with no ⌘, the single *Local only* statement and the *Ready* status; the rail's fixed group order, sorted names, one glyph and one description per tool; per-tool tab names and the top bar's document name; a palette that lists each tool once; QR Code Reader as an image tool; operation buttons only where they choose or start something; option rules (Hex decode hides what it ignores); inspection findings as a key/value list; a cURL refusal in place of a stale result; the one-line metrics and plain action names; generators without an editor; *Match case*; and the size of an unsaved document.
 
 The harness mocks only the Tauri invoke/event/dialog/clipboard boundary. Its app code, reducer, controller, DOM, CSS and result renderers are real. `apps/desktop/tests/native-mock.mjs` deliberately records the boundary distinction so a passing browser test cannot be mistaken for host or codec validation.
 

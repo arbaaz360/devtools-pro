@@ -607,7 +607,7 @@ function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLEleme
   }
   return controls;
 }
-/* ------------------------------------------------------- Diff & Compare */
+/* ------------------------------------------------------- Text Diff */
 let compareWorkspace: CompareWorkspace | null = null;
 function compareSurface(): CompareWorkspace {
   if (compareWorkspace) return compareWorkspace;
@@ -1480,6 +1480,8 @@ function render() {
     $("#preview").hidden = true;
     $("#input-image-wrap").hidden = true;
     $("#input-message").hidden = true;
+    // No document, so nothing for Clipboard or Clear to act on.
+    ($(".input-quick-actions") as HTMLElement).hidden = true;
     $("#result-empty").hidden = false;
     $("#result-content").hidden = true;
     $("#preview-limit").textContent = "";
@@ -1674,7 +1676,7 @@ $("#copy-image").onclick = () => {
     );
 };
 // A preview is never a complete payload. Intercept Select All + Copy so the
-// natural clipboard shortcut has the same semantics as Copy complete result.
+// natural clipboard shortcut has the same semantics as Copy (the complete result).
 $("#result-output").addEventListener("copy", (event) => {
   const tab = activeTab(state);
   const output = $("#result-output") as HTMLTextAreaElement;

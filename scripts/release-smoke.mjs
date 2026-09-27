@@ -70,7 +70,7 @@ const checks = [
     id: "REL-03",
     async run({ driver, page }) {
       const html = `<h1>Release sandbox</h1><img src="${endpoint}/image"><script>fetch("${endpoint}/script")</script>`;
-      const result = await driver.tool("Markdown & HTML Preview", { text: html, operation: "Preview HTML" });
+      const result = await driver.tool("Markdown & HTML Preview", { text: html, operation: "HTML" });
       const frame = page.locator("#result-media iframe");
       const sandbox = await frame.getAttribute("sandbox").catch(() => null);
       const heading = await driver.until(async () => {

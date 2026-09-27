@@ -32,6 +32,7 @@ test('chrome: a wordmark and a Commands button, one privacy statement, and a rea
   await expect(page.locator('#engine-status')).toHaveText('Local');
   await expect(page.locator('#status')).toHaveText('Ready · Ctrl+N for a new document');
   await expect(page.locator('#empty-state h3')).toHaveText('No document open');
+  await expect(page.locator('.input-quick-actions'), 'no document, nothing to paste into or clear').toBeHidden();
   await expect(page.locator('#empty-state p').first()).toHaveText('Create a document or open a file, then choose a tool.');
   await expect(page.locator('.app-title')).toHaveText('DevTools Pro');
   await newText(page);

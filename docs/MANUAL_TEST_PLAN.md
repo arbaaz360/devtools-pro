@@ -517,7 +517,7 @@ Option: case. Limit 64 MiB, deadline 10 s.
 | # | Steps | Expected |
 |---|---|---|
 | 01 | Encode the PNG fixture | Base64 (or data URI) produced; the input shows the image |
-| 02 | Copy complete result → decode it | The same image comes back; visually identical |
+| 02 | Copy the result → decode it | The same image comes back; visually identical |
 | 03 | Decode an invalid Base64 string | Readable error, no broken-image placeholder claiming success |
 | 04 | Decode a data URI with the wrong MIME | Either honoured or reported; not a silent mismatch |
 | 05 | Encode a JPEG and a large PNG (>5 MB) | Works or reports a limit |
