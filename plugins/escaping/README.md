@@ -27,10 +27,14 @@ camel-cased ones) are rejected with `option.unknown`; wrong values with `option.
 | `text.html` | `encode-everything` | `false`, `true` | escape |
 | `text.html` | `allow-unsafe-symbols` | `false`, `true` (ignored when `encode-everything`) | escape |
 | `text.html` | `strict` | `true`, `false` | unescape |
+| `text.html` | `context` | `text` ("In text"), `attribute` ("In an attribute") | unescape |
 | `text.json-string` | `quotes` | `include`, `omit` | both |
 | `text.json-string` | `ascii-only` | `false`, `true` | escape |
 | `text.backslash` | `quotes` | `both`, `double`, `single`, `none` | escape |
 | `text.backslash` | `non-ascii` | `keep`, `unicode`, `utf16` | escape |
+
+The manifest's `visible` rules follow the last column: the shell shows an option only in the
+mode it applies to.
 
 ## HTML character references (`text.html`)
 
@@ -56,8 +60,9 @@ left alone and decodes on the way back.
 
 ### Unescape
 
-Decoding follows the WHATWG HTML tokenizer's character reference states for text content (the
-attribute-value exception for legacy names is not applied). The named table is the complete
+Decoding follows the WHATWG HTML tokenizer's character reference states for text content. With
+`context` set to `attribute`, the attribute-value exception applies too: a legacy name without
+its semicolon, followed by `=` or a letter or digit, stays as text. The named table is the complete
 WHATWG list of 2231 names, including the 106 legacy names that decode without a semicolon;
 it is generated into `html-entities.mjs` by `scripts/generate-entities.py` from the Python
 standard library and pinned by SHA-256 in `test.mjs`. Names are case-sensitive

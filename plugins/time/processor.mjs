@@ -11,6 +11,15 @@ export class TimeError extends Error {
 
 const ISO_REGEX = /^([+-]?\d{4,}-\d{2}-\d{2})(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2}))?$/i;
 
+/** Longest stretch of the input quoted back in an error, in characters (code points). */
+export const QUOTED_INPUT_CHARS = 60;
+
+/** The input as the person typed it, cut to QUOTED_INPUT_CHARS characters with an ellipsis when longer. */
+function quoteInput(text) {
+  const characters = Array.from(text);
+  return characters.length > QUOTED_INPUT_CHARS ? `${characters.slice(0, QUOTED_INPUT_CHARS).join("")}…` : text;
+}
+
 function evaluateArithmetic(expr) {
   const tokens = [];
   let current = "";
@@ -30,7 +39,8 @@ function evaluateArithmetic(expr) {
 
   for(let t of tokens) {
     if (!/[+/*()-]/.test(t) && isNaN(Number(t))) {
-      throw new TimeError("invalid-token", `Invalid token in arithmetic expression: ${t}`);
+      // The tokens have lost the input's spaces and line breaks; quote what was typed.
+      throw new TimeError("invalid-token", `Not a Unix timestamp, ISO 8601 date, RFC date or arithmetic expression: ${quoteInput(expr)}`);
     }
   }
 

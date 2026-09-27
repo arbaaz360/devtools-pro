@@ -153,6 +153,11 @@ open when its parent closes, or when the document ends, does produce one.
 | `wrap-attributes` | enum | `auto` | `auto` keeps attributes on the tag line; `force` puts one per line |
 | `indent-inner-html` | boolean | `false` | indent `<head>` and `<body>` inside `<html>` |
 
+The Minify operation declares only `preserve-comments`; the other three belong
+to Format (the button for `beautify`). The processor still accepts them on
+Minify and ignores them there; `test.mjs` runs every minify fixture with each
+of them at every non-default value and requires the pinned output.
+
 Ids are kebab-case. Every multi-word id also accepts its camelCase alias
 (`preserveComments`, `wrapAttributes`, `indentInnerHtml`); supplying both with
 different values is an error. An unknown key, a value of the wrong type and a

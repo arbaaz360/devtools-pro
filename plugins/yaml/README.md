@@ -39,15 +39,29 @@ tokenizer, `JsonError` and `resolvePositions`, so both packages agree on
   are legal, including after a scalar or a flow token.
 - A single document, with an optional leading `---` (a scalar may follow it
   on the same line) and a trailing `...`.
-- Multi-line plain scalars fold the same way as quoted scalars.
+- Multi-line plain scalars fold the same way as quoted scalars. A plain
+  scalar continues on every later line indented past its parent's column
+  (YAML 1.2 §7.3.3), so at the top level, where there is no parent, lines at
+  column 0 continue it too: the three lines `Hello, World!`, `second line`
+  and `42` are the one string `"Hello, World! second line 42"`, not three
+  documents.
 
 **Rejected, each with its own error code naming the construct and a byte
 offset/line/column position** (`yaml.<code>`): `anchor-unsupported` (`&`),
 `alias-unsupported` (`*`), `tag-unsupported` (`!`), `directive-unsupported`
-(`%`), `complex-key-unsupported` (`?`), `multiple-documents`,
-`tab-indentation`, `duplicate-key` (both mapping and flow-mapping context;
-the diagnostic's `related[0]` is the first occurrence), `trailing-comma`,
-`unterminated-string`, `bad-indentation`, `invalid-escape`, `invalid-utf8`.
+(`%`), `complex-key-unsupported` (`?`), `multiple-documents` (a `---` after
+the first node, or any content after an explicit `...`), `tab-indentation`,
+`duplicate-key` (both mapping and flow-mapping context; the diagnostic's
+`related[0]` is the first occurrence), `trailing-comma`,
+`unterminated-string`, `bad-indentation`, `invalid-escape`, `invalid-utf8`,
+and `unexpected-token` (including a line the top-level node cannot take,
+such as `b: 1` after a top-level sequence).
+
+The error's message is what a person reads: the diagnostic's text followed
+by ` at line L, column C` once the position is resolved, and nothing about
+position when there is none (an output-limit failure). The code is not
+repeated in the message; it is the error's `code` field. Invalid JSON given
+to `convert.json-yaml` is restated the same way.
 A duplicate key is a hard rejection here (unlike `plugins/json`, which keeps
 both occurrences and only warns): YAML mappings are sets of keys, so a
 YAML-specific tool holds documents to that rule.
@@ -165,9 +179,9 @@ node --experimental-strip-types packages/plugin-sdk/scripts/headless.ts plugins 
 ```
 
 Fixtures live in `fixtures/`: `valid/*.yaml` paired with the exact expected
-`*.json` (54 pairs — nested collections, every scalar type, all three
+`*.json` (57 pairs — nested collections, every scalar type, all three
 quoting styles, both block scalar styles with each chomping mode, comments,
-an empty document, quoted keys with spaces, Unicode); `invalid/*.yaml` (15
+an empty document, quoted keys with spaces, Unicode); `invalid/*.yaml` (17
 files) with `invalid/manifest.json` naming each one's expected error code;
 `json/*.json` (17 files) exercising the reverse direction and the
 round-trip property.

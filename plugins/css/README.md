@@ -111,6 +111,12 @@ structured errors (`css.invalid-option`).
 | `preserve-comments` | `preserveComments` | boolean | `true` | Beautify: `false` drops every comment. Minify: `true` keeps only `/*!` comments; `false` drops all of them. Comments are still counted in the `comments` property either way. |
 | `blank-line-between-rules` | `blankLineBetweenRules` | boolean | `true` | One blank line before each top-level rule after the first, in beautify only. |
 
+The Minify operation declares only `preserve-comments`; `indent` and
+`blank-line-between-rules` belong to Format (the button for `beautify`). The
+processor still accepts both ids on Minify and ignores them there; `test.mjs`
+runs every minify fixture with each of them at every value and requires the
+pinned output.
+
 ## Tolerant diagnostics
 
 Each diagnostic is `{ code, severity: "warning", message, offset, end,

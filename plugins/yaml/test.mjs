@@ -100,8 +100,52 @@ for (const item of invalidManifest) {
     assert.equal(result.artifact, undefined);
     assert.equal(result.value, undefined);
     assert.ok(Number.isInteger(result.error.diagnostic.line) && Number.isInteger(result.error.diagnostic.column), "position must be resolved");
+    assertReadableMessage(result.error);
   });
 }
+
+/** A person reads the message: the code is a separate field, and the position is the resolved one, never null. */
+function assertReadableMessage(error) {
+  const { code, message, line, column } = error.diagnostic;
+  assert.equal(error.message.startsWith(code), false, `message must not repeat the code: ${error.message}`);
+  assert.doesNotMatch(error.message, /null/u);
+  assert.equal(error.message, `${message} at line ${line}, column ${column}`);
+}
+
+// "Hello, World!\nsecond line\n42\n" is one document: a plain scalar folded over three
+// lines (YAML 1.2 §7.3.3; PyYAML 6.0.3 safe_load gives the same string). The input is also
+// the valid fixture plain-scalar-multiline-top-level.
+test("three plain lines are one multi-line scalar, not three documents", async () => {
+  const result = await expectOk("convert.yaml-json", "Hello, World!\nsecond line\n42\n", { options: { indent: "minified" } });
+  assert.equal(result.text, "\"Hello, World! second line 42\"");
+  assert.equal(result.value.documents, 1);
+});
+
+test("a real second document is still rejected, with its position and without the code in the message", async () => {
+  // The "---" that starts the second document is line 2, column 1.
+  const result = await run("convert.yaml-json", "a: 1\n---\nb: 2");
+  assert.equal(result.error.code, "yaml.multiple-documents");
+  assert.equal(result.error.message, "input contains more than one YAML document; only a single document is supported at line 2, column 1");
+  const afterEnd = await run("convert.yaml-json", "a: 1\n...\nb: 2\n");
+  assert.equal(afterEnd.error.code, "yaml.multiple-documents", "content after an explicit document end is another document");
+  assert.equal(afterEnd.error.diagnostic.line, 3);
+});
+
+test("a line the top-level node cannot take is out of place, not a second document", async () => {
+  const sequence = await run("convert.yaml-json", "- a\nb: 1\n");
+  assert.equal(sequence.error.code, "yaml.unexpected-token");
+  assert.equal(sequence.error.message, "unexpected content after the top-level sequence at line 2, column 1");
+  const scalar = await run("convert.yaml-json", "plain\nkey: value\n");
+  assert.equal(scalar.error.code, "yaml.unexpected-token");
+  assert.equal(scalar.error.message, "unexpected content after the top-level value at line 2, column 1");
+});
+
+test("an error with no position says nothing about where", async () => {
+  const result = await run("convert.yaml-json", "a: 1\n", { limits: { ...defaultLimits(), maxOutputBytes: 4 } });
+  assert.equal(result.error.code, "yaml.output-limit");
+  assert.equal(result.error.diagnostic.line, null);
+  assert.equal(result.error.message, "output would be 13 bytes, above the 4 byte output limit");
+});
 
 test("duplicate-key diagnostic names both positions", async () => {
   const result = await run("convert.yaml-json", "a: 1\na: 2\n");
@@ -133,6 +177,9 @@ test("json-yaml rejects invalid JSON the same way plugins/json does", async () =
   const result = await run("convert.json-yaml", "{not valid}");
   assert.equal(result.error.code, "json.unexpected-token");
   assert.ok(Number.isInteger(result.error.diagnostic.line));
+  assertReadableMessage(result.error);
+  // `n` is the second character of line 1.
+  assert.match(result.error.message, / at line 1, column 2$/u);
 });
 
 test("json-yaml preserves exact integer lexemes beyond IEEE-754 safe range", async () => {

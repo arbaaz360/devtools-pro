@@ -25,9 +25,9 @@ The converter produces structured `warning` diagnostics for malformed inputs (wh
 ## Options
 
 - `wrap`: Output wrapper. Choose from `none`, `fragment` (wraps in `<>...</>`), or `component` (wraps in `export default function Component() { return ( ... ); }`).
-- `component-name`: The name of the component function (default `Component`). Must be a valid JavaScript identifier.
+- `component-name` ("Component name"): The name of the component function (default `Component`). Must be a valid JavaScript identifier. Shown only when `wrap` is `component`.
 - `indent`: Indentation style. Accepts `2`, `4`, or `tab`.
-- `svg-attributes`: Defines how SVG attributes are handled. Accepts `camel` (default) or `keep`.
+- `svg-attributes` ("SVG attributes"): Defines how SVG attributes are handled. Accepts `camel` (default, labelled "camelCase") or `keep` (labelled "As written").
 
 ## Preserving meaning (AG-129)
 

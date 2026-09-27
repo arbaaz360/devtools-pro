@@ -111,6 +111,21 @@ test("Invalid arithmetic", async () => {
   await rejects({}, { input: "1 / 0" }, /Division by zero/);
 });
 
+const NOT_A_TIME = "Not a Unix timestamp, ISO 8601 date, RFC date or arithmetic expression: ";
+
+test("unparseable input is quoted as typed, spaces and line breaks kept, the code unchanged", async () => {
+  // Surrounding whitespace is trimmed; the inner line breaks and spaces are what was typed.
+  await rejects({}, { input: "Hello, World!\nsecond line\n42\n" }, { name: "TimeError", code: "invalid-token", message: `${NOT_A_TIME}Hello, World!\nsecond line\n42` });
+  await rejects({}, { input: "  1700000000 + x  " }, { code: "invalid-token", message: `${NOT_A_TIME}1700000000 + x` });
+});
+
+test("the quoted input stops at 60 characters, never inside a character", async () => {
+  await rejects({}, { input: "a".repeat(60) }, { code: "invalid-token", message: `${NOT_A_TIME}${"a".repeat(60)}` });
+  await rejects({}, { input: "a".repeat(61) }, { code: "invalid-token", message: `${NOT_A_TIME}${"a".repeat(60)}…` });
+  // U+1F600 is two UTF-16 code units; sixty of them are kept whole.
+  await rejects({}, { input: "\u{1F600}".repeat(61) }, { code: "invalid-token", message: `${NOT_A_TIME}${"\u{1F600}".repeat(60)}…` });
+});
+
 test("Out of range", async () => {
   await rejects({}, { input: "8640000000000001" }, /outside the ECMAScript date range/);
 });

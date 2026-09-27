@@ -79,6 +79,55 @@ test("minify declares only dialect; the beautify-only options it drops never cha
   }
 });
 
+/**
+ * Where the input separates two characters with whitespace, the beautified text separates
+ * them too, except where layout owns the gap: after `(` or `[`, and before `(`, `)`, `,`
+ * or `;`. Checked character by character, without the package's tokenizer, so it cannot
+ * share that tokenizer's mistakes. Keyword case must be `preserve` for the walk to line up.
+ */
+function assertGapsKept(input, output, label) {
+  const squeeze = (text) => text.replace(/\s+/gu, "");
+  assert.equal(squeeze(output), squeeze(input), `${label}: beautify changes nothing but whitespace`);
+  let o = 0;
+  let previous = null;
+  let gap = false;
+  for (let i = 0; i < input.length; i += 1) {
+    const character = input[i];
+    if (/\s/u.test(character)) { gap = true; continue; }
+    let outputGap = false;
+    while (/\s/u.test(output[o])) { outputGap = true; o += 1; }
+    assert.equal(output[o], character, `${label}: output offset ${o}`);
+    if (gap && previous !== null && !"([".includes(previous) && !"(),;".includes(character)) {
+      assert.ok(outputGap, `${label}: the whitespace between ${JSON.stringify(previous)} and ${JSON.stringify(character)} (input offset ${i}) was removed`);
+    }
+    o += 1;
+    previous = character;
+    gap = false;
+  }
+}
+
+test("beautify keeps the whitespace between World! and second (B18)", async () => {
+  // Nothing here is a clause keyword, so the three lines become one line of the same words.
+  const result = await run("beautify", {}, "Hello, World!\nsecond line\n42\n");
+  assert.equal(result.text, "Hello, World! second line 42");
+});
+
+test("beautify never removes whitespace the input had between two tokens", async () => {
+  const cases = [
+    ["reported", "sql", "Hello, World!\nsecond line\n42\n"],
+    ["symbols", "sql", "SELECT a ! b, c # d, e @ f, g ? h, 5! AS f FROM t WHERE x ! = y"],
+    ["postgresql symbols", "postgresql", "SELECT a @ b, c # d FROM t WHERE e ! f"],
+  ];
+  for (const [label, dialect, input] of cases) {
+    const result = await run("beautify", { dialect, "keyword-case": "preserve" }, input);
+    assertGapsKept(input, result.text, label);
+  }
+  for (const vector of await fixture("beautify")) {
+    const result = await run("beautify", { ...vector.options, "keyword-case": "preserve" }, vector.input);
+    assertGapsKept(vector.input, result.text, vector.name);
+  }
+});
+
 for (const vector of await fixture("invalid")) {
   test(`invalid fixture: ${vector.name}`, async () => {
     await rejects(vector.operationId, vector.options, vector.input, (error) => {

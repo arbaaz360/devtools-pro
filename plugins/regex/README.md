@@ -7,23 +7,25 @@ escapes and case folding all follow the ECMAScript specification. **It is not
 ICU** and does not claim ICU conformance, whitespace/comment mode (`x`), or
 possessive/atomic quantifiers.
 
-Two operations share one tool and one option set: `match` reports every
+Two modes share one tool and one option set: `match` reports every
 occurrence and its capture groups; `replace` produces the replaced document.
-The source document is never modified.
+Either way the result document is plain text a person reads (the numbered
+match listing, or the replaced text); the structured fields travel alongside
+it as the value. The source document is never modified.
 
 ## Options
 
-| Id | Alias | Type | Default | Meaning |
-|---|---|---|---|---|
-| `pattern` | | string | `""` | The regular expression source, passed to `new RegExp(pattern, flags)`. At most 4,096 UTF-8 bytes. |
-| `mode` | | `match` \| `replace` | `match` | `match` reports matches and groups; `replace` produces replaced text. |
-| `replacement` | | string | `""` | Replacement pattern used in `replace` mode. |
-| `global` | | boolean | `true` | `true` finds/replaces every occurrence (`matchAll`/`replace` with the `g` flag); `false` finds/replaces only the first. |
-| `ignore-case` | `ignoreCase` | boolean | `false` | Adds the `i` flag. |
-| `multiline` | | boolean | `false` | Adds the `m` flag: `^`/`$` match at line boundaries. |
-| `dot-all` | `dotAll` | boolean | `false` | Adds the `s` flag: `.` matches line terminators. |
-| `unicode` | | boolean | `false` | Adds the `u` flag: code-point-aware matching, `\p{...}` property escapes, strict escape syntax. The `v` flag (set notation) is out of scope. |
-| `sticky` | | boolean | `false` | Adds the `y` flag: each match (in `global` mode, each next match) must start exactly at the previous match's end. |
+| Id | Label | Alias | Type | Default | Meaning |
+|---|---|---|---|---|---|
+| `pattern` | Pattern | | string | `""` | The regular expression source, passed to `new RegExp(pattern, flags)`. At most 4,096 UTF-8 bytes. |
+| `mode` | Mode | | `match` \| `replace` | `match` | `match` reports matches and groups; `replace` produces replaced text. |
+| `replacement` | Replacement | | string | `""` | Replacement pattern used in `replace` mode. Shown only when `mode` is `replace`. |
+| `global` | All matches (g) | | boolean | `true` | `true` finds/replaces every occurrence (`matchAll`/`replace` with the `g` flag); `false` finds/replaces only the first. |
+| `ignore-case` | Ignore case (i) | `ignoreCase` | boolean | `false` | Adds the `i` flag. |
+| `multiline` | Multiline (m) | | boolean | `false` | Adds the `m` flag: `^`/`$` match at line boundaries. |
+| `dot-all` | Dot matches newline (s) | `dotAll` | boolean | `false` | Adds the `s` flag: `.` matches line terminators. |
+| `unicode` | Unicode (u) | | boolean | `false` | Adds the `u` flag: code-point-aware matching, `\p{...}` property escapes, strict escape syntax. The `v` flag (set notation) is out of scope. |
+| `sticky` | Sticky (y) | | boolean | `false` | Adds the `y` flag: each match (in `global` mode, each next match) must start exactly at the previous match's end. |
 
 Options are validated before the input is read. An absent option takes its
 default; `null`, a wrong type, an unknown key, a value outside the enum, a
@@ -76,10 +78,11 @@ group's name, or its number as a string when unnamed), at most 20,000
 entries total; the shell highlights these spans in the editor. Both use
 UTF-16 offsets, the same as `index`/`end`.
 
-The `text` representation is one line per match, `#n [index-end] text`, then
-one indented line per group, `  name: text` (using the group's number when
-it has no name; an empty string for a group that did not participate), so
-the whole list is copyable.
+The result document is one line per match, `#n [index-end] text`, then one
+indented line per group, `  name: text` (using the group's number when it has
+no name; an empty string for a group that did not participate), so the whole
+list is copyable. With no match, or an empty pattern, the document is empty
+and `count` is `0`.
 
 ## Replace mode
 
@@ -98,14 +101,18 @@ group, a reference to a name it does not declare, or to one that did not
 participate in this match, substitutes empty text, the same as a
 non-participating numbered group.
 
-The `text` representation is the replaced document. The value carries
+The result document is the replaced text. The value carries
 `replacements`, the exact count of occurrences replaced (`0` or `1` when
 `global` is `false`). `matches` and `annotations` are empty in `replace`
 mode; `count` equals `replacements`.
 
-## Value
+## Output
 
-Every response (both modes) carries:
+The output port is a `text/plain` document: the match listing or the replaced
+text described above, nothing else. The value written alongside it (the
+properties view, and the `annotations` the editor highlights) carries every
+structured field; it does not repeat the document. Every response (both
+modes) carries:
 
 | Field | Meaning |
 |---|---|
@@ -119,8 +126,7 @@ Every response (both modes) carries:
 | `annotations[]` | see Match mode; `[]` in `replace` mode |
 | `replacements` | exact replacement count; `0` in `match` mode |
 | `inputBytes`, `inputLength` | source size in bytes and UTF-16 code units |
-| `outputBytes`, `outputLength` | size of `text` in bytes and UTF-16 code units |
-| `text` | the match listing or the replaced document, see above |
+| `outputBytes`, `outputLength` | size of the result document in bytes and UTF-16 code units |
 | `complete` | always `true` |
 
 Identical requests produce identical bytes. The processor uses no clock,
@@ -132,7 +138,7 @@ randomness or secrets.
 |---|---|---|
 | Pattern | 4,096 UTF-8 bytes | `regex.invalid-option` |
 | Input | 4 MiB (manifest `maxInputBytes`), and 4 MiB UTF-16 code units (package constant) | SDK `readChunks` error, or `regex.input-limit` |
-| Output | 16 MiB (manifest `maxOutputBytes`) | `regex.output-limit` before anything is written |
+| Output | the result document, and separately the serialized value, each at most the smaller of `maxOutputBytes` (16 MiB) and `maxChunkBytes` (4 MiB) | `regex.output-limit` before anything is written |
 | Listed matches | 10,000 | offsets truncated, `count` stays exact |
 | Listed annotations | 20,000 total | annotations truncated once the bound is reached |
 | Cancellation | polled between input chunks and at least every 256 matches (or replacements) | `ProcessorCancelled`, nothing written |
@@ -147,7 +153,7 @@ randomness or secrets.
 | `regex.invalid-pattern` | thrown | `new RegExp(pattern, flags)` throws a `SyntaxError`; the message is the engine's own |
 | `regex.invalid-utf8` | thrown | input bytes are not valid UTF-8 |
 | `regex.input-limit` | thrown | input above the injected byte limit or the code-unit limit |
-| `regex.output-limit` | thrown | serialized report above the output/chunk limit |
+| `regex.output-limit` | thrown | result document or serialized value above the output/chunk limit |
 
 Thrown errors are `RegexError` instances with `code` and a contract-shaped
 `diagnostic` (`code`, `severity`, `message`, optional `data`).
