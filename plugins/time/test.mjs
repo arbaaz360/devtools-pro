@@ -131,7 +131,7 @@ test("Input limit", async () => {
 });
 
 test("Option validation: unknown interpretation", async () => {
-  await rejects({ interpretation: "bogus" }, { input: "1700000000" }, /interpretation must be auto, seconds, milliseconds, or iso/);
+  await rejects({ interpretation: "bogus" }, { input: "1700000000" }, /interpretation must be auto, seconds, milliseconds, iso, or rfc/);
 });
 
 test("Option validation: invalid milliseconds-from-digits", async () => {
@@ -242,4 +242,40 @@ test("Local time defaults to UTC when the clock names no other zone", async () =
 
 test("An unknown time zone is a named error, not a silent UTC", async () => {
   await rejects({}, { input: "0", zone: "Not/AZone" }, /Unknown time zone: Not\/AZone/);
+});
+
+
+test("RFC dates (well-formed)", async () => {
+  const cases = [
+    { input: "Tue, 14 Nov 2023 22:13:20 +0000", expected: 1700000000000, interp: "rfc5322" },
+    { input: "Tue, 14 Nov 2023 22:13:20 GMT", expected: 1700000000000, interp: "imf-fixdate" },
+    { input: "14 Nov 2023 22:13:20 -0500", expected: 1700018000000, interp: "rfc5322" },
+    { input: "Tue, 14 Nov 2023 22:13 +0530", expected: 1699980180000, interp: "rfc5322" },
+    { input: "Tuesday, 14-Nov-23 22:13:20 GMT", expected: 1700000000000, interp: "rfc850" },
+    { input: "Tue, 14 Nov 2023 17:13:20 EST", expected: 1700000000000, interp: "rfc5322" },
+    { input: "Tue, 14 Nov 2023 14:13:20 PST", expected: 1700000000000, interp: "rfc5322" },
+    { input: "Sun, 06 Nov 1994 08:49:37 GMT", expected: 784111777000, interp: "imf-fixdate" },
+    { input: "Sunday, 06-Nov-94 08:49:37 GMT", expected: 784111777000, interp: "rfc850" },
+    { input: "Sun Nov  6 08:49:37 1994", expected: 784111777000, interp: "asctime" },
+    { input: "Fri, 21 Nov 1997 09:55:06 -0600", expected: 880127706000, interp: "rfc5322" }
+  ];
+
+  for (const { input, expected, interp } of cases) {
+    const res = await run({ interpretation: "auto" }, { input, clock: "2024-01-01T00:00:00Z" });
+    assert.equal(res.value.epochMilliseconds, expected, `Expected ${expected} for ${input}`);
+    assert.equal(res.value.interpretation, interp, `Expected ${interp} for ${input}`);
+
+    const resRfc = await run({ interpretation: "rfc" }, { input, clock: "2024-01-01T00:00:00Z" });
+    assert.equal(resRfc.value.epochMilliseconds, expected);
+  }
+});
+
+test("RFC dates (refused/errors)", async () => {
+  await rejects({ interpretation: "auto" }, { input: "Mon, 14 Nov 2023 22:13:20 GMT" }, /Weekday mismatch. The real day is Tuesday./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:20 Z" }, /Military time zone 'Z' is obsolete and ambiguous./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 25:13:20 GMT" }, /Impossible time./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 29 Feb 2023 22:13:20 GMT" }, /Impossible date./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:60 GMT" }, /Unix time cannot represent leap seconds./);
+
+  await rejects({ interpretation: "rfc" }, { input: "01/02/2024" }, /Input must be an RFC date/);
 });

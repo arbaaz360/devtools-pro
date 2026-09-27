@@ -100,10 +100,123 @@ function evaluateArithmetic(expr) {
   return { value: val, isExpr: hasArithmetic };
 }
 
-function parseInput(input, interpretation) {
+
+function parseRfcDate(input, nowMillis) {
+  const months = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"];
+  const days = ["sun","mon","tue","wed","thu","fri","sat"];
+  const fullDays = ["sunday","monday","tuesday","wednesday","thursday","friday","saturday"];
+  const zones = {
+    ut: 0, gmt: 0,
+    est: -500, edt: -400,
+    cst: -600, cdt: -500,
+    mst: -700, mdt: -600,
+    pst: -800, pdt: -700
+  };
+
+  const imfRegex = /^([A-Za-z]{3}), (\d{2}) ([A-Za-z]{3}) (\d{4}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
+  const rfc850Regex = /^([A-Za-z]{6,9}), (\d{2})-([A-Za-z]{3})-(\d{2}) (\d{2}):(\d{2}):(\d{2}) GMT$/i;
+  const asctimeRegex = /^([A-Za-z]{3}) ([A-Za-z]{3}) (\d{2}| \d) (\d{2}):(\d{2}):(\d{2}) (\d{4})$/i;
+  const rfc5322Regex = /^(?:([A-Za-z]{3}),\s*)?(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2,})\s+(\d{2}):(\d{2})(?::(\d{2}))?\s+([A-Za-z]{1,5}|[+-]\d{4})$/i;
+
+  let m;
+  let res = {};
+  if ((m = imfRegex.exec(input))) {
+    res = { type: 'imf-fixdate', wd: m[1], d: m[2], mo: m[3], y: m[4], h: m[5], mi: m[6], s: m[7], z: 'GMT' };
+  } else if ((m = asctimeRegex.exec(input))) {
+    res = { type: 'asctime', wd: m[1], mo: m[2], d: m[3].trim(), h: m[4], mi: m[5], s: m[6], y: m[7], z: 'GMT' };
+  } else if ((m = rfc850Regex.exec(input))) {
+    res = { type: 'rfc850', wd: m[1], d: m[2], mo: m[3], y: m[4], h: m[5], mi: m[6], s: m[7], z: 'GMT' };
+  } else if ((m = rfc5322Regex.exec(input))) {
+    res = { type: 'rfc5322', wd: m[1], d: m[2], mo: m[3], y: m[4], h: m[5], mi: m[6], s: m[7] || "00", z: m[8] };
+  } else {
+    return null;
+  }
+
+  const moIndex = months.indexOf(res.mo.toLowerCase());
+  if (moIndex === -1) return null; // Invalid month
+
+  let year = parseInt(res.y, 10);
+  if (res.type === 'rfc850') {
+    const currentYear = new Date(nowMillis).getUTCFullYear();
+    const baseCentury = Math.floor(currentYear / 100) * 100;
+    year = baseCentury + parseInt(res.y, 10);
+    if (year > currentYear + 50) {
+      year -= 100;
+    }
+  } else if (res.type === 'rfc5322') {
+    if (res.y.length === 2) {
+      year = parseInt(res.y, 10);
+      if (year < 50) year += 2000;
+      else year += 1950;
+    } else if (res.y.length === 3) {
+      year += 1900;
+    }
+  }
+
+  let offset = 0;
+  let zLower = res.z.toLowerCase();
+  if (zLower !== 'gmt' && zLower !== 'ut') {
+    if (/^[a-z]$/i.test(res.z)) {
+      return { error: 'obsolete-zone', message: `Military time zone '${res.z}' is obsolete and ambiguous.` };
+    }
+    if (zones[zLower] !== undefined) {
+      offset = zones[zLower];
+      const sign = offset < 0 ? -1 : 1;
+      const abs = Math.abs(offset);
+      offset = sign * (Math.floor(abs / 100) * 60 + (abs % 100)); // offset in minutes
+    } else if (/^[+-]\d{4}$/.test(res.z)) {
+      const sign = res.z.startsWith('-') ? -1 : 1;
+      const val = parseInt(res.z.substring(1), 10);
+      offset = sign * (Math.floor(val / 100) * 60 + (val % 100));
+    } else {
+      return null;
+    }
+  }
+
+  const d = parseInt(res.d, 10);
+  const h = parseInt(res.h, 10);
+  const mi = parseInt(res.mi, 10);
+  const s = parseInt(res.s, 10);
+
+  if (s === 60) return { error: 'leap-second', message: "Unix time cannot represent leap seconds." };
+  if (h >= 24 || mi >= 60 || s > 60) return { error: 'invalid-date', message: "Impossible time." };
+
+  const dateObj = new Date(0);
+  dateObj.setUTCFullYear(year, moIndex, d);
+  dateObj.setUTCHours(h, mi, s);
+
+  if (dateObj.getUTCMonth() !== moIndex || dateObj.getUTCDate() !== d) {
+    return { error: 'invalid-date', message: "Impossible date." };
+  }
+
+  if (res.wd) {
+    const wdLower = res.wd.toLowerCase();
+    const actualWdIndex = dateObj.getUTCDay();
+    let isMatch = false;
+    if (res.type === 'rfc850') {
+      if (wdLower === fullDays[actualWdIndex]) isMatch = true;
+    } else {
+      if (wdLower === days[actualWdIndex]) isMatch = true;
+    }
+    if (!isMatch) {
+       const expectedWd = fullDays[actualWdIndex];
+       const capitalizedWd = expectedWd.charAt(0).toUpperCase() + expectedWd.slice(1);
+       return { error: 'weekday-mismatch', message: `Weekday mismatch. The real day is ${capitalizedWd}.` };
+    }
+  }
+
+  return { type: res.type, millis: dateObj.getTime() - offset * 60000 };
+}
+
+function parseInput(input, interpretation, nowMillis) {
   input = input.trim();
   const isIsoForm = ISO_REGEX.test(input);
 
+  const rfcResult = parseRfcDate(input, nowMillis);
+
+  if (interpretation === "rfc" && !rfcResult) {
+    throw new TimeError("interpretation-mismatch", "Input must be an RFC date when interpretation is rfc");
+  }
   if (interpretation === "iso" && !isIsoForm) {
     throw new TimeError("interpretation-mismatch", "Input must be an ISO 8601 date when interpretation is iso");
   }
@@ -129,6 +242,11 @@ function parseInput(input, interpretation) {
     }
 
     return { type: "iso", value: millis };
+  }
+
+  if (rfcResult) {
+    if (rfcResult.error) throw new TimeError(rfcResult.error, rfcResult.message);
+    return { type: "rfc", subtype: rfcResult.type, value: rfcResult.millis };
   }
 
 
@@ -244,8 +362,8 @@ function getOutputs(millis, nowISO, timeZone) {
 
 function normalizeOptions(options) {
   const interpretation = options?.interpretation ?? "auto";
-  if (!["auto", "seconds", "milliseconds", "iso"].includes(interpretation)) {
-    throw new TimeError("invalid-option", "interpretation must be auto, seconds, milliseconds, or iso", { option: "interpretation" });
+  if (!["auto", "seconds", "milliseconds", "iso", "rfc"].includes(interpretation)) {
+    throw new TimeError("invalid-option", "interpretation must be auto, seconds, milliseconds, iso, or rfc", { option: "interpretation" });
   }
 
   const msDigitsRaw = options?.["milliseconds-from-digits"];
@@ -287,10 +405,13 @@ export async function execute(request, context) {
     millis = Date.parse(nowISO);
     interpretation = "now";
   } else {
-    const parsed = parseInput(inputStr, interpOption);
+    const parsed = parseInput(inputStr, interpOption, Date.parse(nowISO));
     if (parsed.type === "iso") {
       millis = parsed.value;
       interpretation = "iso";
+    } else if (parsed.type === "rfc") {
+      millis = parsed.value;
+      interpretation = parsed.subtype;
     } else {
       let numericVal = parsed.value;
       expression = parsed.isExpr;
