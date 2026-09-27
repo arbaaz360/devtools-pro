@@ -1074,7 +1074,7 @@ fn list_plugin_catalog(state: tauri::State<'_, Arc<HostState>>) -> Vec<EmbeddedP
 fn build_main_window(app: &tauri::App) -> tauri::Result<()> {
     use tauri::{webview::Color, WebviewUrl, WebviewWindowBuilder};
     let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
-        .title("The DevTools Pro · Native preview")
+        .title("The DevTools Pro")
         .inner_size(1280.0, 840.0)
         .min_inner_size(800.0, 560.0)
         .background_color(Color(0x11, 0x14, 0x19, 0xff));

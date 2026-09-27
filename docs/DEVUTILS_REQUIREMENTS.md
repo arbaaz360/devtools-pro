@@ -6,6 +6,11 @@ Source root: `F:/IDM/Softwares/devutils-local-complete-with-guide/devutils.com/d
 
 Status legend: **partial** means a related implementation exists, not parity; **planned** means no corresponding complete workbench tool is established by this audit. No entry below is marked parity-complete. Each entry's Required, UX, and Acceptance paragraphs are separate acceptance obligations. Cross-cutting UX requirements are in [PLUGIN_SYSTEM_DESIGN.md](PLUGIN_SYSTEM_DESIGN.md#shared-workspace-vocabulary-and-ux-contract).
 
+**Deliberate deviation:** the cards below mention a per-tool *Sample* action. The app
+does not have one. The owner removed it on 2026-09-27: canned text suits few tools, and
+it broke others (the QR Code Reader was handed text). Input comes from typing, the
+Clipboard action, Open or drag and drop.
+
 ## Status, verified 2026-09-21
 
 Kept current by the integrator when a packet merges. "Usable" means the tool

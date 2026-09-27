@@ -1493,27 +1493,6 @@ $("#input-clear").onclick = () => {
   const tab = activeTab(state);
   if (tab && tab.text !== null) controller.edit(tab.id, "");
 };
-$("#input-sample").onclick = () => {
-  const tab = activeTab(state);
-  if (!tab || tab.text === null) return;
-  const samples: Record<string, string | null> = {
-    "structured.json":
-      '{"store":{"book":[{"category":"reference","title":"Sample"}]}}',
-    "encoding.base64-image":
-      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
-    "text.json-string": '{"name":"Sample","items":[1,2,3]}',
-    "text.url": "https://example.com/search?q=hello world",
-    "text.html": "<p class=\"sample\">Hello</p>",
-    "text.unicode": "Hello ✓",
-    "text.find-replace": "Sample text\nReplace this text",
-  };
-  const sample =
-    Object.prototype.hasOwnProperty.call(samples, tab.toolId)
-      ? samples[tab.toolId]
-      : "Sample text";
-  if (sample === null) return;
-  controller.edit(tab.id, sample);
-};
 $("#palette-open").onclick = (event) =>
   openPalette(event.currentTarget as HTMLElement);
 $("#palette-close").onclick = closePalette;

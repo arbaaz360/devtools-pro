@@ -56,7 +56,7 @@ pnpm --dir apps/desktop tauri build --debug --no-bundle
 .\target\debug\devtools-desktop.exe
 ```
 
-`tauri build` runs `pnpm build` itself (`build.beforeBuildCommand`), compiles the Rust host, embeds `apps/desktop/dist` and writes `target\debug\devtools-desktop.exe`; `--no-bundle` skips installer packaging. The window must open titled "The DevTools Pro · Native preview" with the dark shell: tool rail on the left, tab bar and workspace on the right, nothing stacked or scrolling as a document. If it renders as plain text, the guard has missed a case — record the index and asset names and add a failure case to the tests.
+`tauri build` runs `pnpm build` itself (`build.beforeBuildCommand`), compiles the Rust host, embeds `apps/desktop/dist` and writes `target\debug\devtools-desktop.exe`; `--no-bundle` skips installer packaging. The window must open titled "The DevTools Pro" with the dark shell: tool rail on the left, tab bar and workspace on the right, nothing stacked or scrolling as a document. If it renders as plain text, the guard has missed a case — record the index and asset names and add a failure case to the tests.
 
 `pnpm --dir apps/desktop tauri dev` loads the UI from the Vite dev server at `http://127.0.0.1:1420`, not from the packaged bundle, so it cannot reproduce a packaging regression and is not launch evidence. To build while an executable from `target\debug` is still running, set `$env:CARGO_TARGET_DIR = "apps\desktop\src-tauri\target-native-check"` for that build; the directory is ignored by git.
 
