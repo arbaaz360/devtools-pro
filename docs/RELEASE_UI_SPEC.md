@@ -27,7 +27,7 @@ Legacy categories still map, so nothing falls through to an upper-cased raw cate
 ## Tools: name, group, description, operations
 
 Names are Title Case noun phrases. Two-way tools keep `↔` or `/ Unescape`. The
-description is the rail subtitle and the tool-header subtitle (≤ 60 characters, no
+description is the rail row's tooltip and the tool-header subtitle (≤ 60 characters, no
 trailing full stop). Operation titles are the button labels: one short verb.
 
 | Tool id | Name | Group | Description | Operations (id → title) |
@@ -99,7 +99,7 @@ operation that already runs as you type gets no button.
   - `text.lines`: order, compare when action = sort; ignore-case, ignore-whitespace when action = dedupe
   - `text.regex`: replacement when mode = replace
   - `identity.uuid`: namespace, name when version in [v3, v5]
-  - `text.html`: numeric, prefer-named, encode-everything, allow-unsafe-symbols, context when mode = escape; strict when mode = unescape
+  - `text.html`: numeric, prefer-named, encode-everything, allow-unsafe-symbols when mode = escape; strict, context when mode = unescape
   - `time.unix`: milliseconds-from-digits when interpretation = auto
   - `text.case`: acronyms when preserve-acronyms = true
   - `convert.jsx`: component-name when wrap = component

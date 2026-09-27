@@ -221,8 +221,11 @@ test('image tool has image-only actions; theme stays neutral and controls remain
     expect(Math.max(...channels)).toBeLessThan(48);
     expect(Math.max(...channels) - Math.min(...channels), `neutral surface ${color}`).toBeLessThanOrEqual(8);
   }
-  for (const selector of ['.input-controls', '.output-controls']) {
-    const bounds = await page.locator(selector).evaluate((el) => ({ right: el.getBoundingClientRect().right, parent: el.closest('.pane-header').getBoundingClientRect().right }));
-    expect(bounds.right).toBeLessThanOrEqual(bounds.parent);
+  // The input controls' wrappers lend their children to the header row (display: contents)
+  // and have no box of their own, so each rendered control is measured instead.
+  for (const selector of ['.input-controls > :not(.format-control), .input-controls .format-control > *', '.output-controls']) {
+    const bounds = await page.locator(selector).evaluateAll((nodes) => nodes.filter((el) => el.getClientRects().length).map((el) => ({ right: el.getBoundingClientRect().right, parent: el.closest('.pane-header').getBoundingClientRect().right })));
+    expect(bounds.length, selector).toBeGreaterThan(0);
+    for (const bound of bounds) expect(bound.right, selector).toBeLessThanOrEqual(bound.parent);
   }
 });
