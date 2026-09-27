@@ -4,8 +4,8 @@
 
 ## Options
 
-- `interpretation`: `auto` (default), `seconds`, `milliseconds`, `iso`, `rfc`.
-- `milliseconds-from-digits`: integer, default `12`. In `auto` mode, a numeric input with at least that many digits is milliseconds, fewer is seconds. Explicit interpretations override this heuristic.
+- `interpretation` ("Interpretation"): `auto` (default), `seconds`, `milliseconds`, `iso`, `rfc` (labelled "RFC 5322 / HTTP date").
+- `milliseconds-from-digits` ("Milliseconds when at least N digits"): integer, default `12`. In `auto` mode, a numeric input with at least that many digits is milliseconds, fewer is seconds. Explicit interpretations override this heuristic, so the option is shown only while `interpretation` is `auto`.
 
 ## Inputs
 
@@ -62,4 +62,4 @@ millisecond precision, `2023-11-15T03:43:20.000+05:30`; UTC is written `+00:00`,
 same values. An unrecognized zone name is a structured `invalid-timezone` error that
 names it, not a silent fallback to UTC.
 
-Values outside ±8,640,000,000,000,000 ms are rejected with the bound in the message. Division by zero, unbalanced parentheses, and non-finite results are structured errors. Nothing is written on error.
+Values outside ±8,640,000,000,000,000 ms are rejected with the bound in the message. Division by zero, unbalanced parentheses, and non-finite results are structured errors. Input that is none of the accepted forms is the `invalid-token` error "Not a Unix timestamp, ISO 8601 date, RFC date or arithmetic expression: " followed by the input as typed (surrounding whitespace trimmed, inner spaces and line breaks kept), cut to 60 characters with an ellipsis when longer. Nothing is written on error.
