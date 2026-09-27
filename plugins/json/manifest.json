@@ -4,7 +4,7 @@
   "id": "structured.json",
   "version": "0.1.0",
   "stateVersion": 1,
-  "tools": [{ "id": "structured.json", "title": "JSON", "category": "structured", "operationIds": ["format", "minify", "inspect"], "workspaceId": "json" }],
+  "tools": [{ "id": "structured.json", "title": "JSON Formatter", "category": "format", "description": "Format, minify or validate JSON", "operationIds": ["format", "minify", "inspect"], "workspaceId": "json" }],
   "operations": [
     {
       "id": "format",

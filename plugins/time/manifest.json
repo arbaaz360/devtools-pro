@@ -10,7 +10,8 @@
     {
       "id": "time.unix",
       "title": "Unix Timestamp Converter",
-      "category": "generator",
+      "category": "convert",
+      "description": "Unix time, ISO 8601 and RFC dates, in UTC and local time",
       "operationIds": ["time.unix"],
       "workspaceId": "generator"
     }
@@ -18,7 +19,7 @@
   "operations": [
     {
       "id": "time.unix",
-      "title": "Convert Timestamp",
+      "title": "Convert",
       "executor": {
         "kind": "javascriptWorker",
         "id": "time.unix.processor",
@@ -51,7 +52,7 @@
             { "id": "seconds", "label": "Seconds" },
             { "id": "milliseconds", "label": "Milliseconds" },
             { "id": "iso", "label": "ISO 8601" },
-            { "id": "rfc", "label": "RFC Dates" }
+            { "id": "rfc", "label": "RFC 5322 / HTTP date" }
           ],
           "persistence": "instance",
           "sensitive": false
@@ -59,12 +60,13 @@
         {
           "id": "milliseconds-from-digits",
           "type": "integer",
-          "label": "Milliseconds From Digits",
+          "label": "Milliseconds when at least N digits",
           "default": "12",
           "minimum": "1",
           "maximum": "20",
           "persistence": "instance",
-          "sensitive": false
+          "sensitive": false,
+          "rules": [{ "effect": "visible", "when": { "kind": "predicate", "optionId": "interpretation", "operator": "equals", "value": "auto" } }]
         }
       ],
       "trigger": { "modes": ["explicit", "inputChange", "heldRepeat"], "debounceMs": "200" }

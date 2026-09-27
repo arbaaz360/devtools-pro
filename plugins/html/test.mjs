@@ -83,6 +83,27 @@ test("minify fixtures produce the documented output and diagnostics", async () =
   }
 });
 
+// The shell sends only the ids an operation declares, so minify runs without the
+// beautify-only options; each of them, at every non-default value, must leave every
+// minify fixture's pinned output unchanged, or hiding it would hide a real setting.
+test("minify declares only preserve-comments; the beautify-only options it drops never change minify output", async () => {
+  const beautifyOptions = manifest.operations.find((op) => op.id === "beautify").options;
+  const minifyOptions = manifest.operations.find((op) => op.id === "minify").options;
+  const dropped = beautifyOptions.filter((option) => !minifyOptions.some((kept) => kept.id === option.id));
+  assert.deepEqual(dropped.map((option) => option.id), ["indent", "wrap-attributes", "indent-inner-html"]);
+  const variants = dropped.flatMap((option) => option.type === "boolean"
+    ? [{ [option.id]: !option.default }]
+    : option.choices.filter((choice) => choice.id !== option.default).map((choice) => ({ [option.id]: choice.id })));
+  for (const item of minifyFixtures) {
+    const declaredOnly = Object.fromEntries(minifyOptions.map((option) => [option.id, item.options[option.id] ?? option.default]));
+    assert.equal((await run("minify", declaredOnly, item.input)).text, item.output, `${item.name}: declared options only`);
+    for (const variant of variants) {
+      const result = await run("minify", { ...declaredOnly, ...variant }, item.input);
+      assert.equal(result.text, item.output, `${item.name}: ${JSON.stringify(variant)} must not change minify output`);
+    }
+  }
+});
+
 test("every fixture name is unique and descriptive", () => {
   const names = allFixtures.map((item) => item.name);
   assert.equal(new Set(names).size, names.length, "fixture names must be unique");
@@ -418,7 +439,9 @@ test("the manifest is contract-valid and matches the processor", () => {
   assert.equal(manifest.id, "format.html");
   assert.deepEqual(manifest.tests.requirementIds, ["DU-13"]);
   assert.deepEqual(manifest.tools[0].operationIds, [...OPERATIONS]);
-  assert.equal(manifest.tools[0].category, "converter");
+  assert.equal(manifest.tools[0].category, "format");
+  const declared = { beautify: ["indent", "preserve-comments", "wrap-attributes", "indent-inner-html"], minify: ["preserve-comments"] };
+  const allDefaults = { indent: "spaces-2", "preserve-comments": true, "wrap-attributes": "auto", "indent-inner-html": false };
   for (const operation of manifest.operations) {
     assert.deepEqual(operation.inputs.map((port) => [port.id, port.kind, port.contentKinds]), [["input", "document", ["text"]]]);
     const [output] = operation.outputs;
@@ -428,9 +451,9 @@ test("the manifest is contract-valid and matches the processor", () => {
     assert.deepEqual(output.mime, ["text/html"]);
     assert.equal(operation.limits.maxInputBytes, String(16 * 1024 * 1024));
     assert.equal(operation.limits.maxOutputBytes, String(32 * 1024 * 1024));
-    assert.deepEqual(operation.options.map((option) => option.id), ["indent", "preserve-comments", "wrap-attributes", "indent-inner-html"]);
+    assert.deepEqual(operation.options.map((option) => option.id), declared[operation.id]);
     const defaults = Object.fromEntries(operation.options.map((option) => [option.id, option.default]));
-    assert.deepEqual(defaults, { indent: "spaces-2", "preserve-comments": true, "wrap-attributes": "auto", "indent-inner-html": false });
+    assert.deepEqual(defaults, Object.fromEntries(declared[operation.id].map((id) => [id, allDefaults[id]])));
     for (const option of operation.options) {
       if (option.type !== "enum") continue;
       for (const choice of option.choices) assert.doesNotThrow(() => normalizeOptions({ [option.id]: choice.id }), `${option.id}=${choice.id} must be accepted by the processor`);
