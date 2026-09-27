@@ -281,14 +281,28 @@ function runReplace(text, regex, options, context) {
 // ---------------------------------------------------------------------------
 // Output
 
-async function emit(context, report) {
+/**
+ * The document a person reads is the report itself: the numbered match lines in
+ * match mode, the replaced text in replace mode. The value carries every
+ * structured field (counts, matches and groups, flags, annotations for the editor
+ * highlights) for the properties view. Both are held to the smaller of the output
+ * and chunk limits before anything is written, so a runaway listing fails whole.
+ */
+async function emit(context, report, documentText) {
   check(context);
-  const bytes = encoder.encode(`${JSON.stringify(report)}\n`);
   const limit = Math.min(context.limits.maxOutputBytes, context.limits.maxChunkBytes);
-  if (bytes.byteLength > limit) throw new RegexError("regex.output-limit", `report would be ${bytes.byteLength} bytes, above the ${limit} byte output limit`, { bytes: bytes.byteLength, limit });
+  const bytes = encoder.encode(documentText);
+  if (bytes.byteLength > limit) throw new RegexError("regex.output-limit", `output would be ${bytes.byteLength} bytes, above the ${limit} byte output limit`, { bytes: bytes.byteLength, limit });
+  const reportBytes = encoder.encode(JSON.stringify(report)).byteLength;
+  if (reportBytes > limit) throw new RegexError("regex.output-limit", `report would be ${reportBytes} bytes, above the ${limit} byte output limit`, { bytes: reportBytes, limit });
   await context.writeValue("output", report);
   await context.write("output", bytes);
   return report;
+}
+
+/** Size of the result document, in bytes and UTF-16 code units. */
+function outputSize(documentText) {
+  return { outputBytes: encoder.encode(documentText).byteLength, outputLength: documentText.length };
 }
 
 function baseFields(options, flags, inputBytes, inputLength) {
@@ -332,11 +346,9 @@ export async function execute(request, context) {
       matches: [],
       annotations: [],
       replacements: 0,
-      outputBytes: encoder.encode(emptyText).byteLength,
-      outputLength: emptyText.length,
-      text: emptyText,
+      ...outputSize(emptyText),
       complete: true,
-    });
+    }, emptyText);
   }
 
   const regex = compilePattern(options.pattern, flags);
@@ -353,11 +365,9 @@ export async function execute(request, context) {
       matches,
       annotations,
       replacements: 0,
-      outputBytes: encoder.encode(rendered).byteLength,
-      outputLength: rendered.length,
-      text: rendered,
+      ...outputSize(rendered),
       complete: true,
-    });
+    }, rendered);
   }
 
   const { replacedText, replacements } = runReplace(text, regex, options, context);
@@ -368,9 +378,7 @@ export async function execute(request, context) {
     matches: [],
     annotations: [],
     replacements,
-    outputBytes: encoder.encode(replacedText).byteLength,
-    outputLength: replacedText.length,
-    text: replacedText,
+    ...outputSize(replacedText),
     complete: true,
-  });
+  }, replacedText);
 }

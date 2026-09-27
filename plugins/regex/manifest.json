@@ -15,7 +15,7 @@
       "title":"Run",
       "executor":{"kind":"javascriptWorker","id":"text.regex.processor","version":"0.1.0","engine":"ecmascript","engineVersion":"2024","syntax":"regexp","cancellation":"cooperative"},
       "inputs":[{"id":"input","label":"Text","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
-      "outputs":[{"id":"output","label":"Result","kind":"value","multiplicity":"one","mime":["application/json"],"representations":["annotations","table","properties","text"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
+      "outputs":[{"id":"output","label":"Result","kind":"artifact","multiplicity":"one","mime":["text/plain"],"representations":["text","properties","annotations"],"sensitive":false,"exports":["copyText","save","useAsInput"]}],
       "options":[
         {"id":"pattern","type":"string","label":"Pattern","default":"","maxLength":"4096","persistence":"instance","sensitive":false},
         {"id":"mode","type":"enum","label":"Mode","default":"match","choices":[{"id":"match","label":"Match"},{"id":"replace","label":"Replace"}],"persistence":"instance","sensitive":false},

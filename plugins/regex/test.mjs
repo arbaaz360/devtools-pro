@@ -19,14 +19,18 @@ function harness(input, { limits: injected, cancellation } = {}) {
 
 async function run(options, input, extra) {
   const h = harness(input, extra);
-  await execute({ operationId: OPERATION_ID, options }, h.context);
+  const returned = await execute({ operationId: OPERATION_ID, options }, h.context);
   assert.deepEqual(h.reader.inputs.get("input"), h.source, "source bytes must remain immutable");
   const bytes = h.outputs.bytes.get("output");
   const value = h.outputs.values.get("output");
-  assert.ok(bytes && value, "report bytes and structured value are both published");
-  assert.deepEqual(JSON.parse(decoder.decode(bytes)), value, "serialized report equals the structured value");
+  assert.ok(bytes && value, "the result document and the structured value are both published");
+  assert.equal(returned, value, "execute returns the structured value");
+  const text = decoder.decode(bytes);
+  assert.equal(value.outputBytes, bytes.byteLength, "outputBytes is the document's byte length");
+  assert.equal(value.outputLength, text.length, "outputLength is the document's UTF-16 length");
+  assert.equal("text" in value, false, "the document is not repeated in the value");
   assert.equal(h.outputs.artifacts.get("output").byteLength, bytes.byteLength);
-  return { value, bytes, source: h.source };
+  return { value, bytes, text, source: h.source };
 }
 
 async function fails(options, input, code, pattern, extra) {
@@ -110,7 +114,7 @@ for (const fixture of matchFixtures) {
     assert.equal(value.truncated, fixture.expect.truncated, "truncated");
     assert.equal(value.flags, fixture.expect.flags, "flags");
     assert.deepEqual(value.matches, fixture.expect.matches, "matches");
-    assert.equal(value.text, fixture.expect.text, "text");
+    assert.equal(first.text, fixture.expect.text, "the result document is the match listing");
     assert.equal(value.mode, "match");
     assert.equal(value.pattern, fixture.options.pattern);
     assert.equal(value.replacements, 0);
@@ -122,16 +126,14 @@ for (const fixture of matchFixtures) {
 const replaceFixtures = JSON.parse(await readFile(new URL("./fixtures/replace.json", import.meta.url), "utf8"));
 for (const fixture of replaceFixtures) {
   test(`replace fixture: ${fixture.name}`, async () => {
-    const { value } = await run(fixture.options, fixture.input);
+    const { value, text } = await run(fixture.options, fixture.input);
     assert.equal(value.replacements, fixture.expect.replacements, "replacements");
-    assert.equal(value.text, fixture.expect.text, "text");
+    assert.equal(text, fixture.expect.text, "the result document is the replaced text");
     assert.equal(value.mode, "replace");
     assert.equal(value.count, value.replacements);
     assert.equal(value.truncated, false);
     assert.deepEqual(value.matches, []);
     assert.deepEqual(value.annotations, []);
-    assert.equal(value.outputBytes, encoder.encode(value.text).byteLength);
-    assert.equal(value.outputLength, value.text.length);
     if (fixture.options.global === false) assert.ok(value.replacements <= 1);
   });
 }
@@ -209,6 +211,46 @@ test("output limits: report bytes checked against the smaller of output and chun
   await fails({ pattern: "a" }, "aaa", "regex.output-limit", /output limit/u, { limits: { ...defaultLimits(), maxChunkBytes: 16 } });
   const ok = await run({ pattern: "a" }, "aaa", { limits: { ...defaultLimits(), maxOutputBytes: 4096, maxChunkBytes: 4096 } });
   assert.ok(ok.bytes.byteLength <= 4096);
+});
+
+test("the result document is the readable report; the value keeps the structured fields and highlights", async () => {
+  // Expected values derived by hand from the input: "cat" is [0-3] with group first [0-1], "bat" is [4-7] with first [4-5].
+  const match = await run({ pattern: "(?<first>[cb])at" }, "cat bat rat");
+  assert.equal(match.text, "#1 [0-3] cat\n  first: c\n#2 [4-7] bat\n  first: b\n");
+  assert.equal(match.value.count, 2);
+  assert.equal(match.value.flags, "g");
+  assert.deepEqual(match.value.matches.map((item) => [item.index, item.end, item.text, item.groups.map((group) => [group.name, group.text])]), [
+    [0, 3, "cat", [["first", "c"]]],
+    [4, 7, "bat", [["first", "b"]]],
+  ]);
+  assert.deepEqual(match.value.annotations, [
+    { start: 0, end: 3, kind: "match", label: "#1" },
+    { start: 0, end: 1, kind: "group", label: "first" },
+    { start: 4, end: 7, kind: "match", label: "#2" },
+    { start: 4, end: 5, kind: "group", label: "first" },
+  ]);
+
+  const replace = await run({ pattern: "o", mode: "replace", replacement: "0" }, "hello world");
+  assert.equal(replace.text, "hell0 w0rld");
+  assert.equal(replace.value.replacements, 2);
+  assert.equal(replace.value.flags, "g");
+});
+
+test("the manifest declares a text/plain document that carries annotations", async () => {
+  const manifest = JSON.parse(await readFile(new URL("./manifest.json", import.meta.url), "utf8"));
+  const [port] = manifest.operations[0].outputs;
+  assert.deepEqual(port.mime, ["text/plain"]);
+  assert.equal(port.kind, "artifact");
+  assert.deepEqual(port.representations, ["text", "properties", "annotations"]);
+});
+
+test("the structured value is held to the output limit even when the document fits", async () => {
+  const tight = { ...defaultLimits(), maxOutputBytes: 4096, maxChunkBytes: 4096 };
+  // 150 one-character matches list in about 2.2 KB of text, while the value's match and annotation entries run past 4 KB.
+  const h = await fails({ pattern: "a" }, "a".repeat(150), "regex.output-limit", /^report would be \d+ bytes, above the 4096 byte output limit$/u, { limits: tight });
+  assert.equal(h.outputs.artifacts.size, 0);
+  const fits = await run({ pattern: "a" }, "a".repeat(20), { limits: tight });
+  assert.equal(fits.value.count, 20);
 });
 
 class CountingToken {
