@@ -249,18 +249,17 @@ test("RFC dates (well-formed)", async () => {
   const cases = JSON.parse(await readFile(new URL("./fixtures/rfc_dates.json", import.meta.url), "utf8"));
   // Add hand-written edge cases where Python is not the oracle
   cases.push(
-    // 0099 is read verbatim by our tool but Python treats differently depending on context
+    // RFC 5322 §3.3: a four-digit year is taken literally, so 0099 is the year 99 (as in
+    // AG-132). Python's parsedate reads it as 1999.
     { input: "Sat, 14 Nov 0099 22:13:20 +0000", expected: -59015526400000, interp: "rfc5322" },
-    // Python maps two-digit years below 69 to the 2000s, but RFC 5322 does not (it adds 1900)
+    // RFC 5322 §4.3: 50-99 add 1900. Python maps two-digit years below 69 to the 2000s.
     { input: "Tue, 21 Nov 50 09:55:06 GMT", expected: -603122694000, interp: "rfc5322" },
-    // RFC 850 boundary dates which need the clock
+    // RFC 9110 §5.6.7: a timestamp more than 50 years after the clock is the previous century.
     { input: "Sunday, 01-Jun-75 00:00:00 GMT", clock: "2025-01-01T00:00:00Z", expected: 170812800000, interp: "rfc850" }, // 1975-06-01
     { input: "Tuesday, 01-Jan-75 00:00:00 GMT", clock: "2025-01-01T00:00:00Z", expected: 3313526400000, interp: "rfc850" } // 2075-01-01
   );
 
   for (const { input, expected, interp, clock = "2024-01-01T00:00:00Z" } of cases) {
-    // Skip 0099 for now if exact millis are tricky, I'll provide an exact millis for 21 Nov 97
-    // Let's rely on simple tests
     const res = await run({ interpretation: "auto" }, { input, clock });
     assert.equal(res.value.epochMilliseconds, expected, `Expected ${expected} for ${input}`);
     assert.equal(res.value.interpretation, interp, `Expected ${interp} for ${input}`);

@@ -1,7 +1,9 @@
+# Expected instants for the well-formed RFC dates, from Python's email.utils.
+# Run: py -3 plugins/time/fixtures/generate_rfc_dates.py (writes rfc_dates.json beside it).
 import email.utils
 import json
-import sys
 import datetime
+from pathlib import Path
 
 cases = [
     ("Tue, 14 Nov 2023 22:13:20 +0000", "rfc5322"),
@@ -14,7 +16,8 @@ cases = [
     ("Sun, 06 Nov 1994 08:49:37 GMT", "imf-fixdate"),
     ("Sunday, 06-Nov-94 08:49:37 GMT", "rfc850"),
     ("Sun Nov  6 08:49:37 1994", "asctime"),
-    ("Fri, 21 Nov 1997 09:55:06 -0600", "rfc5322")
+    ("Fri, 21 Nov 1997 09:55:06 -0600", "rfc5322"),
+    ("21 Nov 97 09:55:06 GMT", "rfc5322"),
 ]
 
 results = []
@@ -25,4 +28,6 @@ for input_str, interp in cases:
     expected = int(dt.timestamp() * 1000)
     results.append({"input": input_str, "expected": expected, "interp": interp})
 
-json.dump(results, sys.stdout, indent=2)
+with open(Path(__file__).with_name("rfc_dates.json"), "w", encoding="utf-8", newline="\n") as f:
+    json.dump(results, f, indent=2)
+    f.write("\n")

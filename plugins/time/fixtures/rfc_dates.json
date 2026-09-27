@@ -53,5 +53,10 @@
     "input": "Fri, 21 Nov 1997 09:55:06 -0600",
     "expected": 880127706000,
     "interp": "rfc5322"
+  },
+  {
+    "input": "21 Nov 97 09:55:06 GMT",
+    "expected": 880106106000,
+    "interp": "rfc5322"
   }
 ]
