@@ -159,9 +159,11 @@ function sideSection(side: CompareSide, handlers: CompareWorkspaceHandlers): HTM
   head.className = 'compare-source-head';
   const title = document.createElement('div');
   title.className = 'compare-source-title';
+  // The caption names the side as the diff does (Original, Revised); the longer
+  // "Left / original" stays in messages and accessible names.
   const eyebrow = document.createElement('span');
   eyebrow.className = 'eyebrow';
-  eyebrow.textContent = SIDE_TITLES[side];
+  eyebrow.textContent = side === 'left' ? 'Original' : 'Revised';
   const name = document.createElement('label');
   name.className = 'compare-source-name';
   name.htmlFor = SIDE_IDS[side];
@@ -175,7 +177,16 @@ function sideSection(side: CompareSide, handlers: CompareWorkspaceHandlers): HTM
   dirty.textContent = '●';
   dirty.hidden = true;
   name.append(label, dirty);
-  title.append(eyebrow, name);
+  const meta = document.createElement('span');
+  meta.className = 'compare-source-meta';
+  meta.dataset.meta = side;
+  const issue = document.createElement('span');
+  issue.className = 'compare-source-issue';
+  issue.dataset.issue = side;
+  issue.setAttribute('role', 'alert');
+  issue.hidden = true;
+  // One caption row per side: what it is, what it holds, and what went wrong; no footer.
+  title.append(eyebrow, name, meta, issue);
   const actions = document.createElement('div');
   actions.className = 'compare-source-actions';
   const button = (text: string, aria: string, run: () => void, id?: string) => {
@@ -203,17 +214,7 @@ function sideSection(side: CompareSide, handlers: CompareWorkspaceHandlers): HTM
   area.placeholder = side === 'left' ? 'Type, paste, or open the original text…' : 'Type, paste, or open the revised text…';
   area.addEventListener('input', () => handlers.input(side, area));
   area.addEventListener('paste', event => handlers.paste(side, event, area));
-  const foot = document.createElement('div');
-  foot.className = 'compare-source-foot';
-  const meta = document.createElement('span');
-  meta.dataset.meta = side;
-  const issue = document.createElement('span');
-  issue.className = 'compare-source-issue';
-  issue.dataset.issue = side;
-  issue.setAttribute('role', 'alert');
-  issue.hidden = true;
-  foot.append(meta, issue);
-  section.append(head, area, foot);
+  section.append(head, area);
   return section;
 }
 

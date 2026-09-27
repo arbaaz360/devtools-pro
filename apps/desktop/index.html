@@ -12,9 +12,22 @@
   </head>
   <body>
     <div class="app-shell">
+      <!-- The title row: the wordmark, the document tabs, and the window's two global
+           controls. There is no separate tab bar. -->
       <header class="topbar">
         <div class="brand" aria-hidden="true">
           <span>DevTools <strong>Pro</strong></span>
+        </div>
+        <div class="tabbar">
+          <div id="tabs" role="tablist" aria-label="Documents"></div>
+          <button
+            id="tab-new"
+            class="icon-button"
+            aria-label="New document"
+            title="New document (Ctrl+N)"
+          >
+            ＋
+          </button>
         </div>
         <div class="app-title" aria-live="polite">DevTools Pro</div>
         <div class="topbar-actions">
@@ -64,42 +77,35 @@
           <nav class="tool-nav" aria-label="Available tools"></nav>
         </aside>
         <main class="main-content">
-          <div class="tabbar">
-            <div id="tabs" role="tablist" aria-label="Documents"></div>
-            <button
-              id="tab-new"
-              class="icon-button"
-              aria-label="New document"
-              title="New document (Ctrl+N)"
-            >
-              ＋
-            </button>
-          </div>
           <div id="browser-notice" class="notice" hidden>
             Browser preview · Use the desktop app to open files and run the Rust
             tools.
           </div>
+          <!-- The toolbar block: the tool, its operations and the tab's actions on one
+               row; the options row beneath it only when the operation has options. -->
           <section class="tool-header" aria-label="Active tool">
-            <div class="tool-identity">
-              <span id="active-tool-icon" class="tool-icon" aria-hidden="true"
-                >✎</span
-              >
-              <div>
-                <span id="active-tool-label" class="eyebrow">WORKSPACE</span>
-                <h2 id="active-tool-title">Create or open a document</h2>
-                <p id="active-tool-subtitle">
-                  Ctrl+N creates a blank document.
-                </p>
+            <div class="tool-row">
+              <div class="tool-identity">
+                <span id="active-tool-icon" class="tool-icon" aria-hidden="true"></span>
+                <div>
+                  <span id="active-tool-label" class="eyebrow">WORKSPACE</span>
+                  <h2 id="active-tool-title">Create or open a document</h2>
+                  <p id="active-tool-subtitle">
+                    Ctrl+N creates a blank document.
+                  </p>
+                </div>
+              </div>
+              <div class="toolbar-actions" aria-label="Operations"></div>
+              <div class="tool-header-actions">
+                <button id="save-document" class="flat-button" disabled title="Save as (Ctrl+S)">
+                  Save as…
+                </button>
+                <button id="result-toggle" class="flat-button" type="button" hidden>
+                  Show result
+                </button>
               </div>
             </div>
-            <div class="tool-header-actions">
-              <button id="result-toggle" class="outline-button" type="button" hidden>
-                Show result
-              </button>
-              <button id="save-document" class="outline-button" disabled title="Save as (Ctrl+S)">
-                Save as…
-              </button>
-            </div>
+            <div class="format-control" aria-label="Options"></div>
           </section>
           <section
             id="document-panel"
@@ -110,10 +116,9 @@
             <section class="preview-pane" aria-labelledby="preview-heading">
               <div class="pane-header">
                 <div>
-                  <h2 id="preview-heading">Document</h2>
-                  <span id="preview-meta"
-                    >Create a document or open a file</span
-                  >
+                  <h2 id="preview-heading">Input</h2>
+                  <span id="preview-meta"></span>
+                  <span id="error" class="editor-diagnostic" role="alert" hidden></span>
                 </div>
                 <div class="pane-controls input-controls">
                   <span id="source-mode" class="small-badge">INPUT</span>
@@ -129,13 +134,21 @@
                       Clear
                     </button>
                   </div>
-                  <div class="format-control"></div>
-                  <div class="toolbar-actions"></div>
                 </div>
+              </div>
+              <!-- A generator's form: its operations, the document when the operation
+                   reads one, its options, and the button that runs it. The document
+                   field, the options and the button are the editor, the options row and
+                   the operations, moved here while a generator is on screen. -->
+              <div id="generator-form" class="generator-form" hidden>
+                <div id="operation-switch" class="operation-switch" role="group" aria-label="Operation" hidden></div>
+                <label id="generator-document" class="generator-field" hidden>
+                  <span id="generator-document-label">Input</span>
+                </label>
               </div>
               <div id="editor-host" class="editor-host">
                 <div id="empty-state" class="empty-state">
-                  <div class="empty-glyph">＋</div>
+                  <div class="empty-glyph"><svg viewBox="0 0 16 16" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 1.5H4.5a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-9z"/><path d="M9.5 1.5v3h3M6 8.5h4M6 11h4"/></svg></div>
                   <h3>No document open</h3>
                   <p>Create a document or open a file, then choose a tool.</p>
                   <div class="empty-actions">
@@ -160,7 +173,7 @@
                   spellcheck="false"
                   wrap="off"
                   aria-label="Document text"
-                  placeholder="Start typing or paste text here…"
+                  placeholder="Type or paste here…"
                   hidden
                 ></textarea>
                 <div id="input-image-wrap" class="image-stage" hidden>
@@ -169,40 +182,14 @@
                 <div id="input-message" class="input-message" role="status" hidden>
                   <p id="input-message-text"></p>
                   <button id="input-open-compatible" class="outline-button" type="button" hidden>
-                    Open compatible file…
+                    Open image…
                   </button>
                 </div>
               </div>
-              <div id="tool-source" class="tool-source" hidden>
-                <div class="compare-heading">
-                  <strong>Compare two text documents</strong
-                  ><span>Original files remain unchanged.</span>
-                </div>
-                <div class="compare-sources">
-                  <section class="compare-source">
-                    <div class="compare-source-head"><label for="compare-left">Left / original</label><button id="compare-open-left" class="flat-button" type="button">Open file…</button></div
-                    ><textarea
-                      id="compare-left"
-                      spellcheck="false"
-                      wrap="off"
-                    ></textarea>
-                  </section>
-                  <section class="compare-source">
-                    <label for="compare-right">Right / revised</label
-                    ><textarea
-                      id="compare-right"
-                      spellcheck="false"
-                      wrap="off"
-                      placeholder="Paste revised text here…"
-                    ></textarea
-                    ><button id="compare-open-right" class="outline-button">
-                      Open right file…
-                    </button>
-                  </section>
-                </div>
-              </div>
-              <div class="pane-footer">
-                <span id="error" class="editor-diagnostic" role="alert" hidden></span>
+              <div id="tool-source" class="tool-source" hidden></div>
+              <!-- Not shown: panes have no footer. The compare gate is said in the output
+                   area, a document's notes in the caption, its encoding in the status bar. -->
+              <div class="pane-footer" hidden>
                 <span id="preview-limit"></span
                 ><span id="encoding">UTF-8</span>
               </div>
@@ -211,10 +198,9 @@
             <aside class="results-pane" aria-labelledby="results-heading">
               <div class="pane-header">
                 <div>
-                  <h2 id="results-heading">Result</h2>
+                  <h2 id="results-heading">Output</h2>
                   <span id="result-subtitle"></span>
                 </div>
-                <button id="result-collapse" class="icon-button" type="button" aria-label="Collapse result pane" title="Collapse result pane">›</button>
                 <div class="pane-controls output-controls">
                   <div class="result-actions">
                     <button id="copy-image" class="flat-button" hidden>
@@ -227,19 +213,28 @@
                       Save…
                     </button>
                   </div>
+                  <div id="result-views" class="result-views" role="group" aria-label="Result view" hidden>
+                    <button id="view-text" type="button" class="view-tab" aria-pressed="true">Text</button
+                    ><button id="view-tree" type="button" class="view-tab" aria-pressed="false">Tree</button>
+                  </div>
                 </div>
+                <button id="result-collapse" class="icon-button" type="button" aria-label="Collapse result pane" title="Collapse result pane" hidden>›</button>
               </div>
               <div class="results-content">
                 <div id="result-empty" class="result-empty">
-                  <span class="result-glyph">↗</span>
                   <h3 id="result-empty-title">No result yet</h3>
                   <p id="result-empty-text">Choose a tool to see its result here.</p>
                 </div>
                 <div id="result-content" hidden>
-                  <p id="result-state" class="result-state"></p>
-                  <p id="result-metrics" class="metrics"></p>
+                  <!-- One state line: the outcome with its size and time, a note when
+                       the output is a preview, and Details. -->
+                  <div class="result-state-row">
+                    <p id="result-state" class="result-state"></p>
+                    <span id="result-output-meta"></span>
+                  </div>
+                  <p id="result-metrics" class="metrics" hidden></p>
                   <details class="result-details">
-                    <summary>Operation details</summary>
+                    <summary>Details</summary>
                     <pre
                       id="result-summary"
                       tabindex="0"
@@ -247,14 +242,6 @@
                     ></pre>
                   </details>
                   <div class="result-preview-block">
-                    <div class="result-preview-heading">
-                      <span class="section-label">OUTPUT</span
-                      ><span id="result-output-meta"></span>
-                      <div id="result-views" class="result-views" role="group" aria-label="Result view" hidden>
-                        <button id="view-text" type="button" class="view-tab" aria-pressed="true">Text</button
-                        ><button id="view-tree" type="button" class="view-tab" aria-pressed="false">Tree</button>
-                      </div>
-                    </div>
                     <div id="result-status-message" class="result-status-message" hidden></div>
                     <div id="tree-panel" class="tree-panel" hidden>
                       <div class="tree-query">
@@ -301,7 +288,6 @@
               <span>Document</span
               ><strong id="source-name">No document open</strong>
             </div>
-            <div><span>Size</span><strong id="source-size">—</strong></div>
             <div><span>Kind</span><strong id="source-format">—</strong></div>
           </section>
           <footer class="statusbar">
@@ -317,7 +303,7 @@
               </div>
             </div>
             <span id="status-context" class="status-context" aria-live="polite">
-              <span id="status-position">Ln 1, Col 1</span><span id="status-encoding">UTF-8</span><span id="status-format">TEXT</span><span id="status-validity">Ready</span>
+              <span id="status-position">Ln 1, Col 1</span><span id="status-encoding">UTF-8</span><span id="source-size">—</span><span id="status-format" hidden>TEXT</span><span id="status-validity" hidden>Ready</span>
             </span>
           </footer>
         </main>

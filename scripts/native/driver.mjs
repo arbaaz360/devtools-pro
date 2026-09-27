@@ -168,8 +168,21 @@ export function driver(page) {
     await sleep(220);
   }
 
+  /**
+   * Press an operation. A generator's form chooses its operation with a switch and runs it
+   * with one button, so there the named segment is chosen first; a click on the button
+   * that follows always runs, as a press of an operation button does elsewhere.
+   */
   async function runOperation(name) {
-    const button = page.locator(".toolbar-actions button", { hasText: new RegExp(`^${escape(name)}$`) }).first();
+    const pattern = new RegExp(`^${escape(name)}$`);
+    const segment = page.locator("#operation-switch .segment", { hasText: pattern }).first();
+    if ((await segment.count()) && (await segment.isVisible())) {
+      if ((await segment.getAttribute("aria-pressed")) !== "true") {
+        await segment.click();
+        await sleep(180);
+      }
+    }
+    const button = page.locator(".toolbar-actions button", { hasText: pattern }).first();
     if (!(await button.count())) throw new Error(`no operation button "${name}"`);
     await button.click();
   }

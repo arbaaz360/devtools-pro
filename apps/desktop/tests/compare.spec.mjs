@@ -10,7 +10,7 @@ async function openCompare(page) {
   await expect(page.locator('#compare-right')).toBeVisible();
 }
 async function compared(page) {
-  await expect(page.locator('#result-state')).toContainText('Completed successfully');
+  await expect(page.locator('#result-state')).toContainText('✓ Done');
   await expect(page.locator('#result-state')).not.toContainText('Updating');
 }
 const left = (page) => page.locator('#compare-left');
@@ -18,23 +18,25 @@ const right = (page) => page.locator('#compare-right');
 const label = (page, side) => page.locator(`[data-label="${side}"]`);
 const dirty = (page, side) => page.locator(`[data-dirty="${side}"]`);
 const summary = (page) => page.locator('.diff-summary strong');
-const status = (page) => page.locator('#preview-limit');
+// The compare gate and the diff's summary are said in the output area, below the sources.
+const status = (page) => page.locator('.results-pane');
 const compareCalls = (host) => host.calls.filter((call) => call.cmd === 'run_compare').length;
 
 test('both editors accept typing; compare needs both sides and covers identical, insertion, deletion and replacement', async ({ page, host }, info) => {
   await openCompare(page);
   await expect(page.locator('#editor-host')).toBeHidden();
-  await expect(page.locator('.results-pane'), 'no blank result surface before the first comparison').toBeHidden();
+  // The output area is there from the start, saying what the comparison needs.
+  await expect(page.locator('#result-empty-title'), 'no blank result surface before the first comparison').toHaveText('Both sources are needed');
   await expect(page.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled();
-  await expect(status(page)).toContainText('Both sides are empty');
+  await expect(status(page)).toContainText('Both sides are empty', { useInnerText: true });
   await expect(page.locator('#error')).toBeHidden();
 
   await left(page).fill('alpha\nbeta\ngamma\n');
-  await expect(status(page)).toContainText('Right / revised is empty');
+  await expect(status(page)).toContainText('Right / revised is empty', { useInnerText: true });
   await expect(page.getByRole('button', { name: 'Compare', exact: true })).toBeDisabled();
   await page.waitForTimeout(500);
   expect(compareCalls(host), 'an empty side never reaches the host').toBe(0);
-  await expect(page.locator('.results-pane')).toBeHidden();
+  await expect(page.locator('#result-content')).toBeHidden();
 
   await right(page).fill('alpha\nbeta\ngamma\n');
   await compared(page);
@@ -45,7 +47,7 @@ test('both editors accept typing; compare needs both sides and covers identical,
   await expect(page.locator('.diff-raw')).not.toHaveAttribute('open', '');
   await expect(page.locator('.diff-raw pre')).toBeHidden();
   await expect(left(page), 'editing the right side leaves the left untouched').toHaveValue('alpha\nbeta\ngamma\n');
-  await expect(status(page)).toContainText('No differences');
+  await expect(status(page)).toContainText('No differences', { useInnerText: true });
   await page.screenshot({ path: info.outputPath('compare-identical.png') });
 
   await right(page).fill('alpha\nbeta\ngamma\ndelta\n');
@@ -95,7 +97,7 @@ test('both editors accept typing; compare needs both sides and covers identical,
   const before = compareCalls(host);
   await page.locator('button[data-action="right"]', { hasText: 'Clear' }).click();
   await expect(right(page)).toHaveValue('');
-  await expect(status(page)).toContainText('Right / revised is empty');
+  await expect(status(page)).toContainText('Right / revised is empty', { useInnerText: true });
   await expect(page.locator('#result-empty-title')).toHaveText('Both sources are needed');
   await expect(page.locator('#result-empty-text')).toContainText('Right / revised is empty');
   await expect(page.locator('.results-pane'), 'the pane stays so the editors do not reflow').toBeVisible();
@@ -271,7 +273,7 @@ test('closing a tab with unsaved right-side text asks first and offers no Save',
   await openCompare(page);
   await right(page).fill('pasted or typed revision');
   await expect(page.locator('#tabs .dirty-indicator'), 'the tab shows it holds unsaved text').toBeVisible();
-  await expect(status(page)).toContainText('Left / original is empty');
+  await expect(status(page)).toContainText('Left / original is empty', { useInnerText: true });
   expect(compareCalls(host), 'an empty side never reaches the host').toBe(0);
   await page.locator('.tab-close').first().click();
   await expect(page.locator('#unsaved-dialog')).toBeVisible();

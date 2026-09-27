@@ -62,6 +62,27 @@ export function runsAutomatically(
 /** Whether the document is an input to this operation. Every bundled tool reads it. */
 export const readsDocument = (tool: ToolDefinition, operationId: string | undefined): boolean =>
   operationOf(tool, operationId)?.readsDocument ?? true;
+/**
+ * The workspace a tool is laid out in (docs/DESIGN_SYSTEM.md, "Purpose-built workspaces").
+ * A package tool's generator kind arrives as `emptyInput` (its manifest workspace is a
+ * generator); a compare or image tool says so by its renderer and input. The rest are
+ * named here: the native tools, and the two package tools whose manifests say
+ * "transform" but whose output is a rendered page or a list of findings.
+ */
+export type WorkspaceKind = "transform" | "inspect" | "generator" | "image" | "compare" | "viewer" | "editor";
+const WORKSPACE_KINDS: Record<string, WorkspaceKind> = {
+  "editor.text": "editor",
+  "text.find-replace": "editor",
+  "text.inspect": "inspect",
+  "structured.csv": "inspect",
+  "preview.documents": "viewer",
+};
+export function workspaceKind(tool: ToolDefinition | undefined): WorkspaceKind {
+  if (!tool) return "editor";
+  if (tool.compare) return "compare";
+  if (tool.input === "image") return "image";
+  return WORKSPACE_KINDS[tool.id] ?? (tool.emptyInput ? "generator" : "transform");
+}
 const op = (id: string, label: string) => ({ id, label });
 const define = (
   id: string,

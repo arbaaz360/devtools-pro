@@ -10,7 +10,7 @@ async function newText(page, text) {
   await page.locator('#preview').fill(text);
 }
 async function ready(page) {
-  await expect(page.locator('#result-state')).toContainText('Completed successfully');
+  await expect(page.locator('#result-state')).toContainText('✓ Done');
   await expect(page.locator('#result-state')).not.toContainText('Updating');
 }
 // Default delay of apps/desktop/src/ui/delayedIndicator.ts: a job that finishes inside it
@@ -20,7 +20,7 @@ async function watchGeometry(page) {
   await page.evaluate(() => {
     const completed = () => {
       const text = document.querySelector('#result-state').textContent;
-      return text.includes('Completed successfully') && !text.includes('Updating');
+      return text.includes('✓ Done') && !text.includes('Updating');
     };
     const input = document.querySelector('#editor-host');
     const rect = input.getBoundingClientRect();
@@ -164,7 +164,6 @@ test('fast jobs never flash progress; slow jobs can be cancelled without resizin
   await page.getByRole('button', { name: 'Format', exact: true }).click();
   await expect(page.locator('#job-panel')).toBeVisible();
   await page.locator('#cancel-job').click();
-  await expect(page.locator('#status-validity')).not.toHaveText('Processing');
   await expect(page.locator('#job-panel')).toBeHidden();
   await assertGeometry(page, true);
   expect(host.calls.some((call) => call.cmd === 'cancel_operation')).toBe(true);
@@ -177,7 +176,6 @@ test('invalid JSON does not shift the source editor and never shows an empty suc
   await watchGeometry(page);
   await page.locator('#preview').fill('{');
   await expect(page.locator('#result-state')).toHaveClass(/failed/);
-  await expect(page.locator('#status-validity')).toHaveText('Error');
   await expect(page.locator('.result-code')).toBeHidden();
   await assertGeometry(page);
   await expect(page.locator('#preview')).toBeFocused();
@@ -207,7 +205,9 @@ test('image tool has image-only actions; theme stays neutral and controls remain
   await newText(page, '');
   await chooseTool(page, 'Image to Base64');
   await expect(page.locator('#preview')).toBeHidden();
-  await expect(page.locator('#input-message')).toContainText('Open a PNG or JPEG');
+  // A blank tab is waiting for its image: the drop card says so and offers Open.
+  await expect(page.locator('#input-message')).toContainText('Drop a PNG or JPEG image here');
+  await expect(page.locator('#input-open-compatible')).toBeVisible();
   await expect(page.locator('.input-quick-actions')).toBeHidden();
   await expect(page.locator('.format-control select')).toHaveCount(0);
   await chooseTool(page, 'JSON Formatter');
@@ -221,10 +221,10 @@ test('image tool has image-only actions; theme stays neutral and controls remain
     expect(Math.max(...channels)).toBeLessThan(48);
     expect(Math.max(...channels) - Math.min(...channels), `neutral surface ${color}`).toBeLessThanOrEqual(8);
   }
-  // The input controls' wrappers lend their children to the header row (display: contents)
-  // and have no box of their own, so each rendered control is measured instead.
-  for (const selector of ['.input-controls > :not(.format-control), .input-controls .format-control > *', '.output-controls']) {
-    const bounds = await page.locator(selector).evaluateAll((nodes) => nodes.filter((el) => el.getClientRects().length).map((el) => ({ right: el.getBoundingClientRect().right, parent: el.closest('.pane-header').getBoundingClientRect().right })));
+  // Every control stays inside its row: the caption rows' actions, and the toolbar's
+  // operations and options.
+  for (const [selector, row] of [['.input-controls', '.pane-header'], ['.output-controls', '.pane-header'], ['.tool-header .toolbar-actions', '.tool-header'], ['.tool-header-actions', '.tool-header']]) {
+    const bounds = await page.locator(selector).evaluateAll((nodes, rowSelector) => nodes.filter((el) => el.getClientRects().length).map((el) => ({ right: el.getBoundingClientRect().right, parent: el.closest(rowSelector).getBoundingClientRect().right })), row);
     expect(bounds.length, selector).toBeGreaterThan(0);
     for (const bound of bounds) expect(bound.right, selector).toBeLessThanOrEqual(bound.parent);
   }

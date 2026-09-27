@@ -109,13 +109,14 @@ operation that already runs as you type gets no button.
 
 ## Result pane
 
-- Subtitle: "Updates as you type" for a tool that runs on input; "Press Format or Minify
-  to run" (the operation titles) for one that runs on request.
-- One metrics line: `In 29 B · Out 40 B · 1 ms`. Whether a file's bytes or the text
-  was read goes into Operation details, not the metrics.
+- Caption note (after OUTPUT): "Updates as you type" for a tool that runs on input;
+  "Press Format or Minify to run" (the operation titles) for one that runs on request;
+  none for a generator, whose form has its own button.
+- One state line: `✓ Done · 40 B · 1 ms` (output size and time; the document's size is in
+  the status bar). Whether a file's bytes or the text was read goes into Details.
 - Inspect-style results (Text Inspector, CSV Inspector, JSON Validate) show their
   findings as a key/value list in the OUTPUT area, never "review the operation details".
-- One OUTPUT label (the section label); the badge in the header goes.
+- One OUTPUT caption (the pane's caption row); no badge, no second label.
 - Actions: "Copy" (or "Copy SVG" / "Copy image"), "Open as tab", "Save…".
 - A tool gated by validation (cURL to Code with non-cURL text) shows the reason as the
   result state and drops the stale result; nothing stays marked "Updating…".
@@ -132,18 +133,20 @@ operation that already runs as you type gets no button.
   here."
 - Status bar: "Ready" once the engine is connected; with no document, "Ready · Ctrl+N
   for a new document". Engine indicator text: "Local".
-- Tool header: eyebrow = group, title = name, subtitle = description. The centre of the
-  top bar shows the active document's name, or "DevTools Pro".
+- Toolbar: title = name, subtitle = description; the group is the rail's heading and is
+  not repeated. The document's name is its tab; the title row does not repeat it.
 - Tab names count per tool ("UUID Generator 2" only when a second UUID tab exists).
-- Generators whose active operation reads no document (UUID Generate, Example Strings)
-  show no editor: an input message says "Generated from the options above; there is no
-  input.", with Clipboard and Clear hidden. Operations that read the document (UUID
-  Decode, QR Code Generator, Unix Timestamp) keep the editor.
+- Generators (UUID, Example Strings, QR Code Generator, Unix Timestamp) are a form, not
+  an editor (DESIGN_SYSTEM.md, "generator"): an operation switch when there are two, the
+  document as the first field only when the operation reads it ("UUID", "Timestamp or
+  date", "Text"), the options stacked, and one button that runs the chosen operation.
+  Generate and Example Strings read no document, so their form has no document field.
 - An image tool is one whose input port declares image content (`media.qr-reader`,
   `encoding.image-base64`), decided from the manifest, never from the label. With no
-  document open it opens the file picker; in a text tab it shows "This tab does not
-  contain an image. Open a PNG or JPEG image to use <tool>." with the Open compatible
-  file… button, and its operation button is disabled.
+  document open it opens the file picker; a blank tab shows a drop card, "Drop a PNG or
+  JPEG image here, or open one.", and a tab holding text says "This tab does not contain
+  an image. Open a PNG or JPEG image to use <tool>."; both offer Open image…, and the
+  operation button is disabled until there is an image.
 - Command palette: New document, Open file, Save, Save as…; "Switch to <tab>" per open
   tab; each tool once (applied to the active tab, or a new tab when none is open).
 - Text Diff: no Word/Character granularity buttons until the engine has them.
