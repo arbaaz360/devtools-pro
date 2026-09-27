@@ -13,5 +13,7 @@
   { "name": "unterminated-single-quote", "file": "unterminated-single-quote.yaml", "code": "yaml.unterminated-string" },
   { "name": "unterminated-double-quote", "file": "unterminated-double-quote.yaml", "code": "yaml.unterminated-string" },
   { "name": "bad-indentation-mapping", "file": "bad-indentation-mapping.yaml", "code": "yaml.bad-indentation" },
-  { "name": "bad-indentation-sequence", "file": "bad-indentation-sequence.yaml", "code": "yaml.bad-indentation" }
+  { "name": "bad-indentation-sequence", "file": "bad-indentation-sequence.yaml", "code": "yaml.bad-indentation" },
+  { "name": "trailing-content-after-sequence", "file": "trailing-content-after-sequence.yaml", "code": "yaml.unexpected-token" },
+  { "name": "trailing-content-after-scalar", "file": "trailing-content-after-scalar.yaml", "code": "yaml.unexpected-token" }
 ]
