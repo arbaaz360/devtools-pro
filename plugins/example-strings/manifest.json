@@ -10,7 +10,8 @@
     {
       "id": "generate.examples",
       "title": "Example String Generator",
-      "category": "generator",
+      "category": "generate",
+      "description": "Sample names, emails, URLs, words and paragraphs",
       "operationIds": ["generate.examples"],
       "workspaceId": "generator"
     }
@@ -18,7 +19,7 @@
   "operations": [
     {
       "id": "generate.examples",
-      "title": "Generate Example Strings",
+      "title": "Generate",
       "executor": {
         "kind": "javascriptWorker",
         "id": "generate.examples.processor",
@@ -57,13 +58,13 @@
             { "id": "sentence", "label": "Sentence" },
             { "id": "word", "label": "Word" },
             { "id": "title", "label": "Title" },
-            { "id": "first-name", "label": "First Name" },
-            { "id": "last-name", "label": "Last Name" },
-            { "id": "full-name", "label": "Full Name" },
+            { "id": "first-name", "label": "First name" },
+            { "id": "last-name", "label": "Last name" },
+            { "id": "full-name", "label": "Full name" },
             { "id": "email", "label": "Email" },
             { "id": "url", "label": "URL" },
-            { "id": "short-tweet", "label": "Short Tweet" },
-            { "id": "long-tweet", "label": "Long Tweet" }
+            { "id": "short-tweet", "label": "Short tweet" },
+            { "id": "long-tweet", "label": "Long tweet" }
           ],
           "persistence": "instance",
           "sensitive": false

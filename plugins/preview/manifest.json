@@ -9,8 +9,8 @@
   "tools": [{
     "id": "preview.documents",
     "title": "Markdown & HTML Preview",
-    "category": "viewer",
-    "description": "Preview Markdown or HTML as a rendered document, its generated HTML source, or its properties.",
+    "category": "format",
+    "description": "Markdown or HTML rendered as a page",
     "searchAliases": ["markdown preview", "html preview", "render", "marked"],
     "operationIds": ["preview.markdown", "preview.html"],
     "workspaceId": "preview"
@@ -18,7 +18,7 @@
   "operations": [
     {
       "id": "preview.markdown",
-      "title": "Preview Markdown",
+      "title": "Markdown",
       "executor": { "kind": "javascriptWorker", "id": "preview.documents.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
       "inputs": [{ "id": "input", "label": "Markdown", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/markdown"] }],
       "outputs": [{ "id": "output", "label": "Preview", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["previewDocument", "code", "properties"], "sensitive": false, "exports": ["copyText", "save", "openInBrowser"] }],
@@ -32,7 +32,7 @@
     },
     {
       "id": "preview.html",
-      "title": "Preview HTML",
+      "title": "HTML",
       "executor": { "kind": "javascriptWorker", "id": "preview.documents.processor", "version": "0.1.0", "engine": "node", "engineVersion": "20", "syntax": "javascript", "cancellation": "cooperative" },
       "inputs": [{ "id": "input", "label": "HTML", "kind": "document", "required": true, "multiplicity": "one", "contentKinds": ["text"], "mime": ["text/html"] }],
       "outputs": [{ "id": "output", "label": "Preview", "kind": "artifact", "multiplicity": "one", "mime": ["text/html"], "language": "html", "representations": ["previewDocument", "code", "properties"], "sensitive": false, "exports": ["copyText", "save", "openInBrowser"] }],

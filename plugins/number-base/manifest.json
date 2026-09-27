@@ -10,7 +10,8 @@
     {
       "id": "number.base",
       "title": "Number Base Converter",
-      "category": "converter",
+      "category": "convert",
+      "description": "Integers between binary, octal, decimal, hex and more",
       "operationIds": ["number.base"],
       "workspaceId": "converter"
     }
@@ -18,7 +19,7 @@
   "operations": [
     {
       "id": "number.base",
-      "title": "Convert Number Base",
+      "title": "Convert",
       "executor": {
         "kind": "javascriptWorker",
         "id": "number.base.processor",
@@ -61,7 +62,7 @@
         {
           "id": "from-base",
           "type": "integer",
-          "label": "From Base",
+          "label": "From base",
           "default": "10",
           "minimum": "2",
           "maximum": "36",
@@ -71,7 +72,7 @@
         {
           "id": "to-base",
           "type": "integer",
-          "label": "To Base",
+          "label": "To base",
           "default": "16",
           "minimum": "2",
           "maximum": "36",
@@ -84,8 +85,8 @@
           "label": "Digits",
           "default": "lower",
           "choices": [
-            { "id": "lower", "label": "Lower" },
-            { "id": "upper", "label": "Upper" }
+            { "id": "lower", "label": "Lowercase" },
+            { "id": "upper", "label": "Uppercase" }
           ],
           "persistence": "instance",
           "sensitive": false

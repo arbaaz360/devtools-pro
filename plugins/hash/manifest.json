@@ -6,10 +6,10 @@
   "stateVersion": 1,
   "title": "Hash Generator",
   "description": "Calculate compatible MD5, SHA-1, SHA-224, SHA-256, SHA-384 and SHA-512 digests from a byte stream.",
-  "tools": [{"id":"encoding.hash","title":"Hash Generator","category":"converter","operationIds":["encoding.hash"],"workspaceId":"hash"}],
+  "tools": [{"id":"encoding.hash","title":"Hash Generator","category":"encode","description":"SHA-256 and SHA-512 digests of text or a file","operationIds":["encoding.hash"],"workspaceId":"hash"}],
   "operations": [{
     "id":"encoding.hash",
-    "title":"Calculate hashes",
+    "title":"Hash",
     "executor":{"kind":"javascriptWorker","id":"encoding.hash.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
     "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["binary","text"]}],
     "outputs":[

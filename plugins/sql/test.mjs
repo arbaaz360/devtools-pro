@@ -57,6 +57,28 @@ for (const vector of await fixture("minify")) {
   });
 }
 
+// The shell sends only the ids an operation declares, so minify runs with `dialect`
+// alone. Keyword case, indentation and comma position are layout choices minify
+// never applies (it prints each token as written); each of them, at every
+// non-default value, must leave every minify fixture's pinned output unchanged, or
+// hiding it would hide a real setting.
+test("minify declares only dialect; the beautify-only options it drops never change minify output", async () => {
+  const beautifyOptions = operation("beautify").options;
+  const minifyOptions = operation("minify").options;
+  assert.deepEqual(minifyOptions.map((option) => option.id), ["dialect"]);
+  const dropped = beautifyOptions.filter((option) => !minifyOptions.some((kept) => kept.id === option.id));
+  assert.deepEqual(dropped.map((option) => option.id), ["keyword-case", "indent", "comma-position"]);
+  const variants = dropped.flatMap((option) => option.choices.filter((choice) => choice.id !== option.default).map((choice) => ({ [option.id]: choice.id })));
+  for (const vector of await fixture("minify")) {
+    const declaredOnly = { dialect: vector.options.dialect ?? "sql" };
+    assert.equal((await run("minify", declaredOnly, vector.input)).text, vector.output, `${vector.name}: declared options only`);
+    for (const variant of variants) {
+      const result = await run("minify", { ...declaredOnly, ...variant }, vector.input);
+      assert.equal(result.text, vector.output, `${vector.name}: ${JSON.stringify(variant)} must not change minify output`);
+    }
+  }
+});
+
 for (const vector of await fixture("invalid")) {
   test(`invalid fixture: ${vector.name}`, async () => {
     await rejects(vector.operationId, vector.options, vector.input, (error) => {

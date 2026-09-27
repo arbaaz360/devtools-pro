@@ -6,7 +6,7 @@
   "stateVersion": 1,
   "title": "UUID Generator and Decoder",
   "description": "Generate UUID v1, v3, v4 and v5 values or inspect a canonical UUID.",
-  "tools": [{"id":"identity.uuid","title":"UUID Generator","category":"generator","operationIds":["identity.uuid.generate","identity.uuid.decode"],"workspaceId":"generator"}],
+  "tools": [{"id":"identity.uuid","title":"UUID Generator","category":"generate","description":"UUID v1, v3, v4 and v5, or decode one","operationIds":["identity.uuid.generate","identity.uuid.decode"],"workspaceId":"generator"}],
   "operations": [
     {
       "id":"identity.uuid.generate",

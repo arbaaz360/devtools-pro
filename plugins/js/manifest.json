@@ -10,7 +10,8 @@
     {
       "id": "format.js",
       "title": "JavaScript Formatter",
-      "category": "converter",
+      "category": "format",
+      "description": "Beautify or minify JavaScript",
       "operationIds": ["beautify", "minify"],
       "workspaceId": "js-formatter",
       "searchAliases": ["js beautifier", "js minifier", "javascript beautifier"]
@@ -19,7 +20,7 @@
   "operations": [
     {
       "id": "beautify",
-      "title": "Beautify JavaScript",
+      "title": "Format",
       "executor": {
         "kind": "javascriptWorker",
         "id": "format.js.processor",
@@ -125,7 +126,7 @@
     },
     {
       "id": "minify",
-      "title": "Minify JavaScript",
+      "title": "Minify",
       "executor": {
         "kind": "javascriptWorker",
         "id": "format.js.processor",

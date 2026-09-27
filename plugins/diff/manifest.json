@@ -6,10 +6,10 @@
   "stateVersion": 1,
   "title": "Text Diff",
   "description": "Compare two bounded text documents with line-oriented structured hunks.",
-  "tools": [{"id":"text.compare","title":"Text Diff","category":"compare","operationIds":["text.compare"],"workspaceId":"compare"}],
+  "tools": [{"id":"text.compare","title":"Text Diff","category":"text","description":"Line-by-line differences between two texts","operationIds":["text.compare"],"workspaceId":"compare"}],
   "operations": [{
     "id":"text.compare",
-    "title":"Compare text",
+    "title":"Compare",
     "executor":{"kind":"javascriptWorker","id":"text.compare.processor","version":"0.1.0","engine":"node","engineVersion":"20","syntax":"javascript","cancellation":"cooperative"},
     "inputs":[
       {"id":"left","label":"Left input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]},

@@ -7,12 +7,12 @@
   "title": "Find & Replace",
   "description": "Literal Unicode find and replace.",
   "tools": [
-    {"id":"text.find-replace","title":"Find & Replace","category":"text","operationIds":["text.find-replace"],"workspaceId":"find-replace"}
+    {"id":"text.find-replace","title":"Find & Replace","category":"text","description":"Find text in the document and replace it","operationIds":["text.find-replace"],"workspaceId":"find-replace"}
   ],
   "operations": [
     {
       "id":"text.find-replace",
-      "title":"Find and replace",
+      "title":"Run",
       "executor":{"kind":"javascriptWorker","id":"text.find-replace.processor","version":"0.2.0","engine":"ecmascript","engineVersion":"2024","syntax":"literal","cancellation":"cooperative"},
       "inputs":[{"id":"input","kind":"document","required":true,"multiplicity":"one","contentKinds":["text"]}],
       "outputs":[{"id":"output","kind":"report","multiplicity":"one","representations":["text","code","properties"],"language":"json","sensitive":false,"exports":["copyText","save","useAsInput"]}],
