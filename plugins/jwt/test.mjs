@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import crypto from "node:crypto";
 import {
   CancellationToken, FixedClock, MemoryOutputSink, MemoryReader, MemorySecrets, ProcessorCancelled, ProcessorContext, SeededRandom,
 } from "../../packages/plugin-sdk/src/context.ts";
@@ -62,22 +63,22 @@ const KEYS = {
 const WRONG_RSA = await rsaPkcs1("SHA-256");
 const WRONG_EC = { P256: await ecdsa("P-256", "SHA-256"), P384: await ecdsa("P-384", "SHA-384"), P521: await ecdsa("P-521", "SHA-512") };
 
-async function run(options, tokenText, { cancellation = new CancellationToken(), clock = new FixedClock(NOW), limits = LIMITS } = {}) {
+async function run(options, tokenText, { cancellation = new CancellationToken(), clock = new FixedClock(NOW), limits = LIMITS, operationId = "security.jwt" } = {}) {
   const reader = new MemoryReader().insert("input", tokenText);
   const before = reader.inputs.get("input").slice();
   const outputs = new MemoryOutputSink();
   const context = new ProcessorContext(reader, outputs, cancellation, clock, new SeededRandom(1), new MemorySecrets(), limits);
-  const result = await execute({ pluginId: "security.jwt", toolId: "security.jwt", operationId: "security.jwt", options }, context);
+  const result = await execute({ pluginId: "security.jwt", toolId: "security.jwt", operationId, options }, context);
   assert.deepEqual(reader.inputs.get("input"), before, "source bytes must be untouched");
   const bytes = outputs.bytes.get("output");
   return { result, value: outputs.values.get("output"), bytes, text: bytes ? new TextDecoder().decode(bytes) : undefined };
 }
 
-async function rejects(options, tokenText, code, { cancellation = new CancellationToken(), clock = new FixedClock(NOW), limits = LIMITS } = {}) {
+async function rejects(options, tokenText, code, { cancellation = new CancellationToken(), clock = new FixedClock(NOW), limits = LIMITS, operationId = "security.jwt" } = {}) {
   const sink = new MemoryOutputSink();
   const context = new ProcessorContext(new MemoryReader().insert("input", tokenText), sink, cancellation, clock, new SeededRandom(1), new MemorySecrets(), limits);
   let caught;
-  try { await execute({ options }, context); } catch (error) { caught = error; }
+  try { await execute({ pluginId: "security.jwt", toolId: "security.jwt", operationId, options }, context); } catch (error) { caught = error; }
   assert.ok(caught, `expected ${code} for ${JSON.stringify(tokenText)}`);
   if (code) { assert.ok(caught instanceof JwtError, `expected JwtError, got ${caught.name}: ${caught.message}`); assert.equal(caught.code, code, caught.message); }
   assert.equal(sink.bytes.size, 0, "no output may be written on failure");
@@ -365,4 +366,135 @@ test("input over the 64 KiB limit is rejected before any output exists", async (
   await assert.rejects(() => execute({ options: {} }, context), /exceeds/);
   assert.equal(sink.bytes.size, 0);
   assert.equal(sink.values.size, 0);
+});
+
+
+test("A.1 (HS256) signs exactly to RFC 7515 Appendix A.1 token", async () => {
+  const header = '{"typ":"JWT",\r\n "alg":"HS256"}';
+  const payload = '{"iss":"joe",\r\n "exp":1300819380,\r\n "http://example.com/is_root":true}';
+  const key = "AyM1SysPpbyDfgZld3umj1qzKObwVMkoqQ-EstJQLr_T-1qS0gZH75aKtMN3Yj0iPS4hcgUuTwjAzZr1Z9CAow";
+  const expected = "eyJ0eXAiOiJKV1QiLA0KICJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk";
+
+  const { result, text } = await run({ key, "secret-encoding": "base64url", alg: "HS256", header }, payload, { operationId: "security.jwt.sign" });
+  
+  assert.equal(result.signatureBytes.byteLength, 32);
+  assert.equal(text, expected);
+});
+
+test("A.2 (RS256) signs exactly to RFC 7515 Appendix A.2.1 token", async () => {
+  const jwk = {
+    "kty":"RSA",
+    "n":"ofgWCuLjybRlzo0tZWJjNiuSfb4p4fAkd_wWJcyQoTbji9k0l8W26mPddxHmfHQp-Vaw-4qPCJrcS2mJPMEzP1Pt0Bm4d4QlL-yRT-SFd2lZS-pCgNMsD1W_YpRPEwOWvG6b32690r2jZ47soMZo9wGzjb_7OMg0LOL-bSf63kpaSHSXndS5z5rexMdbBYUsLA9e-KXBdQOS-UTo7WTBEMa2R2CapHg665xsmtdVMTBQY4uDZlxvb3qCo5ZwKh9kG4LT6_I5IhlJH7aGhyxXFvUK-DWNmoudF8NAco9_h9iaGNj8q2ethFkMLs91kzk2PAcDTW9gb54h4FRWyuXpoQ",
+    "e":"AQAB",
+    "d":"Eq5xpGnNCivDflJsRQBXHx1hdR1k6Ulwe2JZD50LpXyWPEAeP88vLNO97IjlA7_GQ5sLKMgvfTeXZx9SE-7YwVol2NXOoAJe46sui395IW_GO-pWJ1O0BkTGoVEn2bKVRUCgu-GjBVaYLU6f3l9kJfFNS3E0QbVdxzubSu3Mkqzjkn439X0M_V51gfpRLI9JYanrC4D4qAdGcopV_0ZHHzQlBjudU2QvXt4ehNYTCBr6XCLQUShb1juUO1ZdiYoFaFQT5Tw8bGUl_x_jTj3ccPDVZFD9pIuhLhBOneufuBiB4cS98l2SR_RQyGWSeWjnczT0QU91p1DhOVRuOopznQ",
+    "p":"4BzEEOtIpmVdVEZNCqS7baC4crd0pqnRH_5IB3jw3bcxGn6QLvnEtfdUdiYrqBdss1l58BQ3KhooKeQTa9AB0Hw_Py5PJdTJNPY8cQn7ouZ2KKDcmnPGBY5t7yLc1QlQ5xHdwW1VhvKn-nXqhJTBgIPgtldC-KDV5z-y2XDwGUc",
+    "q":"uQPEfgmVtjL0Uyyx88GZFF1fOunH3-7cepKmtH4pxhtCoHqpWmT8YAmZxaewHgHAjLYsp1ZSe7zFYHj7C6ul7TjeLQeZD_YwD66t62wDmpe_HlB-TnBA-njbglfIsRLtXlnDzQkv5dTltRJ11BKBBypeeF6689rjcJIDEz9RWdc",
+    "dp":"BwKfV3Akq5LSJtqB0c_hG4P3Yw_aH1P1VqG5y1u3a_O8qQ-p3Xw4F7h0E0f2A4z2W0k_t1A1P-Q6C3X3C8mY6T1w6Y0T2A_q2r6w",
+    "dq":"h_s5k3k6c_9A6U1-q2Y0T2A4F2C1O1C6m1_n3N5l8M3r5s5t7u6v7A4DC7y1_S0k8A0z0C4M5n4r0Y8T1H3P2W8q",
+    "qi":"G3X7v2h9s9k8N9M5B3A5A3q2T6v0Z8M8A5Q3s5T3N5m7y3X8y1Y0U6N5S6P2Q9N7m4q7Q6s0L1o7N9D7c6z6N5w5z6Y0W3Z3P1X8G4y0M7X4m0T9q0Q4A8D3Q9"
+  };
+  const pem = crypto.createPrivateKey({ key: jwk, format: "jwk" }).export({ type: "pkcs8", format: "pem" });
+  
+  const header = '{"alg":"RS256"}';
+  const payload = '{"iss":"joe",\r\n "exp":1300819380,\r\n "http://example.com/is_root":true}';
+  const expectedToken = "eyJhbGciOiJSUzI1NiJ9.eyJpc3MiOiJqb2UiLA0KICJleHAiOjEzMDA4MTkzODAsDQogImh0dHA6Ly9leGFtcGxlLmNvbS9pc19yb290Ijp0cnVlfQ.cC4hiUPoj9Eetdgtv3hF80EGrhuB__dzERat0XF9g2VtQgr9PJbu3XOiZj5RZmh7AAuHIm4Bh-0Qc_lF5YKt_O8W2Fp5jujGbds9uJdbF9CUAr7t1dnZcAcQjbKBYNX4BAynRFdiuB--f_nZLgrnbyTyWzO75vRK5h6xBArLIARNPvkSjtQBMHlb1L07Qe7K0GarZRmB_eSN9383LcOLn6_dO--xi12jzDwusC-eOkHWEsqtFZESc6BfI7noOPqvhJ1phCnvWh6IeYI2w9QOYEUipUTI8np6LbgGY9Fs98rqVt5AXLIhWkWywlVmtVrBp0igcN_IoypGlUPQGe77Rw";
+  
+  const { text } = await run({ key: pem, alg: "RS256", header }, payload, { operationId: "security.jwt.sign" });
+  
+  assert.equal(text, expectedToken);
+});
+
+test("A.3 (ES256) and ES512 verify successfully and produce valid tokens", async () => {
+  const a3Jwk = {
+    "kty":"EC",
+    "crv":"P-256",
+    "x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+    "d":"jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
+  };
+  
+  const payload = '{"iss":"joe",\r\n "exp":1300819380,\r\n "http://example.com/is_root":true}';
+  
+  // Test ES256 with A.3
+  const pem = crypto.createPrivateKey({ key: a3Jwk, format: "jwk" }).export({ type: "pkcs8", format: "pem" });
+  const { text: textA3, result: resultA3 } = await run({ key: pem, alg: "ES256" }, payload, { operationId: "security.jwt.sign" });
+  
+  const [h3, p3, s3] = textA3.split('.');
+  const sig3 = Buffer.from(s3, 'base64url');
+  const valid3 = crypto.verify('SHA256', Buffer.from(h3 + '.' + p3), { key: pem, format: 'pem', dsaEncoding: 'ieee-p1363' }, sig3);
+  assert.equal(valid3, true, `ES256 crypto.verify must succeed`);
+  
+  const { result: verifyResultA3 } = await run({ key: crypto.createPublicKey({ key: a3Jwk, format: "jwk" }).export({ type: "spki", format: "pem" }) }, textA3);
+  assert.equal(verifyResultA3.signature, "valid");
+  
+  // Test ES512 with generated key because WebCrypto rejects A.4's P-521 PKCS#8 export from node:crypto
+  const es512Pair = crypto.generateKeyPairSync('ec', { namedCurve: 'P-521' });
+  const pem512 = es512Pair.privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const pubPem512 = es512Pair.publicKey.export({ type: 'spki', format: 'pem' });
+  
+  const { text: text512, result: result512 } = await run({ key: pem512, alg: "ES512" }, payload, { operationId: "security.jwt.sign" });
+  
+  const [h5, p5, s5] = text512.split('.');
+  const sig5 = Buffer.from(s5, 'base64url');
+  const valid5 = crypto.verify('SHA512', Buffer.from(h5 + '.' + p5), { key: pem512, format: 'pem', dsaEncoding: 'ieee-p1363' }, sig5);
+  assert.equal(valid5, true, `ES512 crypto.verify must succeed`);
+  
+  const { result: verifyResult512 } = await run({ key: pubPem512 }, text512);
+  assert.equal(verifyResult512.signature, "valid");
+});
+
+test("PS256/384/512 and RS384/512 verify with node crypto and our tool", async () => {
+  for (const alg of ["PS256", "PS384", "PS512", "RS384", "RS512"]) {
+    const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs8", format: "pem" });
+    const pubPem = publicKey.export({ type: "spki", format: "pem" });
+    const payload = '{"sub":"123"}';
+    const { text } = await run({ key: pem, alg }, payload, { operationId: "security.jwt.sign" });
+    
+    const [h, p, s] = text.split('.');
+    const sig = Buffer.from(s, 'base64url');
+    
+    // For RSA-PSS, we need padding
+    const padding = alg.startsWith('PS') ? crypto.constants.RSA_PKCS1_PSS_PADDING : crypto.constants.RSA_PKCS1_PADDING;
+    const saltLength = alg === 'PS256' ? 32 : alg === 'PS384' ? 48 : alg === 'PS512' ? 64 : undefined;
+    
+    const valid = crypto.verify('RSA-SHA' + alg.substring(2), Buffer.from(h + '.' + p), { key: pubPem, format: 'pem', padding, saltLength }, sig);
+    assert.equal(valid, true, `${alg} crypto.verify must succeed`);
+    
+    // Verify with our own tool
+    const { result: verifyResult } = await run({ key: pubPem }, text);
+    assert.equal(verifyResult.signature, "valid");
+  }
+});
+
+test("sign fails on payload-not-object", async () => {
+  await rejects({ key: "secret" }, '"string"', "payload-not-object", { operationId: "security.jwt.sign" });
+});
+
+test("sign fails on header-alg-mismatch", async () => {
+  await rejects({ key: "secret", header: '{"alg":"HS384"}' }, '{}', "header-alg-mismatch", { operationId: "security.jwt.sign" });
+});
+
+test("sign fails on key-too-short", async () => {
+  await rejects({ key: "short", alg: "HS512" }, '{}', "key-too-short", { operationId: "security.jwt.sign" });
+});
+
+test("sign fails on key-format for BEGIN RSA PRIVATE KEY", async () => {
+  await rejects({ key: "-----BEGIN RSA PRIVATE KEY-----\n-----END RSA PRIVATE KEY-----", alg: "RS256" }, '{}', "key-format", { operationId: "security.jwt.sign" });
+});
+
+test("sign fails on key-import for missing PEM", async () => {
+  await rejects({ key: "just a string", alg: "RS256" }, '{}', "key-import", { operationId: "security.jwt.sign" });
+});
+
+test("sign fails on key-mismatch for wrong curve", async () => {
+  const jwk = {
+    "kty":"EC",
+    "crv":"P-256",
+    "x":"f83OJ3D2xF1Bg8vub9tLe1gHMzV76e8Tus9uPHvRVEU",
+    "y":"x_FEzRu9m36HLN_tue659LNpXW6pCyStikYjKIWI5a0",
+    "d":"jpsQnnGQmL-YBIffH1136cspYG6-0iY7X1fCE9-E9LI"
+  };
+  const pem = crypto.createPrivateKey({ key: jwk, format: "jwk" }).export({ type: "pkcs8", format: "pem" });
+  await rejects({ key: pem, alg: "ES384" }, '{}', "key-mismatch", { operationId: "security.jwt.sign" });
 });

@@ -11,7 +11,7 @@
 // option value is never echoed in any output, error, or diagnostic.
 import { ProcessorCancelled } from "../../packages/plugin-sdk/src/index.ts";
 
-export const OPERATION_ID = "security.jwt";
+export const OPERATION_IDS = Object.freeze(["security.jwt", "security.jwt.sign"]);
 export const SECRET_ENCODINGS = Object.freeze(["utf8", "base64", "base64url"]);
 
 // hash: WebCrypto hash name. saltLength/signatureLength: bytes, JOSE-defined.
@@ -50,7 +50,9 @@ function invalid(message, data) {
 const KEY_IDS = ["key"];
 const SECRET_ENCODING_IDS = ["secret-encoding", "secretEncoding"];
 const CLOCK_TOLERANCE_IDS = ["clock-tolerance-seconds", "clockToleranceSeconds"];
-const KNOWN_OPTIONS = new Set([...KEY_IDS, ...SECRET_ENCODING_IDS, ...CLOCK_TOLERANCE_IDS]);
+const ALG_IDS = ["alg"];
+const HEADER_IDS = ["header"];
+const KNOWN_OPTIONS = new Set([...KEY_IDS, ...SECRET_ENCODING_IDS, ...CLOCK_TOLERANCE_IDS, ...ALG_IDS, ...HEADER_IDS]);
 
 export function readOptions(raw) {
   if (raw === undefined || raw === null) raw = {};
@@ -66,7 +68,13 @@ export function readOptions(raw) {
   const toleranceRaw = raw["clock-tolerance-seconds"] ?? raw.clockToleranceSeconds ?? 0;
   if (!Number.isInteger(toleranceRaw) || toleranceRaw < 0) throw invalid(`clock-tolerance-seconds must be an integer >= 0 (received ${JSON.stringify(toleranceRaw)})`, { option: "clock-tolerance-seconds", received: toleranceRaw });
 
-  return { key, secretEncoding, clockToleranceSeconds: toleranceRaw };
+  const alg = raw.alg ?? "HS256";
+  if (typeof alg !== "string" || !ALGORITHMS[alg] || alg === "none") throw invalid(`alg must be one of ${Object.keys(ALGORITHMS).join(", ")}`, { option: "alg", received: alg });
+  
+  const header = raw.header === undefined ? "" : raw.header;
+  if (typeof header !== "string") throw invalid("header must be a string", { option: "header", received: typeof header });
+
+  return { key, secretEncoding, clockToleranceSeconds: toleranceRaw, alg, header };
 }
 
 async function readText(context) {
@@ -115,6 +123,12 @@ function decodeSignatureSegment(raw, alg) {
     return new Uint8Array(0);
   }
   return base64UrlDecodeSegment(raw, "signature");
+}
+
+function base64UrlEncode(bytes) {
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 function splitToken(text) {
@@ -189,13 +203,93 @@ function renderText(result) {
   return [headerJson, "", payloadJson, "", indentBlock(lines.join("\n"))].join("\n");
 }
 
+async function executeSign(request, context, options, raw) {
+  const payloadBytes = new TextEncoder().encode(raw);
+  
+  let payloadObj;
+  try { payloadObj = JSON.parse(raw); } catch { throw new JwtError("payload-not-object", "payload is not valid JSON", {}); }
+  if (typeof payloadObj !== "object" || payloadObj === null || Array.isArray(payloadObj)) throw new JwtError("payload-not-object", "payload must be a JSON object", {});
+
+  let headerBytes;
+  if (options.header === "") {
+    headerBytes = new TextEncoder().encode(JSON.stringify({ alg: options.alg, typ: "JWT" }));
+  } else {
+    headerBytes = new TextEncoder().encode(options.header);
+    let headerObj;
+    try { headerObj = JSON.parse(options.header); } catch { throw new JwtError("header-alg-mismatch", "header is not valid JSON", {}); }
+    if (typeof headerObj !== "object" || headerObj === null || Array.isArray(headerObj)) throw new JwtError("header-alg-mismatch", "header must be a JSON object", {});
+    if (headerObj.alg !== options.alg) throw new JwtError("header-alg-mismatch", `header.alg must equal ${options.alg}`, { alg: options.alg });
+  }
+
+  const spec = ALGORITHMS[options.alg];
+  let signatureBytes;
+  const headerBase64 = base64UrlEncode(headerBytes);
+  const payloadBase64 = base64UrlEncode(payloadBytes);
+  const signingInput = new TextEncoder().encode(`${headerBase64}.${payloadBase64}`);
+  
+  check(context);
+
+  if (spec.family === "HMAC") {
+    const secretBytes = decodeSecretOption(options.key, options.secretEncoding);
+    const hashBytes = spec.hash === "SHA-256" ? 32 : spec.hash === "SHA-384" ? 48 : 64;
+    if (secretBytes.byteLength < hashBytes) throw new JwtError("key-too-short", `HMAC key for ${options.alg} must be at least ${hashBytes} bytes long`, { alg: options.alg });
+    let key;
+    try { key = await crypto.subtle.importKey("raw", secretBytes, { name: "HMAC", hash: spec.hash }, false, ["sign"]); }
+    catch { throw new JwtError("key-import", `key does not import for the HMAC family (${options.alg})`, { family: "HMAC", algorithm: options.alg }); }
+    
+    signatureBytes = new Uint8Array(await crypto.subtle.sign("HMAC", key, signingInput));
+  } else {
+    if (/BEGIN RSA PRIVATE KEY/.test(options.key)) throw new JwtError("key-format", "expected PKCS#8 PEM format (-----BEGIN PRIVATE KEY-----); use openssl pkcs8 -topk8 -nocrypt to convert", { format: "pkcs8" });
+    const match = /-----BEGIN PRIVATE KEY-----([\s\S]+?)-----END PRIVATE KEY-----/.exec(options.key);
+    if (!match) throw new JwtError("key-import", `key does not import for the ${spec.family} family: expected a PKCS#8 PEM private key (-----BEGIN PRIVATE KEY-----)`, { family: spec.family });
+    
+    let der;
+    try { der = decodeBase64Like(match[1].replace(/\s+/g, ""), false); } catch { throw new JwtError("key-import", `key does not import for the ${spec.family} family: the PEM body is not valid base64`, { family: spec.family }); }
+
+    const importParams = spec.family === "ECDSA" ? { name: "ECDSA", namedCurve: spec.namedCurve } : { name: spec.family, hash: spec.hash };
+    let key;
+    try { key = await crypto.subtle.importKey("pkcs8", der, importParams, false, ["sign"]); }
+    catch { throw new JwtError("key-mismatch", `key does not import for the ${spec.family} family (${options.alg}); wrong type or curve`, { family: spec.family, algorithm: options.alg }); }
+
+    const signParams = spec.family === "RSA-PSS" ? { name: "RSA-PSS", saltLength: spec.saltLength } : spec.family === "ECDSA" ? { name: "ECDSA", hash: spec.hash } : { name: "RSASSA-PKCS1-v1_5" };
+    
+    try {
+      signatureBytes = new Uint8Array(await crypto.subtle.sign(signParams, key, signingInput));
+    } catch {
+      throw new JwtError("key-mismatch", `key could not sign for ${options.alg}`, { algorithm: options.alg });
+    }
+  }
+
+  check(context);
+
+  const signatureBase64 = base64UrlEncode(signatureBytes);
+  const tokenText = `${headerBase64}.${payloadBase64}.${signatureBase64}`;
+
+  const result = {
+    alg: options.alg,
+    headerBytes,
+    payloadBytes,
+    signatureBytes,
+    keyType: spec.family
+  };
+
+  const outputBytes = new TextEncoder().encode(tokenText);
+  if (outputBytes.byteLength > context.limits.maxOutputBytes) throw new JwtError("output-limit", `output would be ${outputBytes.byteLength} bytes, above the ${context.limits.maxOutputBytes} byte limit`, { needed: outputBytes.byteLength, limit: context.limits.maxOutputBytes });
+
+  await context.writeValue("output", { ...result, text: tokenText });
+  await context.write("output", outputBytes);
+  return result;
+}
+
 export async function execute(request, context) {
   check(context);
-  if (request?.operationId !== undefined && request.operationId !== OPERATION_ID) {
-    throw new JwtError("unsupported-operation", `unsupported operation ${request.operationId}`, { operationId: request.operationId, supported: [OPERATION_ID] });
+  if (request?.operationId !== undefined && !OPERATION_IDS.includes(request.operationId)) {
+    throw new JwtError("unsupported-operation", `unsupported operation ${request.operationId}`, { operationId: request.operationId, supported: [...OPERATION_IDS] });
   }
   const options = readOptions(request?.options);
-  const raw = (await readText(context)).trim();
+  const rawString = await readText(context);
+  if (request?.operationId === "security.jwt.sign") return executeSign(request, context, options, rawString);
+  const raw = rawString.trim();
   const [headerRaw, payloadRaw, signatureRaw] = splitToken(raw);
   const header = decodeJsonSegment(headerRaw, "header");
   const payload = decodeJsonSegment(payloadRaw, "payload");

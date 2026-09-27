@@ -24,6 +24,30 @@ Anything else throws a structured `JwtError`:
 Decoding never calls WebCrypto and always succeeds once these checks pass,
 regardless of whether `alg` is supported or a key was supplied.
 
+## Signing
+
+The `security.jwt.sign` operation takes the exact bytes of the `input` payload (which must parse as a JSON object) and signs it into a JWS compact token.
+
+### Signing Options
+
+| Option | Type | Default | Meaning |
+|---|---|---|---|
+| `alg` | enum | `HS256` | The signature algorithm (`HS256/384/512`, `RS256/384/512`, `PS256/384/512`, `ES256/384/512`). `none` is not supported. |
+| `key` | string, `sensitive: true` | `""` | The HMAC secret for HS*, or a PKCS#8 PEM private key for RS*/PS*/ES*. |
+| `secret-encoding` | enum `utf8`, `base64`, `base64url` | `utf8` | How `key` is read for HS*. |
+| `header` | string | `""` | Optional JSON object for the header. If empty, `{"alg":"<alg>","typ":"JWT"}` is used. If given, its exact bytes are used, and `alg` must match the option. |
+
+### Signing Errors
+
+| `code` | When |
+|---|---|
+| `payload-not-object` | The input payload does not parse as a JSON object. |
+| `header-alg-mismatch` | The provided `header` is not a JSON object, or its `alg` property does not strictly equal the `alg` option. |
+| `key-mismatch` | A private key was supplied that is the wrong type or curve for the selected algorithm. |
+| `key-too-short` | An HMAC secret was supplied that is shorter than the hash output length. |
+| `key-format` | A PEM was supplied that is not PKCS#8 (e.g., `BEGIN RSA PRIVATE KEY`). Use `openssl pkcs8 -topk8 -nocrypt` to convert it. |
+| `key-import` | The key could not be imported for the selected algorithm family (e.g., invalid base64 in PEM). |
+
 ## Verification
 
 Verification runs only when decoding succeeds, and is independent of it:
@@ -145,6 +169,6 @@ and EC) and is not committed to disk, per the packet.
   it. The self-generated vector is verified the same way (a real
   `crypto.subtle.verify` against a real PEM key) and exercises the same code
   path.
-- Signing tokens, private keys, JWK input, `x5c` chains, nested JWE, network
+- JWK input, `x5c` chains, nested JWE, network
   calls, and the segmented-token/editable-workspace UI are out of scope per
   the packet and are not implemented here.
