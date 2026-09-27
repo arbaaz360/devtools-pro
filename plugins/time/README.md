@@ -15,6 +15,8 @@ Accepted input:
 - An integer or decimal number of seconds or milliseconds (negative allowed).
 - An ISO 8601 date or date-time with `Z` or a numeric offset.
 - RFC Dates: RFC 5322 (`Fri, 21 Nov 1997 09:55:06 -0600`), IMF-fixdate (`Sun, 06 Nov 1994 08:49:37 GMT`), RFC 850 (`Sunday, 06-Nov-94 08:49:37 GMT`), and asctime (`Sun Nov  6 08:49:37 1994`).
+  - Year rules: Four digits are taken literally. RFC 5322 two-digit years below 50 add 2000, and 50-99 add 1900. Three-digit years add 1900. RFC 850 two-digit years are mapped to the current century unless that places them more than 50 years in the future, in which case they belong to the previous century.
+  - Zones: Accepted zone names are `UT`, `GMT`, `EST`, `EDT`, `CST`, `CDT`, `MST`, `MDT`, `PST`, `PDT`, or a numeric offset like `+0530`.
 - An arithmetic expression over numeric timestamps with `+ - * /`, decimal numbers, and one level of parentheses, evaluated with normal precedence.
 
 Nothing else parses: no words, no locale dates, no function calls. Ambiguous forms such as `01/02/2024` are rejected with a message naming the ISO form.

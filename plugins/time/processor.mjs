@@ -140,14 +140,11 @@ function parseRfcDate(input, nowMillis) {
     const currentYear = new Date(nowMillis).getUTCFullYear();
     const baseCentury = Math.floor(currentYear / 100) * 100;
     year = baseCentury + parseInt(res.y, 10);
-    if (year > currentYear + 50) {
-      year -= 100;
-    }
   } else if (res.type === 'rfc5322') {
     if (res.y.length === 2) {
       year = parseInt(res.y, 10);
       if (year < 50) year += 2000;
-      else year += 1950;
+      else year += 1900;
     } else if (res.y.length === 3) {
       year += 1900;
     }
@@ -167,9 +164,11 @@ function parseRfcDate(input, nowMillis) {
     } else if (/^[+-]\d{4}$/.test(res.z)) {
       const sign = res.z.startsWith('-') ? -1 : 1;
       const val = parseInt(res.z.substring(1), 10);
-      offset = sign * (Math.floor(val / 100) * 60 + (val % 100));
+      const minutes = val % 100;
+      if (minutes > 59) return { error: 'invalid-date', message: `Invalid offset minutes in ${res.z}` };
+      offset = sign * (Math.floor(val / 100) * 60 + minutes);
     } else {
-      return null;
+      return { error: 'unknown-zone', message: `Unknown time zone '${res.z}' in RFC date. Accepted zones: UT, GMT, EST, EDT, CST, CDT, MST, MDT, PST, PDT, or numeric offset.` };
     }
   }
 
@@ -184,6 +183,15 @@ function parseRfcDate(input, nowMillis) {
   const dateObj = new Date(0);
   dateObj.setUTCFullYear(year, moIndex, d);
   dateObj.setUTCHours(h, mi, s);
+
+  if (res.type === 'rfc850') {
+    const limit = new Date(nowMillis);
+    limit.setUTCFullYear(limit.getUTCFullYear() + 50);
+    if (dateObj.getTime() > limit.getTime()) {
+      dateObj.setUTCFullYear(year - 100);
+      year -= 100;
+    }
+  }
 
   if (dateObj.getUTCMonth() !== moIndex || dateObj.getUTCDate() !== d) {
     return { error: 'invalid-date', message: "Impossible date." };
@@ -220,7 +228,7 @@ function parseInput(input, interpretation, nowMillis) {
   if (interpretation === "iso" && !isIsoForm) {
     throw new TimeError("interpretation-mismatch", "Input must be an ISO 8601 date when interpretation is iso");
   }
-  if ((interpretation === "seconds" || interpretation === "milliseconds") && isIsoForm) {
+  if ((interpretation === "seconds" || interpretation === "milliseconds") && (isIsoForm || rfcResult)) {
     throw new TimeError("interpretation-mismatch", `Input must be numeric when interpretation is ${interpretation}`);
   }
 
