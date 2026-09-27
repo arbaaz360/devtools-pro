@@ -1,0 +1,206 @@
+[
+  {
+    "name": "empty input",
+    "options": {},
+    "input": "",
+    "output": ""
+  },
+  {
+    "name": "one line",
+    "options": {},
+    "input": "hello",
+    "output": "hello"
+  },
+  {
+    "name": "one line trailing",
+    "options": {},
+    "input": "hello\n",
+    "output": "hello\n"
+  },
+  {
+    "name": "mixed endings CRLF majority",
+    "options": {},
+    "input": "a\r\nb\r\nc\nd",
+    "output": "a\r\nb\r\nc\r\nd"
+  },
+  {
+    "name": "mixed endings CR majority",
+    "options": {},
+    "input": "a\rb\rc\n\r\nd",
+    "output": "\ra\rb\rc\rd"
+  },
+  {
+    "name": "mixed endings LF majority",
+    "options": {},
+    "input": "a\nb\nc\r\nd",
+    "output": "a\nb\nc\nd"
+  },
+  {
+    "name": "code point surrogates",
+    "options": {
+      "compare": "code-point"
+    },
+    "input": "😀\n｡",
+    "output": "｡\n😀"
+  },
+  {
+    "name": "code point surrogates desc",
+    "options": {
+      "compare": "code-point",
+      "order": "descending"
+    },
+    "input": "｡\n😀",
+    "output": "😀\n｡"
+  },
+  {
+    "name": "natural sort",
+    "options": {
+      "compare": "natural"
+    },
+    "input": "a10\na02\na2\na1b\n10\n9",
+    "output": "9\n10\na1b\na2\na02\na10"
+  },
+  {
+    "name": "natural sort long digits",
+    "options": {
+      "compare": "natural"
+    },
+    "input": "10000000000000000000000000001\n10000000000000000000000000000",
+    "output": "10000000000000000000000000000\n10000000000000000000000000001"
+  },
+  {
+    "name": "natural sort non ascii digits",
+    "options": {
+      "compare": "natural"
+    },
+    "input": "x10\nx٣\nx2",
+    "output": "x2\nx10\nx٣"
+  },
+  {
+    "name": "numeric sort",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "abc\n-1.5e2\n 42\n+0.5\nno number\n.9",
+    "output": "-1.5e2\n+0.5\n.9\n 42\nabc\nno number"
+  },
+  {
+    "name": "numeric sort desc",
+    "options": {
+      "compare": "numeric",
+      "order": "descending"
+    },
+    "input": "abc\n-1.5e2\n 42\n+0.5\nno number\n.9",
+    "output": "no number\nabc\n 42\n.9\n+0.5\n-1.5e2"
+  },
+  {
+    "name": "numeric exact 1",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "123456789012345678901234567891\n123456789012345678901234567890",
+    "output": "123456789012345678901234567890\n123456789012345678901234567891"
+  },
+  {
+    "name": "numeric exact 2",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "0.10000000000000000001\n0.1",
+    "output": "0.1\n0.10000000000000000001"
+  },
+  {
+    "name": "numeric exact 3",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "1e-400\n0",
+    "output": "0\n1e-400"
+  },
+  {
+    "name": "numeric exact 4",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "2e308\n1e309",
+    "output": "2e308\n1e309"
+  },
+  {
+    "name": "numeric non ascii digits",
+    "options": {
+      "compare": "numeric"
+    },
+    "input": "٣\n2\n10",
+    "output": "2\n10\n٣"
+  },
+  {
+    "name": "dedupe default",
+    "options": {
+      "action": "dedupe"
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\nA\n a "
+  },
+  {
+    "name": "dedupe ignore case",
+    "options": {
+      "action": "dedupe",
+      "ignore-case": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\n a "
+  },
+  {
+    "name": "dedupe ignore whitespace",
+    "options": {
+      "action": "dedupe",
+      "ignore-whitespace": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a\nA"
+  },
+  {
+    "name": "dedupe both",
+    "options": {
+      "action": "dedupe",
+      "ignore-case": true,
+      "ignore-whitespace": true
+    },
+    "input": "a\nA\n a \na",
+    "output": "a"
+  },
+  {
+    "name": "remove blank",
+    "options": {
+      "action": "remove-blank"
+    },
+    "input": "a\n\n \n\t\nb",
+    "output": "a\nb"
+  },
+  {
+    "name": "remove blank trailing",
+    "options": {
+      "action": "remove-blank"
+    },
+    "input": "a\n\n \n\t\n",
+    "output": "a\n"
+  },
+  {
+    "name": "descending stability",
+    "options": {
+      "order": "descending",
+      "compare": "numeric"
+    },
+    "input": "1 b\n1 a\n1 c",
+    "output": "1 b\n1 a\n1 c"
+  },
+  {
+    "name": "descending stability exact",
+    "options": {
+      "order": "descending",
+      "compare": "numeric"
+    },
+    "input": "0 b\n-0 a\n+0.0 c\n0e5 d",
+    "output": "0 b\n-0 a\n+0.0 c\n0e5 d"
+  }
+]
