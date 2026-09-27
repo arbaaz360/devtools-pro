@@ -217,7 +217,7 @@ export class WorkbenchController {
               .catch(() => undefined);
       }, 400);
       this.hooks.changed(this.state);
-      this.hooks.notify("Engine connected · Ctrl+N to create a document");
+      this.hooks.notify("Ready");
     } catch (error) {
       this.hooks.notify(`Engine connection failed: ${errorText(error)}`);
     }

@@ -62,6 +62,10 @@ export interface ToolManifest {
   engine?: 'worker';
   group?: string;
   icon?: string;
+  /** One line saying what the tool does: the rail and tool-header subtitle. */
+  description?: string;
+  /** Set when the primary input port declares image content: the tool reads an image, never text. */
+  inputContent?: 'image';
   auto?: boolean;
   /** Generators run without input text. */
   emptyInput?: boolean;

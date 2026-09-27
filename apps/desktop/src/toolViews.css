@@ -1,6 +1,6 @@
 /* Tool-specific surfaces. Loaded after styles.css; shared tokens come from :root there. */
 
-/* Diff & Compare: two editors that fill the source pane; the result stacks below. */
+/* Text Diff: two editors that fill the source pane; the result stacks below. */
 .tool-source { display: flex; min-height: 0; flex: 1; flex-direction: column; padding: 0; overflow: hidden; }
 .compare-sources { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; min-height: 0; flex: 1; }
 .compare-source { display: flex; min-width: 0; min-height: 0; flex-direction: column; border: 0; background: var(--well); }
@@ -16,10 +16,6 @@
 .compare-source-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto; min-height: 19px; padding: 2px 8px; border-top: 1px solid var(--border); color: var(--faint); font-size: 9px; }
 .compare-source-foot > span { min-width: 0; white-space: nowrap; }
 .compare-source-issue { overflow: hidden; text-overflow: ellipsis; color: var(--red); }
-.compare-granularity { display: inline-flex; align-items: center; border: 1px solid var(--border-strong); border-radius: var(--radius); overflow: hidden; }
-.compare-granularity .flat-button { min-height: 23px; padding: 0 7px; border-radius: 0; font-size: 10px; }
-.compare-granularity .flat-button.active { background: var(--surface-3); color: var(--text); }
-.compare-granularity .flat-button:disabled { opacity: .4; }
 #preview-limit.compare-gate { color: var(--yellow); }
 #preview-limit.compare-ok { color: var(--green); }
 

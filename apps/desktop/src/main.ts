@@ -36,11 +36,15 @@ import {
   type WorkspaceState,
 } from "./workbench/state";
 import {
+  editor,
   validation,
   type ToolDefinition,
   optionSchemaFor,
+  readsDocument,
+  runsAutomatically,
 } from "./workbench/tools";
 import { WorkerEngine } from "./plugins/engine";
+import { GROUP_ORDER, optionPresentation } from "./plugins/describe";
 import { annotationMarkup } from "./ui/annotations";
 import { renderJsonTree, renderMatches } from "./ui/jsonTree";
 import { JsonPathError, WORK_LIMIT, evaluateJsonPath } from "./ui/jsonPath";
@@ -54,7 +58,6 @@ import {
   byteLength,
   compareInputProblem,
   describeCompare,
-  granularityControl,
   lineCount,
   mountCompareWorkspace,
   parseCompareResult,
@@ -78,6 +81,8 @@ const esc = (value: string) =>
         "'": "&#039;",
       })[char] ?? char,
   );
+/** A three-character glyph (SQL, JWT, </>) is set tighter so it fits the same box. */
+const iconClass = (base: string, icon: string) => ([...icon].length > 2 ? `${base} wide` : base);
 const bytes = (value: number | null | undefined) => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   const units = ["B", "KB", "MB", "GB"];
@@ -139,6 +144,8 @@ interface CompareMeta {
   status: string;
 }
 const compareMetas = new Map<string, CompareMeta>();
+/** The tool each tab's result pane was shown for; it stays while the tab keeps that tool. */
+const shownFor = new Map<string, string>();
 const emptySide = (): CompareSourceMeta => ({ label: null, baseline: null, issue: null });
 function compareMeta(id: string): CompareMeta {
   let meta = compareMetas.get(id);
@@ -154,11 +161,38 @@ try {
 } catch {
   /* local storage is optional in browser preview */
 }
+const untitled = (tab: TabState) => /^Untitled-\d+\.txt$/i.test(tab.name);
+/**
+ * An untitled tab is named after its tool, counted per tool: the first UUID tab is
+ * "UUID Generator", and a second one open beside it "UUID Generator 2".
+ */
 function displayTabName(tab: TabState): string {
-  if (!/^Untitled-\d+\.txt$/i.test(tab.name)) return tab.name;
-  const tool = controller.toolDefinition(tab.toolId);
-  const number = tab.name.match(/\d+/)?.[0] ?? "";
-  return `${tool?.label ?? "Document"}${number ? ` ${number}` : ""}`;
+  if (!untitled(tab)) return tab.name;
+  const label = controller.toolDefinition(tab.toolId)?.label ?? "Document";
+  const position = state.tabs
+    .filter((other) => untitled(other) && other.toolId === tab.toolId)
+    .findIndex((other) => other.id === tab.id);
+  return position > 0 ? `${label} ${position + 1}` : label;
+}
+/** The rail's order, which the palette follows: the fixed group order, then by name. */
+function orderedTools(tools: readonly ToolDefinition[]): ToolDefinition[] {
+  const rank = (group: string) => {
+    const index = GROUP_ORDER.indexOf(group);
+    return index < 0 ? GROUP_ORDER.length : index;
+  };
+  return [...tools].sort((a, b) =>
+    rank(a.group) - rank(b.group) || a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
+}
+/** Apply a tool to the active tab; with none open, to a new one (an image tool asks for its image). */
+function useTool(tool: ToolDefinition) {
+  if (!state.activeId) {
+    if (tool.input === "image") {
+      void controller.chooseFile(tool.id);
+      return;
+    }
+    controller.newDocument();
+  }
+  if (state.activeId) controller.selectTool(state.activeId, tool.id);
 }
 function persistLayout() {
   try {
@@ -170,8 +204,12 @@ function persistLayout() {
 }
 const palette = $("#palette") as HTMLDialogElement;
 const paletteSearch = $("#palette-search") as HTMLInputElement;
+/** The idle status line; with no document open it also says how to start one. */
+const READY = "Ready";
+const READY_EMPTY = "Ready · Ctrl+N for a new document";
 const notify = (message: string) => {
-  $("#status").textContent = message;
+  $("#status").textContent =
+    message === READY || message === READY_EMPTY ? (state?.tabs.length ? READY : READY_EMPTY) : message;
 };
 const jobIndicator = delayedIndicator((visible) => {
   const panel = $("#job-panel");
@@ -301,7 +339,7 @@ function renderTools() {
   if (toolsKey === renderedToolsKey) return;
   renderedToolsKey = toolsKey;
   nav.innerHTML = "";
-  const visible = controller.availableTools().filter(
+  const visible = orderedTools(controller.availableTools()).filter(
     (tool) =>
       !query || `${tool.label} ${tool.id}`.toLowerCase().includes(query),
   );
@@ -331,17 +369,9 @@ function renderTools() {
       button.className = `tool-item${active ? " active" : ""}`;
       button.setAttribute("aria-current", String(active));
       button.setAttribute("aria-label", tool.label);
-      button.innerHTML = `<span class="tool-item-icon" aria-hidden="true">${esc(tool.icon)}</span><span><strong>${esc(tool.label)}</strong><small>${esc(tool.operations.map((operation) => operation.label).join(" · ") || "New document")}</small></span>`;
-      button.onclick = () => {
-        if (!state.activeId) {
-          if (tool.input === "image") {
-            void controller.chooseFile();
-            return;
-          }
-          controller.newDocument();
-        }
-        if (state.activeId) controller.selectTool(state.activeId, tool.id);
-      };
+      if (tool.description) button.title = tool.description;
+      button.innerHTML = `<span class="${iconClass("tool-item-icon", tool.icon)}" aria-hidden="true">${esc(tool.icon)}</span><span><strong>${esc(tool.label)}</strong><small>${esc(tool.description)}</small></span>`;
+      button.onclick = () => useTool(tool);
       section.append(button);
     }
     nav.append(section);
@@ -399,7 +429,7 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
     const check = document.createElement("input");
     check.type = "checkbox";
     check.checked = tab.findCaseSensitive;
-    caseSensitive.append(check, document.createTextNode("Aa"));
+    caseSensitive.append(check, document.createTextNode("Match case"));
     const wholeWord = document.createElement("label");
     wholeWord.className = "check-option";
     const whole = document.createElement("input");
@@ -502,7 +532,8 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
         newline: select.value,
       });
     label.append(select);
-    host.append(label, granularityControl());
+    // Lines are the only granularity the engine compares; no Word/Character until it has them.
+    host.append(label);
     return;
   }
   // The controls belong to the operation on screen: a sibling operation may
@@ -510,18 +541,26 @@ function renderOptions(tab: TabState, tool: ToolDefinition | undefined) {
   const schema = optionSchemaFor(tool, tab.operation);
   if (schema.length) host.append(...optionControls(tab, schema));
 }
-/** Controls for a package tool's declared options: one dense control per option. */
+/**
+ * Controls for a package tool's declared options: one dense control per option. An
+ * option the current values make irrelevant (its `visible` rule fails) gets no control;
+ * one whose `enabled` rule fails is shown disabled. Every change re-renders the form,
+ * so the rules follow the values.
+ */
 function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLElement[] {
   const set = (id: string, value: unknown) =>
     controller.options(tab.id, tab.operation, { ...tab.options, [id]: value });
   const controls: HTMLElement[] = [];
   for (const option of schema) {
+    const { visible, enabled } = optionPresentation(option, schema, tab.options);
+    if (!visible) continue;
     if (option.type === "boolean") {
       const label = document.createElement("label");
       label.className = "check-option";
       const check = document.createElement("input");
       check.type = "checkbox";
       check.checked = tab.options[option.id] === true;
+      check.disabled = !enabled;
       check.setAttribute("aria-label", option.label);
       check.onchange = () => set(option.id, check.checked);
       label.append(check, document.createTextNode(option.label));
@@ -542,6 +581,7 @@ function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLEleme
         item.selected = choice.id === (tab.options[option.id] ?? option.default);
         select.append(item);
       }
+      select.disabled = !enabled;
       select.onchange = () => set(option.id, select.value);
       label.append(select);
     } else {
@@ -559,6 +599,7 @@ function optionControls(tab: TabState, schema: readonly OptionSpec[]): HTMLEleme
         if (option.maximum !== undefined) input.max = option.maximum;
         if (option.type === "integer") input.step = "1";
       }
+      input.disabled = !enabled;
       input.onchange = () => set(option.id, numeric ? Number(input.value) : input.value);
       label.append(input);
     }
@@ -768,25 +809,31 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
   const imageInput = tab.source?.contentKind === "image";
   const binaryInput = tab.source?.contentKind === "binary";
   const imageTool = tool?.input === "image";
+  // A generator whose operation reads no document (UUID Generate) has nothing to edit;
+  // the tab keeps its text for an operation that does read it (UUID Decode).
+  const generated = !!tool && !tool.compare && !imageInput && !binaryInput && !readsDocument(tool, tab.operation);
   const quickActions = $(".input-quick-actions") as HTMLElement;
   empty.hidden = true;
   $("#editor-host").hidden = !!tool?.compare;
   wrap.hidden = !imageInput;
   input.hidden =
-    imageInput || binaryInput || !!tool?.compare || tool?.input === "image";
-  message.hidden = !(binaryInput || (tool?.input === "image" && !imageInput));
-  quickActions.hidden = imageTool || binaryInput || !!tool?.compare;
+    imageInput || binaryInput || !!tool?.compare || imageTool || generated;
+  message.hidden = !(binaryInput || (imageTool && !imageInput) || generated);
+  quickActions.hidden = imageTool || binaryInput || !!tool?.compare || generated;
   openCompatible.hidden = true;
-  openCompatible.onclick = () => void controller.chooseFile();
+  // The image a tool asks for opens in that tool, not in whichever tool images default to.
+  openCompatible.onclick = () => void controller.chooseFile(imageTool ? tool?.id : undefined);
   if (binaryInput)
     messageText.textContent =
-      "Binary file · Choose a compatible tool such as Hash generator. Text editing is unavailable for this file.";
+      "Binary file · Choose a compatible tool such as Hash Generator. Text editing is unavailable for this file.";
   else if (imageTool && !imageInput) {
     const detected = tab.source?.contentKind === "text"
       ? `This tab contains ${tab.source.format.toUpperCase()} text.`
       : "This tab does not contain an image.";
-    messageText.textContent = `${detected} Open a PNG or JPEG image to use Image to Base64.`;
+    messageText.textContent = `${detected} Open a PNG or JPEG image to use ${tool?.label}.`;
     openCompatible.hidden = false;
+  } else if (generated) {
+    messageText.textContent = "Generated from the options above; there is no input.";
   } else if (imageInput && !tab.image) {
     messageText.textContent = tab.imageError ?? "Loading image preview…";
   }
@@ -868,11 +915,26 @@ function renderInput(tab: TabState, tool: ToolDefinition | undefined) {
             : "Editable blank document";
   $("#encoding").textContent = tab.source?.encoding ?? "UTF-8";
   $("#source-name").textContent = displayTabName(tab);
-  $("#source-size").textContent = tab.source ? bytes(tab.source.size) : "—";
+  // An unsaved or edited document's size is its text in UTF-8; an unedited file's is the file's.
+  $("#source-size").textContent =
+    tab.text !== null && (!tab.source || tab.dirty) ? bytes(byteLength(tab.text)) : tab.source ? bytes(tab.source.size) : "—";
   $("#source-format").textContent =
     tab.source?.contentKind === "text"
       ? tab.source.format.toUpperCase()
       : (tab.source?.contentKind.toUpperCase() ?? "TEXT");
+}
+/** Operation buttons show for two or more operations, or for one that runs only on request. */
+const operationButtons = (tool: ToolDefinition): boolean =>
+  tool.operations.length > 1 || (tool.operations.length === 1 && !runsAutomatically(tool, tool.operations[0]!.id, "input"));
+/**
+ * What makes the result appear: typing, or the named operations. For a tool that runs
+ * as you type (the active operation does) the answer is the former.
+ */
+function resultSubtitle(tab: TabState, tool: ToolDefinition | undefined): string {
+  if (!tool?.operations.length || tool.id === "text.find-replace") return "";
+  if (tool.compare || runsAutomatically(tool, tab.operation, "input")) return "Updates as you type";
+  const onRequest = tool.operations.filter((operation) => !runsAutomatically(tool, operation.id, "input"));
+  return `Press ${onRequest.map((operation) => operation.label).join(" or ")} to run`;
 }
 function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
   const host = $(".toolbar-actions");
@@ -905,6 +967,9 @@ function renderActions(tab: TabState, tool: ToolDefinition | undefined) {
     host.append(swap, compare);
     return;
   }
+  // A button chooses between operations or starts one that waits to be asked. A single
+  // operation that already runs as you type needs neither.
+  if (!operationButtons(tool)) return;
   for (const operation of tool.operations) {
     const button = document.createElement("button");
     button.type = "button";
@@ -1001,31 +1066,93 @@ function renderTree(tabId: string, value: unknown): void {
   }
 }
 
+/**
+ * Why the tool cannot run on this tab's input, when the result pane is where that is said:
+ * the reason replaces any result, current or stale. Image tools say it in the input pane,
+ * with a button to open an image; Text Diff has its own gate.
+ */
+function refusal(tab: TabState, tool: ToolDefinition | undefined): string | null {
+  if (!tool?.operations.length || tool.compare || tool.input === "image" || tool.id === "text.find-replace") return null;
+  return validation(tab, tool, controller.manifests.get(tool.id));
+}
+/**
+ * A summary as key/value pairs: a JSON object, or lines of `key: value`. Anything else
+ * (a sentence such as "valid JSON") is one entry with no key.
+ */
+function summaryEntries(summary: unknown): [string, unknown][] {
+  let value = summary;
+  if (typeof summary === "string") {
+    try {
+      value = JSON.parse(summary) as unknown;
+    } catch {
+      const lines = summary.split(/\r?\n/).filter((line) => line.trim());
+      const pairs = lines.map((line) => /^([^:]{1,60}):\s*(.*)$/.exec(line));
+      if (lines.length && pairs.every(Boolean)) return pairs.map((match) => [match![1]!.trim(), match![2]!]);
+      return summary.trim() ? [["", summary.trim()]] : [];
+    }
+  }
+  if (value && typeof value === "object" && !Array.isArray(value)) return Object.entries(value as Record<string, unknown>);
+  return value === null || value === undefined || value === "" ? [] : [["", value]];
+}
+/** Key/value rows; a nested object becomes an indented list of its own, so it stays readable. */
+function summaryList(entries: [string, unknown][]): HTMLElement {
+  const list = document.createElement("dl");
+  list.className = "summary-list";
+  for (const [key, value] of entries) {
+    const row = document.createElement("div");
+    row.className = "summary-row";
+    const term = document.createElement("dt");
+    term.textContent = key;
+    const detail = document.createElement("dd");
+    if (value && typeof value === "object" && !(Array.isArray(value) && value.every((item) => typeof item !== "object")))
+      detail.append(summaryList(Object.entries(value as Record<string, unknown>)));
+    else detail.textContent = Array.isArray(value) ? value.join(", ") : String(value);
+    if (key) row.append(term);
+    else row.classList.add("summary-note");
+    row.append(detail);
+    list.append(row);
+  }
+  return list;
+}
 function renderResult(tab: TabState) {
   const result = tab.result;
   const empty = $("#result-empty");
   const content = $("#result-content");
+  const tool = controller.toolDefinition(tab.toolId);
+  $("#result-subtitle").textContent = resultSubtitle(tab, tool);
+  const refused = refusal(tab, tool);
+  const hideActions = () => {
+    for (const id of ["#copy-result", "#copy-image", "#open-result", "#save-result"]) $(id).hidden = true;
+  };
+  if (refused) {
+    // The reason stands in for the result: a stale one would answer input that is gone.
+    renderedResult = null;
+    renderedStaleNote = "";
+    hideActions();
+    empty.hidden = true;
+    content.hidden = false;
+    const stateNode = $("#result-state");
+    stateNode.className = "result-state failed";
+    stateNode.textContent = `● ${refused}`;
+    $("#result-metrics").hidden = true;
+    $(".result-details").hidden = true;
+    $(".result-preview-block").hidden = true;
+    return;
+  }
+  $("#result-metrics").hidden = false;
+  $(".result-details").hidden = false;
+  $(".result-preview-block").hidden = false;
   if (!result) {
     renderedResult = null;
     renderedStaleNote = "";
-    $("#copy-result").hidden = true;
-    $("#copy-image").hidden = true;
-    $("#open-result").hidden = true;
-    $("#save-result").hidden = true;
+    hideActions();
     $("#result-highlight").hidden = true;
     $("#result-status-message").hidden = true;
     empty.hidden = false;
     content.hidden = true;
-    const tool = controller.toolDefinition(tab.toolId);
-    const problem = tool
-      ? validation(tab, tool, controller.manifests.get(tool.id))
-      : null;
     const title = $("#result-empty-title");
     const text = $("#result-empty-text");
-    if (problem) {
-      title.textContent = "Input needs attention";
-      text.textContent = problem;
-    } else if (tool?.compare) {
+    if (tool?.compare) {
       const gate = compareProblem(tab);
       if (gate) {
         title.textContent = "Both sources are needed";
@@ -1040,17 +1167,14 @@ function renderResult(tab: TabState) {
         title.textContent = "Ready to compare";
         text.textContent = "Compare runs after you edit either side, or press Compare.";
       }
-    } else if (tool?.input === "image") {
-      title.textContent = "Open an image to begin";
-      text.textContent =
-        "PNG and JPEG files are supported. The encoded result will appear here automatically.";
-    } else if (tool?.operations.length) {
-      title.textContent = "Ready when you are";
-      text.textContent = `Run ${tool.operations.map((operation) => operation.label).join(", ")} to see the result here.`;
+    } else if (tab.phase === "queued" || tab.phase === "running") {
+      title.textContent = "Running…";
+      text.textContent = "The result appears here when the run finishes.";
     } else {
-      title.textContent = "Tools at your fingertips";
-      text.textContent =
-        "Choose a tool on the left. Your document stays in this tab, and the result appears here.";
+      title.textContent = "No result yet";
+      text.textContent = tool?.operations.length
+        ? `${resultSubtitle(tab, tool)}.`
+        : "Choose a tool to see its result here.";
     }
     return;
   }
@@ -1075,24 +1199,21 @@ function renderResult(tab: TabState) {
       ? "○ Cancelled"
       : `● ${friendlyError(tab, event)}`;
   stateNode.textContent += staleNote(tab);
-  $("#result-summary").textContent = readableSummary(event.summary);
-  $("#result-metrics").innerHTML = [
-    ["Elapsed", `${event.elapsedMs} ms`],
-    ["Input", bytes(event.inputBytes)],
-    // For a byte tool the two readings differ (a BOM, CRLF), so say which one it was.
-    ...(result.inputFrom
-      ? [["Read", result.inputFrom === "file" ? "the file's bytes" : "the text, as UTF-8"]]
-      : []),
-    ["Output", bytes(event.outputBytes)],
-    ["Status", event.ok ? "Ready to review" : "No output"],
-  ]
-    .map(([key, value]) => `<div><dt>${key}</dt><dd>${esc(value)}</dd></div>`)
-    .join("");
+  // For a byte tool the two readings differ (a BOM, CRLF), so the details say which it was.
+  const read = result.inputFrom
+    ? `Read: ${result.inputFrom === "file" ? "the file's bytes" : "the text, as UTF-8"}\n`
+    : "";
+  $("#result-summary").textContent = read + readableSummary(event.summary);
+  $("#result-metrics").textContent = [
+    `In ${bytes(event.inputBytes)}`,
+    ...(typeof event.outputBytes === "number" ? [`Out ${bytes(event.outputBytes)}`] : []),
+    `${event.elapsedMs} ms`,
+  ].join(" · ");
   const media = $("#result-media");
   media.innerHTML = "";
   const structured = $("#result-structured");
   structured.replaceChildren();
-  structured.classList.remove("diff-result");
+  structured.classList.remove("diff-result", "summary-result");
   const output = $("#result-output") as HTMLTextAreaElement;
   const highlight = $("#result-highlight");
   const statusMessage = $("#result-status-message");
@@ -1114,7 +1235,7 @@ function renderResult(tab: TabState) {
         result: model,
         raw: result.text,
         current: meta.change,
-        stats: `${event.elapsedMs} ms · in ${bytes(event.inputBytes)} · out ${bytes(event.outputBytes)}`,
+        stats: `In ${bytes(event.inputBytes)} · Out ${bytes(event.outputBytes)} · ${event.elapsedMs} ms`,
         onNavigate: (index) => {
           meta.change = index;
         },
@@ -1122,7 +1243,16 @@ function renderResult(tab: TabState) {
       diff = true;
     }
   }
-  structured.hidden = !diff;
+  const noOutput =
+    event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
+  // An inspection (Text Inspector, CSV Inspector, JSON Validate) has no output document:
+  // its findings are the output, listed where an output would be.
+  const findings = noOutput ? summaryEntries(event.summary) : [];
+  if (findings.length) {
+    structured.classList.add("summary-result");
+    structured.append(summaryList(findings));
+  }
+  structured.hidden = !diff && !findings.length;
   media.hidden = !binary;
   $(".result-preview-block").classList.toggle("binary-output", binary);
   media.classList.toggle("preview-stage", framed);
@@ -1189,14 +1319,10 @@ function renderResult(tab: TabState) {
   if (showTree && parsed.ok) renderTree(tab.id, parsed.value);
   else $("#tree-body").replaceChildren();
 
-  const noOutput =
-    event.ok && !event.resultDocumentId && !result.text && !binary && !diff;
   $(".result-code").hidden = !readable || binary || diff || noOutput || showTree;
-  statusMessage.hidden = !noOutput;
-  statusMessage.textContent = noOutput
-    ? event.operationId === "inspect"
-      ? "✓ Input is valid. Review the operation details for the inspection summary."
-      : "✓ Operation completed without a generated output document."
+  statusMessage.hidden = !noOutput || findings.length > 0;
+  statusMessage.textContent = noOutput && !findings.length
+    ? "✓ Operation completed without a generated output document."
     : "";
   if (noOutput) output.hidden = true;
   if (output.value !== result.text) output.value = result.text;
@@ -1205,12 +1331,14 @@ function renderResult(tab: TabState) {
     result.previewError ??
     (result.truncated
       ? `Preview: ${bytes(new TextEncoder().encode(result.text).length)} of ${bytes(event.outputBytes)} · Copy button or Ctrl+A/Ctrl+C copies complete result`
-      : event.ok
-        ? "Complete result"
-        : "No result");
+      : noOutput
+        ? ""
+        : event.ok
+          ? "Complete result"
+          : "No result");
   $("#copy-result").hidden =
     tab.resultStale || !event.ok || !!result.image || !result.text;
-  $("#copy-result").textContent = event.renderer === "svg" ? "Copy SVG" : "Copy complete result";
+  $("#copy-result").textContent = event.renderer === "svg" ? "Copy SVG" : "Copy";
   // A picture copies as a picture: a binary image, or an SVG drawn to PNG.
   $("#copy-image").hidden =
     tab.resultStale || !event.ok || !(result.image || (event.renderer === "svg" && result.text && !result.truncated));
@@ -1249,18 +1377,24 @@ function renderWorkspaceLayout(tab: TabState | undefined, tool: ToolDefinition |
   const compare = !!tool?.compare;
   const meta = tab && compare ? compareMeta(tab.id) : null;
   if (meta && hasResult) meta.hadResult = true;
+  // A refusal is shown in the result pane, and the pane then stays for that tool, so
+  // fixing the input does not make it vanish until the next run lands.
+  const refused = !!tab && !!refusal(tab, tool);
+  if (tab && shownFor.get(tab.id) !== tab.toolId) shownFor.delete(tab.id);
+  if (tab && (hasResult || refused)) shownFor.set(tab.id, tab.toolId);
+  const kept = !!meta?.hadResult || (!!tab && shownFor.has(tab.id));
   // The result pane appears with the first result and then stays, so clearing
   // a side while comparing does not bounce the editors between two heights.
-  const showResult = !!tab && (hasResult || !!meta?.hadResult) && !collapsedResults.has(tab.id);
+  const showResult = !!tab && (hasResult || kept) && !collapsedResults.has(tab.id);
   workspace.classList.toggle("compare-layout", compare);
   workspace.style.setProperty("--split-position", `${Math.round((compare ? compareSplitRatio : splitRatio) * 100)}%`);
   workspace.classList.toggle("result-absent", !showResult);
-  workspace.classList.toggle("result-collapsed", !!tab && !showResult && (hasResult || !!meta?.hadResult));
+  workspace.classList.toggle("result-collapsed", !!tab && !showResult && (hasResult || kept));
   resultPane.hidden = !showResult;
   splitter.hidden = !showResult;
   splitter.setAttribute("aria-orientation", splitIsVertical() ? "horizontal" : "vertical");
   const toggle = $("#result-toggle") as HTMLButtonElement;
-  toggle.hidden = !(hasResult || !!meta?.hadResult);
+  toggle.hidden = !(hasResult || kept);
   toggle.textContent = showResult ? "Hide result" : "Show result";
   toggle.setAttribute("aria-expanded", String(showResult));
   const collapse = $("#result-collapse") as HTMLButtonElement;
@@ -1274,26 +1408,32 @@ function render() {
   renderTabs();
   renderTools();
   const tool = tab ? controller.toolDefinition(tab.toolId) : undefined;
-  $(".app-title").textContent = tool?.label ?? "DevTools Pro";
+  $(".app-title").textContent = tab ? displayTabName(tab) : "DevTools Pro";
   $("#document-panel").classList.toggle(
     "single-pane",
     tool?.id === "editor.text" || tool?.id === "text.find-replace",
   );
-  $("#active-tool-icon").textContent = tool?.icon ?? "Aa";
+  const icon = $("#active-tool-icon");
+  icon.textContent = tool?.icon ?? editor.icon;
+  icon.className = iconClass("tool-icon", icon.textContent);
   $("#active-tool-label").textContent = (
     tool?.group ?? "WORKSPACE"
   ).toUpperCase();
   $("#active-tool-title").textContent =
     tool?.label ?? "Create or open a document";
   $("#active-tool-subtitle").textContent = tool
-    ? "Choose an operation or edit the document in place."
+    ? tool.description
     : "Press Ctrl+N for a blank document or choose a file.";
+  // The idle line follows whether a document is open.
+  const status = $("#status").textContent;
+  if (status === READY || status === READY_EMPTY) notify(READY);
   // Operation failures already have a result diagnostic. Other errors use the
   // fixed source footer so toggling them never pushes the document down.
   // The compare gate is guidance, not a failure: the status line explains the
-  // empty side in place, so the red diagnostic stays for real errors.
+  // empty side in place, so the red diagnostic stays for real errors. A refusal
+  // is said in the result pane, so it is not said twice.
   const gated = !!tab && !!tool?.compare && !!compareProblem(tab);
-  const sourceError = !!tab?.error && (!tab.result || tab.resultStale) && !gated;
+  const sourceError = !!tab?.error && (!tab.result || tab.resultStale) && !gated && !refusal(tab, tool);
   $("#error").hidden = !sourceError;
   $("#error").textContent = tab?.error ?? "";
   $("#error").title = tab?.error ?? "";
@@ -1342,9 +1482,16 @@ function render() {
     $("#input-message").hidden = true;
     $("#result-empty").hidden = false;
     $("#result-content").hidden = true;
+    $("#preview-limit").textContent = "";
+    $("#source-name").textContent = "No document open";
+    $("#source-size").textContent = "—";
   }
   renderWorkspaceLayout(tab, tool);
 }
+/**
+ * The palette: document commands, one entry per open tab, and each tool once. A tool
+ * applies to the active tab, as the rail does; there is no tool × tab product.
+ */
 function commands() {
   const list = $("#command-list");
   list.innerHTML = "";
@@ -1357,17 +1504,14 @@ function commands() {
           { label: "Save as…", run: () => void controller.save(state.activeId!, { as: true }) },
         ]
       : []),
-    ...state.tabs.flatMap((tab) =>
-      controller.availableTools()
-        .filter((tool) => tool.id !== "editor.text")
-        .map((tool) => ({
-          label: `${tool.label} · ${displayTabName(tab)}`,
-          run: () => {
-            controller.activate(tab.id);
-            controller.selectTool(tab.id, tool.id);
-          },
-        })),
-    ),
+    ...state.tabs.map((tab) => ({
+      label: `Switch to ${displayTabName(tab)}`,
+      run: () => controller.activate(tab.id),
+    })),
+    ...orderedTools(controller.availableTools()).map((tool) => ({
+      label: tool.label,
+      run: () => useTool(tool),
+    })),
   ];
   actions
     .filter(
@@ -1405,6 +1549,8 @@ const hooks = {
     state = next;
     for (const id of compareMetas.keys())
       if (!next.tabs.some((tab) => tab.id === id)) compareMetas.delete(id);
+    for (const id of shownFor.keys())
+      if (!next.tabs.some((tab) => tab.id === id)) shownFor.delete(id);
     render();
     if (switched && activeTab(state)?.text !== null) {
       const input = $(
@@ -1755,7 +1901,7 @@ window.addEventListener("beforeunload", (event) => {
 void controller.initialize();
 render();
 $("#browser-notice").hidden = native;
-$("#engine-status").textContent = native ? "Local engine" : "Browser preview";
+$("#engine-status").textContent = native ? "Local" : "Browser preview";
 const dropTarget = $("#editor-host");
 const removeDragOver = () => dropTarget.classList.remove("drag-over");
 /** Everything a native drop carries, opened in order; the drop highlight clears either way. */

@@ -1,5 +1,6 @@
 import type { Annotation, ToolManifest, ToolOperation } from "../bridge";
 import type {
+  Condition,
   OperationSpec,
   OptionSpec,
   PluginManifest,
@@ -22,25 +23,62 @@ export interface EngineTool {
   manifest: ToolManifest;
 }
 
+/** The rail's groups, in the fixed order it shows them (RELEASE_UI_SPEC.md, "Rail groups"). */
+export const GROUP_ORDER: readonly string[] = ["WORKSPACE", "FORMAT", "CONVERT", "ENCODE", "TEXT", "WEB & SECURITY", "GENERATE"];
+/**
+ * A manifest's `category` (or, failing that, its tool id's family) to a rail group. The
+ * legacy categories still map, so no tool falls through to an upper-cased raw category.
+ */
 const GROUPS: Record<string, string> = {
-  converter: "TEXT & ENCODING",
-  text: "TEXT & ENCODING",
-  encoding: "TEXT & ENCODING",
-  structured: "STRUCTURED DATA",
-  compare: "COMPARE",
-  generator: "GENERATORS",
-  web: "WEB & API",
-  identity: "GENERATORS",
-  time: "TIME & NUMBERS",
-  number: "TIME & NUMBERS",
+  format: "FORMAT",
+  convert: "CONVERT",
+  encode: "ENCODE",
+  text: "TEXT",
+  web: "WEB & SECURITY",
+  security: "WEB & SECURITY",
+  generate: "GENERATE",
+  converter: "CONVERT",
+  encoding: "ENCODE",
+  structured: "FORMAT",
+  compare: "TEXT",
+  generator: "GENERATE",
+  identity: "GENERATE",
+  media: "GENERATE",
+  time: "CONVERT",
+  number: "CONVERT",
+  viewer: "FORMAT",
 };
+export const groupFor = (category: string | undefined, family?: string): string | undefined =>
+  (category ? GROUPS[category] : undefined) ?? (family ? GROUPS[family] : undefined);
+/** One distinct glyph per package tool, legible in a 20px box. Native tools set theirs in tools.ts. */
 const ICONS: Record<string, string> = {
+  "format.css": "CSS",
+  "format.html": "</>",
+  "format.js": "JS",
+  "format.sql": "SQL",
+  "format.xml": "<>",
+  "preview.documents": "md",
+  "convert.yaml": "Y",
+  "convert.jsx": "JSX",
+  "number.base": "10",
+  "time.unix": "t",
   "text.case": "Aa",
   "encoding.base64-text": "64",
+  "encoding.hex": "0x",
+  "text.html": "&",
   "text.backslash": "\\",
+  "text.lines": "≡",
+  "text.regex": ".*",
   "web.url-parser": "?",
+  "security.jwt": "JWT",
   "identity.uuid": "id",
+  "media.qr": "▦",
+  "media.qr-reader": "⌖",
+  "generate.examples": "…",
 };
+/** A tool the table does not know yet still gets a legible mark: its name's initials. */
+export const initials = (title: string): string =>
+  title.split(/[^A-Za-z0-9]+/).filter(Boolean).slice(0, 2).map((word) => word[0]!.toUpperCase()).join("") || "?";
 
 /** Package tools whose category marks them as samples, not products. */
 export const isSampleTool = (tool: ToolSpec): boolean => tool.category === "examples";
@@ -85,6 +123,63 @@ export function prepareOptions(
   for (const option of operation.options)
     if (supplied[option.id] !== undefined) options[option.id] = supplied[option.id];
   return options;
+}
+
+/** Whether a predicate's value and an option's value are the same, as a form would read them. */
+const sameValue = (current: unknown, expected: unknown): boolean =>
+  current === expected ||
+  (current !== undefined && current !== null && expected !== undefined && expected !== null &&
+    typeof current !== "object" && typeof expected !== "object" && String(current) === String(expected));
+
+/** A contract condition over the tab's option values. No expression language: four operators and three combinators. */
+export function conditionHolds(condition: Condition, values: Readonly<Record<string, unknown>>): boolean {
+  switch (condition.kind) {
+    case "all":
+      return condition.conditions.every((item) => conditionHolds(item, values));
+    case "any":
+      return condition.conditions.some((item) => conditionHolds(item, values));
+    case "not":
+      return !conditionHolds(condition.condition, values);
+    case "predicate": {
+      const current = values[condition.optionId];
+      switch (condition.operator) {
+        case "equals":
+          return sameValue(current, condition.value);
+        case "notEquals":
+          return !sameValue(current, condition.value);
+        case "in":
+          return Array.isArray(condition.value) && condition.value.some((item) => sameValue(current, item));
+        case "isSet":
+          return current !== undefined && current !== null && current !== "";
+        default:
+          return true;
+      }
+    }
+    default:
+      return true;
+  }
+}
+
+/**
+ * How an option's control is shown, from its declared `rules` and the values the tab
+ * would run with (its own over the defaults): hidden when a `visible` rule fails,
+ * disabled when an `enabled` rule fails. `required` is the processor's to enforce.
+ */
+export function optionPresentation(
+  option: OptionSpec,
+  schema: readonly OptionSpec[],
+  supplied: Readonly<Record<string, unknown>>,
+): { visible: boolean; enabled: boolean } {
+  const rules = option.rules ?? [];
+  if (!rules.length) return { visible: true, enabled: true };
+  const values: Record<string, unknown> = {};
+  for (const item of schema) {
+    const value = supplied[item.id] ?? optionDefault(item);
+    if (value !== undefined) values[item.id] = value;
+  }
+  const holds = (effect: "visible" | "enabled") =>
+    rules.filter((rule) => rule.effect === effect).every((rule) => conditionHolds(rule.when, values));
+  return { visible: holds("visible"), enabled: holds("enabled") };
 }
 
 /**
@@ -185,6 +280,7 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
       readsDocument: operation.inputs.length > 0,
     }));
     const family = tool.id.split(".")[0] ?? "";
+    const image = inputContentKind(primaryInput(first)) === "image";
     tools.push({
       id: tool.id,
       pluginId: manifest.id,
@@ -194,8 +290,11 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
       manifest: {
         id: tool.id,
         label: tool.title,
+        description: tool.description ?? manifest.description,
         contractVersion: 2,
-        inputKinds: inputContentKind(primaryInput(first)) === "image" ? ["bytes"] : ["text"],
+        inputKinds: image ? ["bytes"] : ["text"],
+        // An image tool is decided by what its input port declares, never by its name.
+        ...(image ? { inputContent: "image" as const } : {}),
         limits,
         capabilities: {
           deterministic: true,
@@ -210,8 +309,8 @@ export function describePackage(manifest: PluginManifest, packageDir: string): E
         operations: toolOperations,
         renderer: output?.mime?.includes("application/json") ? "json" : "text",
         engine: "worker",
-        group: GROUPS[tool.category] ?? GROUPS[family] ?? tool.category.toUpperCase(),
-        icon: tool.icon ?? ICONS[tool.id] ?? "◇",
+        group: groupFor(tool.category, family) ?? tool.category.toUpperCase(),
+        icon: ICONS[tool.id] ?? tool.icon ?? initials(tool.title),
         auto: operations.some(autoOnOption),
         emptyInput: workspace?.kind === "generator",
       },

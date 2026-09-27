@@ -14,8 +14,7 @@
     <div class="app-shell">
       <header class="topbar">
         <div class="brand" aria-hidden="true">
-          <span class="brand-mark">⌘</span
-          ><span>DevTools <strong>Pro</strong></span>
+          <span>DevTools <strong>Pro</strong></span>
         </div>
         <div class="app-title" aria-live="polite">DevTools Pro</div>
         <div class="topbar-actions">
@@ -27,7 +26,7 @@
             class="command-button"
             title="Commands (Ctrl+K)"
           >
-            <span aria-hidden="true">⌘</span><kbd>Ctrl K</kbd>
+            <span>Commands</span><kbd>Ctrl K</kbd>
           </button>
         </div>
       </header>
@@ -64,10 +63,6 @@
               autocomplete="off"
           /></label>
           <nav class="tool-nav" aria-label="Available tools"></nav>
-          <div class="sidebar-foot">
-            <span class="engine-dot"></span
-            ><span>Files stay on your computer</span>
-          </div>
         </aside>
         <main class="main-content">
           <div class="tabbar">
@@ -88,7 +83,7 @@
           <section class="tool-header" aria-label="Active tool">
             <div class="tool-identity">
               <span id="active-tool-icon" class="tool-icon" aria-hidden="true"
-                >Aa</span
+                >✎</span
               >
               <div>
                 <span id="active-tool-label" class="eyebrow">WORKSPACE</span>
@@ -142,11 +137,8 @@
               <div id="editor-host" class="editor-host">
                 <div id="empty-state" class="empty-state">
                   <div class="empty-glyph">＋</div>
-                  <h3>A place for your next idea</h3>
-                  <p>
-                    Write something, paste a snippet, or open a file.<br />Choose
-                    a tool on the left to see its result.
-                  </p>
+                  <h3>No document open</h3>
+                  <p>Create a document or open a file, then choose a tool.</p>
                   <div class="empty-actions">
                     <button id="empty-new" class="primary-button">
                       New document</button
@@ -212,8 +204,7 @@
               </div>
               <div class="pane-footer">
                 <span id="error" class="editor-diagnostic" role="alert" hidden></span>
-                <span id="preview-limit"
-                  >Editable documents · Local processing</span
+                <span id="preview-limit"></span
                 ><span id="encoding">UTF-8</span>
               </div>
             </section>
@@ -222,20 +213,19 @@
               <div class="pane-header">
                 <div>
                   <h2 id="results-heading">Result</h2>
-                  <span id="result-subtitle">Results update as you work</span>
+                  <span id="result-subtitle"></span>
                 </div>
                 <button id="result-collapse" class="icon-button" type="button" aria-label="Collapse result pane" title="Collapse result pane">›</button>
                 <div class="pane-controls output-controls">
-                  <span class="small-badge">OUTPUT</span>
                   <div class="result-actions">
                     <button id="copy-image" class="flat-button" hidden>
                       Copy image</button
                     ><button id="copy-result" class="flat-button" hidden>
-                      Copy result</button
+                      Copy</button
                     ><button id="open-result" class="flat-button" hidden>
                       Open as tab</button
                     ><button id="save-result" class="flat-button" hidden>
-                      Save result…
+                      Save…
                     </button>
                   </div>
                 </div>
@@ -243,15 +233,12 @@
               <div class="results-content">
                 <div id="result-empty" class="result-empty">
                   <span class="result-glyph">↗</span>
-                  <h3 id="result-empty-title">Tools at your fingertips</h3>
-                  <p id="result-empty-text">
-                    Choose a tool on the left. Your document stays in this tab,
-                    and the result appears here.
-                  </p>
+                  <h3 id="result-empty-title">No result yet</h3>
+                  <p id="result-empty-text">Choose a tool to see its result here.</p>
                 </div>
                 <div id="result-content" hidden>
                   <p id="result-state" class="result-state"></p>
-                  <dl id="result-metrics" class="metrics"></dl>
+                  <p id="result-metrics" class="metrics"></p>
                   <details class="result-details">
                     <summary>Operation details</summary>
                     <pre
@@ -308,10 +295,6 @@
                   </div>
                 </div>
               </div>
-              <div class="pane-footer">
-                <span>Separate result · Source stays intact</span
-                ><span>Processed locally</span>
-              </div>
             </aside>
           </section>
           <section class="document-info" aria-label="Document information">
@@ -321,15 +304,12 @@
             </div>
             <div><span>Size</span><strong id="source-size">—</strong></div>
             <div><span>Kind</span><strong id="source-format">—</strong></div>
-            <span class="info-note"
-              >Each tab keeps its own tool and result</span
-            >
           </section>
           <footer class="statusbar">
             <span
               ><span id="engine-dot" class="engine-dot"></span
               ><span id="engine-status">Connecting…</span></span
-            ><span id="status" role="status" aria-live="polite">Ready</span>
+            ><span id="status" role="status" aria-live="polite">Connecting…</span>
             <div class="job-slot">
               <div id="job-panel" class="job-panel" aria-label="Operation progress" hidden>
                 <span id="job-phase">Starting…</span>

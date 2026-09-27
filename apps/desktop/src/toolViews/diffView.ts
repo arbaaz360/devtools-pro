@@ -252,28 +252,6 @@ export function mountCompareWorkspace(host: HTMLElement, handlers: CompareWorksp
   };
 }
 
-/** Line/word/character selector. Only line granularity exists in the native engine today. */
-export function granularityControl(): HTMLElement {
-  const group = document.createElement('div');
-  group.className = 'compare-granularity';
-  group.setAttribute('role', 'group');
-  group.setAttribute('aria-label', 'Diff granularity');
-  for (const [id, label] of [['line', 'Line'], ['word', 'Word'], ['character', 'Character']] as const) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = `flat-button${id === 'line' ? ' active' : ''}`;
-    button.textContent = label;
-    button.dataset.granularity = id;
-    button.setAttribute('aria-pressed', String(id === 'line'));
-    if (id !== 'line') {
-      button.disabled = true;
-      button.title = `${label} granularity is not available in this engine yet. Lines are compared.`;
-    }
-    group.append(button);
-  }
-  return group;
-}
-
 /* ----------------------------------------------------------------- result */
 
 export interface CompareResultView {
@@ -486,7 +464,7 @@ export const diffView: ToolView = {
       option.textContent = value === 'cr_lf' ? 'Normalize CRLF' : value[0].toUpperCase() + value.slice(1);
       newline.append(option);
     }
-    runtime.optionsHost.append(newline, granularityControl());
+    runtime.optionsHost.append(newline);
     const compare = document.createElement('button');
     compare.type = 'button';
     compare.className = 'primary-button';
