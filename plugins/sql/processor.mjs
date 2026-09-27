@@ -570,6 +570,12 @@ function processTokens(tokens, options, isMinify, context) {
           needsSpace = true;
         }
         if (lastChar === ',') needsSpace = true;
+        // Whitespace the input had between two tokens stays. The pairs above are the ones
+        // the style spaces on its own; a pair they do not name (`World!` then `second`, a
+        // `#` or `@` operator) printed touching, gluing words the input kept apart. Only
+        // the punctuation handled around this block, and `(` after a function or type
+        // name below, close a gap on purpose.
+        if (i > 0 && tokens[i - 1].type === 'whitespace') needsSpace = true;
 
         if (prevCt && t.value === '(') {
            if (prevCt.token.type === 'identifier') needsSpace = false;
