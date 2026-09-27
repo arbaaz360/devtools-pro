@@ -209,7 +209,9 @@ test('image tool has image-only actions; theme stays neutral and controls remain
   await expect(page.locator('.input-quick-actions')).toBeHidden();
   await expect(page.locator('.format-control select')).toHaveCount(0);
   await chooseTool(page, 'JSON');
-  await page.locator('#input-sample').click();
+  // No Sample action, by the owner's decision (2026-09-27): input is typed, pasted or opened.
+  await expect(page.locator('.input-quick-actions').getByRole('button', { name: 'Sample', exact: true })).toHaveCount(0);
+  await page.locator('#preview').fill('{"store":{"book":[{"category":"reference"}]}}');
   await ready(page);
   const colors = await page.locator('body, .sidebar, .editor-host, .statusbar').evaluateAll((nodes) => nodes.map((node) => getComputedStyle(node).backgroundColor));
   for (const color of colors) {

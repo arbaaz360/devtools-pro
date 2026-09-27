@@ -129,7 +129,7 @@ node -e "const c=require('crypto'),b=o=>Buffer.from(JSON.stringify(o)).toString(
 
 | ID | Steps | Expected |
 |---|---|---|
-| SMK-01 (suite) **[P1]** | Launch the app | A window titled *The DevTools Pro · Native preview* opens within 10 s, dark theme, tool rail on the left, tab bar and workspace on the right. Nothing renders as an unstyled document |
+| SMK-01 (suite) **[P1]** | Launch the app | A window titled *The DevTools Pro* opens within 10 s, dark theme, tool rail on the left, tab bar and workspace on the right. Nothing renders as an unstyled document |
 | SMK-02 (suite) **[P1]** | Look at the status bar | The engine dot is lit and reads *Local engine* (not *Browser preview*); the status text reads *Ready* |
 | SMK-03 (suite) **[P1]** | Count the tools in the rail | Every group renders with a heading; record the total. CI's native smoke currently reports **32**. A number materially lower means package discovery failed |
 | SMK-04 **[P1]** | Press Ctrl+N, type `hello` | A tab appears, the editor accepts text, the status bar shows *Ln 1, Col 6* |
@@ -200,7 +200,7 @@ If any P1 here fails, stop and report — the rest of the plan is not meaningful
 | EDT-06 **[P1]** | With a large pasted input, run a tool | The tool processes the **whole** input, not the preview. Verify with a length-reporting tool (Text inspector) |
 | EDT-07 | Copy text elsewhere, press the **Clipboard** quick action | The clipboard text is inserted at the caret / replaces the selection |
 | EDT-08 | Press **Clipboard** with an empty clipboard, and with an image on the clipboard | A readable message; no crash |
-| EDT-09 | Press **Sample** on JSON, URL, HTML, Find & Replace, Base64-to-image | Each inserts a sensible sample for that tool and the result updates |
+| EDT-09 | Look at the input actions on any text tool | **Clipboard** and **Clear** only. There is no Sample button: it was removed on 2026-09-27, because canned text suits few tools and broke others (the QR Code Reader got text) |
 | EDT-10 | Press **Clear** | The editor empties; the result pane clears or shows the empty state — it must not keep showing the previous result as current |
 | EDT-11 | Type into a very long single line (no newlines) | The editor stays responsive; horizontal behaviour (wrap or scroll) is consistent |
 | EDT-12 | Scroll to the middle of a long document, switch tabs, switch back | The scroll position and caret are preserved |
