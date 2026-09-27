@@ -42,14 +42,18 @@ test('chrome: a wordmark and a Commands button, one privacy statement, and a rea
   await expect(page.locator('#status')).toHaveText('Ready · Ctrl+N for a new document');
 });
 
-test('the rail: fixed group order, names sorted in each group, a glyph and a description for every tool', async ({ page, host }) => {
+test('the rail: fixed group order, names sorted in each group, an icon and a description for every tool', async ({ page, host }) => {
   void host;
   const groups = await page.locator('.tool-group').evaluateAll((sections) => sections.map((section) => ({
     label: section.querySelector('.group-label').textContent,
     tools: [...section.querySelectorAll('.tool-item')].map((item) => ({
       name: item.querySelector('strong').textContent,
-      icon: item.querySelector('.tool-item-icon').textContent,
-      description: item.querySelector('small').textContent,
+      // The icon is drawn per tool id (ui/icons.ts); an id without a mark gets the generic one.
+      icon: item.querySelector('.tool-item-icon').dataset.icon,
+      mark: item.querySelector('.tool-item-icon svg')?.innerHTML ?? '',
+      // One line per tool: the description is the row's tooltip, not a second line.
+      description: item.getAttribute('title') ?? '',
+      subtitle: !!item.querySelector('small'),
     })),
   })));
   // The mock host's renderer probes sit in their own group, after the fixed ones.
@@ -59,11 +63,13 @@ test('the rail: fixed group order, names sorted in each group, a glyph and a des
     expect(names, group.label).toEqual([...names].sort((a, b) => a.localeCompare(b)));
   }
   const tools = groups.flatMap((group) => group.tools).filter((tool) => !tool.name.endsWith('(mock)'));
-  const icons = tools.map((tool) => tool.icon);
-  expect(new Set(icons).size, icons.join(' ')).toBe(icons.length);
+  const marks = tools.map((tool) => tool.mark);
+  expect(new Set(marks).size, 'one distinct icon per tool').toBe(marks.length);
   for (const tool of tools) {
-    expect(tool.icon, tool.name).not.toBe('◇');
+    expect(tool.icon, tool.name).not.toBe('generic');
+    expect(tool.mark, tool.name).not.toBe('');
     expect(tool.description.trim(), tool.name).not.toBe('');
+    expect(tool.subtitle, `${tool.name} has no second line in the rail`).toBe(false);
   }
   expect(groups[0].tools.map((tool) => tool.name)).toEqual(['Text Editor']);
   const where = (name) => groups.find((group) => group.tools.some((tool) => tool.name === name))?.label;
@@ -85,7 +91,7 @@ test('the tool header and the rail say what the tool does', async ({ page, host 
   await expect(page.locator('#active-tool-subtitle')).toHaveText('Encode text as Base64, or decode Base64 to text');
   await chooseTool(page, 'JSON Formatter');
   await expect(page.locator('#active-tool-subtitle')).toHaveText('Format, minify or validate JSON');
-  await expect(page.locator('.tool-item.active small')).toHaveText('Format, minify or validate JSON');
+  await expect(page.locator('.tool-item.active')).toHaveAttribute('title', 'Format, minify or validate JSON');
 });
 
 test('tab names count per tool, and the top bar names the active document', async ({ page, host }) => {

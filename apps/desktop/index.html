@@ -34,7 +34,6 @@
         <aside class="sidebar" aria-label="Tool navigation">
           <div class="sidebar-head">
             <div>
-              <span class="eyebrow">WORKBENCH</span>
               <h1>Tools</h1>
             </div>
             <button
@@ -47,10 +46,10 @@
             </button>
           </div>
           <div class="sidebar-actions">
-            <button id="new-document" class="primary-button">
-              <span>＋ New document</span><kbd>Ctrl N</kbd></button
-            ><button id="open-file" class="outline-button">
-              <span>Open file…</span><kbd>Ctrl O</kbd>
+            <button id="new-document" class="primary-button" aria-label="New document" title="New document (Ctrl+N)">
+              <span>New</span><kbd>Ctrl N</kbd></button
+            ><button id="open-file" class="outline-button" aria-label="Open file…" title="Open file (Ctrl+O)">
+              <span>Open…</span><kbd>Ctrl O</kbd>
             </button>
           </div>
           <label class="tool-search"
@@ -327,7 +326,6 @@
     <dialog id="palette" aria-labelledby="palette-heading">
       <div class="palette-header">
         <div>
-          <span class="eyebrow">QUICK ACTIONS</span>
           <h2 id="palette-heading">Command palette</h2>
         </div>
         <button

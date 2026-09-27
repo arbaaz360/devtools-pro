@@ -20,7 +20,17 @@ The Playwright suite builds and serves the actual Vite bundle. It runs every sce
 - native drag/drop event routing without replacing a dirty tab;
 - image-only actions, top-aligned media, neutral dark surfaces and control bounds.
 
-`release.spec.mjs` holds the release UI conventions of [RELEASE_UI_SPEC.md](RELEASE_UI_SPEC.md): the wordmark and *Commands* button with no ⌘, the single *Local only* statement and the *Ready* status; the rail's fixed group order, sorted names, one glyph and one description per tool; per-tool tab names and the top bar's document name; a palette that lists each tool once; QR Code Reader as an image tool; operation buttons only where they choose or start something; option rules (Hex decode hides what it ignores); inspection findings as a key/value list; a cURL refusal in place of a stale result; the one-line metrics and plain action names; generators without an editor; *Match case*; and the size of an unsaved document.
+The look those scenarios render is [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md): flat graphite
+surfaces on a four-step ladder with hairline edges (no gradients, bevels, glows or chrome
+shadows; one shadow, under a dialog), one steel accent, type from an 11/12/13/14 px scale,
+controls 26 px and toolbar buttons 24 px on a 4 px grid. The neutral-surface check reads
+`body`, `.sidebar` and `.statusbar` at `--chrome` `#202124` and `.editor-host` at `--well`
+`#151618`: every channel below 48, channels within 8 of each other. The control-bounds
+check measures each rendered control in the Document header rather than its wrappers:
+`.input-controls` and `.format-control` are `display: contents`, so their controls share
+the header's rows and edges, and a wrapper has no box of its own to measure.
+
+`release.spec.mjs` holds the release UI conventions of [RELEASE_UI_SPEC.md](RELEASE_UI_SPEC.md): the wordmark and *Commands* button with no ⌘, the single *Local only* statement and the *Ready* status; the rail's fixed group order, sorted names, one drawn icon per tool (none generic, no two alike) and one description, which is the row's tooltip rather than a second line; per-tool tab names and the top bar's document name; a palette that lists each tool once; QR Code Reader as an image tool; operation buttons only where they choose or start something; option rules (Hex decode hides what it ignores); inspection findings as a key/value list; a cURL refusal in place of a stale result; the one-line metrics and plain action names; generators without an editor; *Match case*; and the size of an unsaved document.
 
 The harness mocks only the Tauri invoke/event/dialog/clipboard boundary. Its app code, reducer, controller, DOM, CSS and result renderers are real. `apps/desktop/tests/native-mock.mjs` deliberately records the boundary distinction so a passing browser test cannot be mistaken for host or codec validation.
 

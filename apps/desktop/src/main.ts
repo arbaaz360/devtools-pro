@@ -46,6 +46,7 @@ import {
 import { WorkerEngine } from "./plugins/engine";
 import { GROUP_ORDER, optionPresentation } from "./plugins/describe";
 import { annotationMarkup } from "./ui/annotations";
+import { hasToolIcon, toolIcon } from "./ui/icons";
 import { renderJsonTree, renderMatches } from "./ui/jsonTree";
 import { JsonPathError, WORK_LIMIT, evaluateJsonPath } from "./ui/jsonPath";
 import { parseJsonLossless } from "./ui/losslessJson";
@@ -81,8 +82,6 @@ const esc = (value: string) =>
         "'": "&#039;",
       })[char] ?? char,
   );
-/** A three-character glyph (SQL, JWT, </>) is set tighter so it fits the same box. */
-const iconClass = (base: string, icon: string) => ([...icon].length > 2 ? `${base} wide` : base);
 const bytes = (value: number | null | undefined) => {
   if (typeof value !== "number" || !Number.isFinite(value)) return "—";
   const units = ["B", "KB", "MB", "GB"];
@@ -369,8 +368,10 @@ function renderTools() {
       button.className = `tool-item${active ? " active" : ""}`;
       button.setAttribute("aria-current", String(active));
       button.setAttribute("aria-label", tool.label);
+      // One line per tool: its drawn icon and its name. The description is the row's
+      // tooltip here and the subtitle in the tool header.
       if (tool.description) button.title = tool.description;
-      button.innerHTML = `<span class="${iconClass("tool-item-icon", tool.icon)}" aria-hidden="true">${esc(tool.icon)}</span><span><strong>${esc(tool.label)}</strong><small>${esc(tool.description)}</small></span>`;
+      button.innerHTML = `<span class="tool-item-icon" data-icon="${hasToolIcon(tool.id) ? esc(tool.id) : "generic"}" aria-hidden="true">${toolIcon(tool.id)}</span><span><strong>${esc(tool.label)}</strong></span>`;
       button.onclick = () => useTool(tool);
       section.append(button);
     }
@@ -1414,8 +1415,11 @@ function render() {
     tool?.id === "editor.text" || tool?.id === "text.find-replace",
   );
   const icon = $("#active-tool-icon");
-  icon.textContent = tool?.icon ?? editor.icon;
-  icon.className = iconClass("tool-icon", icon.textContent);
+  const iconId = tool?.id ?? editor.id;
+  if (icon.dataset.icon !== iconId) {
+    icon.innerHTML = toolIcon(iconId);
+    icon.dataset.icon = iconId;
+  }
   $("#active-tool-label").textContent = (
     tool?.group ?? "WORKSPACE"
   ).toUpperCase();
