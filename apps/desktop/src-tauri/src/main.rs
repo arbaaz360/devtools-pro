@@ -504,14 +504,13 @@ fn execute_job_inputs(inputs: &[JobInput], manifest: &ToolManifest, executor: Re
                 return Err(ToolError::InvalidOptions { message: "This compatibility processor accepts only the source input.".into() });
             }
             let source = &inputs[0].document;
-            let output = if manifest.id == "encoding.hash" {
+            if manifest.id == "encoding.hash" {
                 execute_hash_file(&source.path, operation, token, progress)?
             } else {
                 let kind = if manifest.input_kinds.contains(&InputKind::Bytes) { DocumentKind::Binary } else { DocumentKind::Text };
                 let document = read_bounded_document(&source.path, kind, manifest.limits.max_input_bytes, token, progress)?;
-                execute(&manifest.id, operation, &document, options, token, progress)?
-            };
-            NativeResult { output, summary: None }
+                NativeResult { output: execute(&manifest.id, operation, &document, options, token, progress)?, summary: None }
+            }
         }
     };
     for input in inputs { check_job_input(input)?; }
@@ -612,8 +611,7 @@ fn execute_registered_tool(
         "encoding.hash" => {
             let algorithm = match operation_id { "sha256" => HashAlgorithm::Sha256, "sha512" => HashAlgorithm::Sha512, _ => return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }) };
             let (hash, _) = hash_document(input, algorithm, token, progress)?;
-            let text = serde_json::to_string_pretty(&hash).map_err(|error| ToolError::Execution { message: error.to_string() })?;
-            Ok(devtools_core::ToolResult { output: Document::from_text(text).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
+            Ok(hash.to_tool_result())
         }
         "encoding.image-base64" => {
             if operation_id != "encode" { return Err(ToolError::UnsupportedOperation { tool_id: tool_id.into(), operation_id: operation_id.into() }); }
@@ -654,15 +652,16 @@ fn read_bounded_document(path: &Path, kind: DocumentKind, limit: Option<u64>, to
     Ok(Document::from_bytes(bytes).with_kind(kind))
 }
 
-fn execute_hash_file(path: &Path, operation_id: &str, token: &CancellationToken, progress: &impl Fn(Progress)) -> Result<devtools_core::ToolResult, ToolError> {
+/// The digest is the whole result document and "SHA-256 · 3 bytes" the summary; the
+/// path hashed (often the host's temp snapshot of pasted text) appears in neither.
+fn execute_hash_file(path: &Path, operation_id: &str, token: &CancellationToken, progress: &impl Fn(Progress)) -> Result<NativeResult, ToolError> {
     let algorithm = match operation_id {
         "sha256" => HashAlgorithm::Sha256,
         "sha512" => HashAlgorithm::Sha512,
         _ => return Err(ToolError::UnsupportedOperation { tool_id: "encoding.hash".into(), operation_id: operation_id.into() }),
     };
     let (hash, _) = devtools_core::hash_file(path, algorithm, token, progress)?;
-    let text = serde_json::to_string_pretty(&hash).map_err(|error| ToolError::Execution { message: error.to_string() })?;
-    Ok(devtools_core::ToolResult { output: Document::from_text(text).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
+    Ok(NativeResult { output: hash.to_tool_result(), summary: Some(hash.summary()) })
 }
 
 /// Compare two open text documents through the same bounded scheduler used by
@@ -1355,6 +1354,28 @@ mod tests {
         token.cancel();
         let error = execute_registered_tool("encoding.hash", "sha256", &input, &serde_json::json!({}), &token, &|_| {}).unwrap_err();
         assert!(matches!(error, ToolError::Cancelled));
+    }
+
+    #[test]
+    fn hash_job_publishes_the_digest_alone_and_a_short_summary() {
+        // The host hashes its own temp snapshot of pasted text; that path must not reach the result.
+        let path = create_owned_snapshot(b"abc", "txt", 11).unwrap();
+        let meta = fs::metadata(&path).unwrap();
+        let document = RegisteredDocument { path: path.clone(), size: meta.len(), modified: meta.modified().ok(), temporary: true, display_name: None, origin_path: None };
+        let manifest = devtools_core::builtin_manifests().into_iter().find(|manifest| manifest.id == "encoding.hash").unwrap();
+        let inputs = vec![JobInput { port_id: "source".into(), document_id: "doc".into(), document }];
+        let result = execute_job_inputs(&inputs, &manifest, RegisteredExecutor::Legacy(execute_registered_tool), "sha256", &serde_json::json!({}), &CancellationToken::default(), &|_| {}).unwrap();
+        let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        assert_eq!(result.output.output.as_text().unwrap(), digest);
+        assert_eq!(result.output.output.mime.as_deref(), Some("text/plain"));
+        assert_eq!(result.output.output.kind, DocumentKind::Text);
+        assert_eq!(result.summary.as_deref(), Some("SHA-256 · 3 bytes"));
+        fs::remove_file(path).unwrap();
+
+        let input = Document::from_bytes(b"abc".to_vec()).with_kind(DocumentKind::Binary);
+        let in_memory = execute_registered_tool("encoding.hash", "sha256", &input, &serde_json::json!({}), &CancellationToken::default(), &|_| {}).unwrap();
+        assert_eq!(in_memory.output.as_text().unwrap(), digest);
+        assert_eq!(in_memory.output.mime.as_deref(), Some("text/plain"));
     }
 
     #[test]
