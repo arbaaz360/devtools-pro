@@ -33,6 +33,19 @@ fn valid_and_invalid_json_fixtures_have_expected_results() {
 }
 
 #[test]
+fn inspect_summaries_are_key_value_lines_and_json_errors_state_the_position_once() {
+    let bom = inspect_file(&fixture("bom.json"), FileFormat::Json, &CancellationToken::default(), |_| {}).expect("bom.json inspects");
+    assert_eq!(bom.summary, format!("valid: true\nbytes: {}\ndepth: 1", fs::metadata(fixture("bom.json")).unwrap().len()));
+    let malformed = inspect_file(&fixture("malformed.json"), FileFormat::Json, &CancellationToken::default(), |_| {}).unwrap_err();
+    assert_eq!(malformed.to_string(), "invalid JSON at line 1, column 6: expected value");
+    let csv = scratch("summary.csv");
+    fs::write(&csv, "id,note\r\n1,ok\r\n2,\"two\r\nlines\"\r\n").unwrap();
+    let report = inspect_file(&csv, FileFormat::Csv, &CancellationToken::default(), |_| {}).expect("csv inspects");
+    assert_eq!(report.summary, format!("rows: 2\ncolumns: 2\ndelimiter: \",\"\nheader: assumed\nbytes: {}", fs::metadata(&csv).unwrap().len()));
+    fs::remove_file(csv).unwrap();
+}
+
+#[test]
 fn large_files_are_streamed_and_previews_are_bounded() {
     for name in ["fixture-50mb.json", "fixture-250mb.json"] {
         let path = fixture(name);

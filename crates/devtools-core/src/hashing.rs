@@ -21,13 +21,21 @@ pub struct HashResult {
     pub algorithm: String,
     pub digest: String,
     pub byte_count: u64,
-    pub source: Option<String>,
+}
+
+impl HashResult {
+    /// The result document is the lowercase hex digest and nothing else, so it can be
+    /// copied or saved as-is. Where the bytes came from (often a host temp snapshot of
+    /// pasted text) is deliberately not part of the result.
+    pub fn to_tool_result(&self) -> ToolResult { ToolResult { output: Document::from_text(&self.digest).with_kind(DocumentKind::Text).with_mime("text/plain"), diagnostics: Vec::new() } }
+    /// One line for the job summary, e.g. "SHA-256 · 3 bytes".
+    pub fn summary(&self) -> String { format!("{} · {} {}", self.algorithm, self.byte_count, if self.byte_count == 1 { "byte" } else { "bytes" }) }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HashStats { pub bytes_read: u64 }
 
-fn hash_bytes<R: Read>(mut reader: R, algorithm: HashAlgorithm, source: Option<String>, cancel: &CancellationToken, progress: impl Fn(Progress), total: Option<u64>) -> Result<(HashResult, HashStats), ToolError> {
+fn hash_bytes<R: Read>(mut reader: R, algorithm: HashAlgorithm, cancel: &CancellationToken, progress: impl Fn(Progress), total: Option<u64>) -> Result<(HashResult, HashStats), ToolError> {
     let mut sha256 = Sha256::new();
     let mut sha512 = Sha512::new();
     let mut buffer = [0u8; CHUNK_SIZE];
@@ -45,21 +53,21 @@ fn hash_bytes<R: Read>(mut reader: R, algorithm: HashAlgorithm, source: Option<S
         HashAlgorithm::Sha256 => format!("{:x}", sha256.finalize()),
         HashAlgorithm::Sha512 => format!("{:x}", sha512.finalize()),
     };
-    Ok((HashResult { algorithm: algorithm.as_str().into(), digest, byte_count: read, source }, HashStats { bytes_read: read }))
+    Ok((HashResult { algorithm: algorithm.as_str().into(), digest, byte_count: read }, HashStats { bytes_read: read }))
 }
 
 pub fn hash_reader<R: Read>(reader: R, algorithm: HashAlgorithm, total_bytes: Option<u64>, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<(HashResult, HashStats), ToolError> {
-    hash_bytes(reader, algorithm, None, cancel, progress, total_bytes)
+    hash_bytes(reader, algorithm, cancel, progress, total_bytes)
 }
 
 pub fn hash_file(path: &Path, algorithm: HashAlgorithm, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<(HashResult, HashStats), ToolError> {
     let file = std::fs::File::open(path)?;
     let total = file.metadata()?.len();
-    hash_bytes(file, algorithm, Some(path.to_string_lossy().into_owned()), cancel, progress, Some(total))
+    hash_bytes(file, algorithm, cancel, progress, Some(total))
 }
 
 pub fn hash_document(input: &Document, algorithm: HashAlgorithm, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<(HashResult, HashStats), ToolError> {
-    hash_bytes(input.bytes(), algorithm, None, cancel, progress, Some(input.len() as u64))
+    hash_bytes(input.bytes(), algorithm, cancel, progress, Some(input.len() as u64))
 }
 
 pub struct HashTool { manifest: ToolManifest }
@@ -80,8 +88,7 @@ impl GenericTool for HashTool {
     fn execute(&self, operation_id: &str, input: &Document, _options: &Value) -> Result<ToolResult, ToolError> {
         let algorithm = match operation_id { "sha256" => HashAlgorithm::Sha256, "sha512" => HashAlgorithm::Sha512, _ => return Err(ToolError::UnsupportedOperation { tool_id: self.manifest.id.clone(), operation_id: operation_id.into() }) };
         let (result, _) = hash_document(input, algorithm, &CancellationToken::default(), |_| {})?;
-        let text = serde_json::to_string_pretty(&result).map_err(|e| ToolError::Execution { message: e.to_string() })?;
-        Ok(ToolResult { output: Document::from_text(text).with_kind(DocumentKind::Text).with_mime("application/json"), diagnostics: Vec::new() })
+        Ok(result.to_tool_result())
     }
 }
 
@@ -108,6 +115,35 @@ mod tests {
         assert_eq!(stats.bytes_read, data.len() as u64);
         assert!(seen.borrow().last() == Some(&(data.len() as u64)));
         assert!(seen.borrow().len() >= 2);
+    }
+
+    #[test]
+    fn tool_output_is_the_digest_alone_as_plain_text() {
+        let result = HashTool::default().execute("sha256", &Document::from_bytes(b"abc".to_vec()).with_kind(DocumentKind::Binary), &serde_json::json!({})).unwrap();
+        assert_eq!(result.output.as_text().unwrap(), "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
+        assert_eq!(result.output.mime.as_deref(), Some("text/plain"));
+        assert_eq!(result.output.kind, DocumentKind::Text);
+    }
+
+    #[test]
+    fn summary_names_the_algorithm_and_the_byte_count() {
+        let token = CancellationToken::default();
+        let (three, _) = hash_reader(Cursor::new(b"abc"), HashAlgorithm::Sha256, Some(3), &token, |_| {}).unwrap();
+        assert_eq!(three.summary(), "SHA-256 · 3 bytes");
+        let (one, _) = hash_reader(Cursor::new(b"a"), HashAlgorithm::Sha512, Some(1), &token, |_| {}).unwrap();
+        assert_eq!(one.summary(), "SHA-512 · 1 byte");
+    }
+
+    #[test]
+    fn file_hash_keeps_no_trace_of_the_path() {
+        let path = std::env::temp_dir().join(format!("devtools-hash-path-{}.txt", std::process::id()));
+        std::fs::write(&path, b"abc").unwrap();
+        let (result, _) = hash_file(&path, HashAlgorithm::Sha256, &CancellationToken::default(), |_| {}).unwrap();
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        let output = result.to_tool_result().output;
+        for text in [output.as_text().unwrap().to_string(), result.summary(), serde_json::to_string(&result).unwrap()] { assert!(!text.contains(&name), "{text} leaks {name}"); }
+        assert_eq!(output.as_text().unwrap(), result.digest);
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

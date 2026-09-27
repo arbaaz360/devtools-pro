@@ -17,7 +17,7 @@ impl CancellationToken { pub fn cancel(&self) { self.0.store(true, Ordering::Rel
 fn metadata_len(path: &Path) -> Result<u64, crate::ToolError> { Ok(fs::metadata(path)?.len()) }
 fn check_cancel(token: &CancellationToken) -> Result<(), crate::ToolError> { if token.is_cancelled() { Err(crate::ToolError::Cancelled) } else { Ok(()) } }
 
-struct VerifiedReader<R, F> { inner: R, token: CancellationToken, progress: F, total: u64, processed: u64, bom: usize, raw_seen: usize, carry: Vec<u8>, in_string: bool, escaped: bool, depth: usize, scan_structure: bool, failed: Option<crate::ToolError>, last_progress: Instant }
+struct VerifiedReader<R, F> { inner: R, token: CancellationToken, progress: F, total: u64, processed: u64, bom: usize, raw_seen: usize, carry: Vec<u8>, in_string: bool, escaped: bool, depth: usize, max_depth: usize, scan_structure: bool, failed: Option<crate::ToolError>, last_progress: Instant }
 impl<R: Read, F: Fn(Progress)> VerifiedReader<R, F> {
     fn verify_utf8(&mut self, bytes: &[u8]) -> Result<(), crate::ToolError> {
         if bytes.is_empty() { return Ok(()); }
@@ -31,7 +31,7 @@ impl<R: Read, F: Fn(Progress)> VerifiedReader<R, F> {
     fn scan_json(&mut self, bytes: &[u8]) -> Result<(), crate::ToolError> {
         for &b in bytes {
             if self.in_string { if self.escaped { self.escaped = false; } else if b == b'\\' { self.escaped = true; } else if b == b'"' { self.in_string = false; } continue; }
-            match b { b'"' => self.in_string = true, b'{' | b'[' => { self.depth += 1; if self.depth > MAX_DEPTH { return Err(crate::ToolError::ResourceLimit { message: format!("JSON nesting exceeds {MAX_DEPTH}") }); } }, b'}' | b']' => { self.depth = self.depth.saturating_sub(1); }, _ => {} }
+            match b { b'"' => self.in_string = true, b'{' | b'[' => { self.depth += 1; self.max_depth = self.max_depth.max(self.depth); if self.depth > MAX_DEPTH { return Err(crate::ToolError::ResourceLimit { message: format!("JSON nesting exceeds {MAX_DEPTH}") }); } }, b'}' | b']' => { self.depth = self.depth.saturating_sub(1); }, _ => {} }
         }
         Ok(())
     }
@@ -61,7 +61,7 @@ impl<R: Read, F: Fn(Progress)> Read for VerifiedReader<R, F> {
 }
 
 fn new_reader<R: Read, F: Fn(Progress)>(file: R, total: u64, token: &CancellationToken, progress: F, bom: usize, scan_structure: bool) -> VerifiedReader<R, F> {
-    VerifiedReader { inner: file, token: token.clone(), progress, total, processed: 0, bom, raw_seen: 0, carry: Vec::new(), in_string: false, escaped: false, depth: 0, scan_structure, failed: None, last_progress: Instant::now() - Duration::from_secs(1) }
+    VerifiedReader { inner: file, token: token.clone(), progress, total, processed: 0, bom, raw_seen: 0, carry: Vec::new(), in_string: false, escaped: false, depth: 0, max_depth: 0, scan_structure, failed: None, last_progress: Instant::now() - Duration::from_secs(1) }
 }
 
 /// Transform an already bounded JSON payload with the same streaming parser
@@ -106,8 +106,18 @@ pub fn transform_json_bytes(input: &[u8], layout: JsonLayout, cancel: &Cancellat
 
 fn parse_json<R: Read>(reader: &mut R) -> Result<(), crate::ToolError> {
     let mut de = serde_json::Deserializer::from_reader(reader);
-    IgnoredAny::deserialize(&mut de).map_err(|e| crate::ToolError::InvalidJson { message: e.to_string(), line: e.line(), column: e.column() })?;
-    de.end().map_err(|e| crate::ToolError::InvalidJson { message: e.to_string(), line: e.line(), column: e.column() })
+    IgnoredAny::deserialize(&mut de).map_err(json_error)?;
+    de.end().map_err(json_error)
+}
+
+/// serde_json's message already ends in " at line L column C". The position is kept in
+/// its own fields, so the text drops that suffix and the error reads the position once:
+/// "invalid JSON at line 1, column 1: expected value".
+fn json_error(e: serde_json::Error) -> crate::ToolError {
+    let (line, column) = (e.line(), e.column());
+    let message = e.to_string();
+    let message = message.strip_suffix(&format!(" at line {line} column {column}")).map(str::to_owned).unwrap_or(message);
+    crate::ToolError::InvalidJson { message, line, column }
 }
 
 pub fn inspect_file(path: &Path, format: FileFormat, cancel: &CancellationToken, progress: impl Fn(Progress)) -> Result<Inspection, crate::ToolError> {
@@ -120,12 +130,12 @@ pub fn inspect_file(path: &Path, format: FileFormat, cancel: &CancellationToken,
         let summary = serde_json::to_string(&summary).map_err(|e| crate::ToolError::Execution { message: e.to_string() })?;
         return Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary });
     }
-    let result = match format {
-        FileFormat::Json => { let mut br = BufReader::with_capacity(CHUNK, &mut vr); let r = parse_json(&mut br); drop(br); if let Some(e) = vr.failed.take() { return Err(e); } r },
-        FileFormat::Csv => scan_csv(&mut vr), FileFormat::Text => unreachable!()
+    // JSON and CSV summaries are `key: value` lines, one per line, which the shell lists as they are.
+    let summary = match format {
+        FileFormat::Json => { let mut br = BufReader::with_capacity(CHUNK, &mut vr); let r = parse_json(&mut br); drop(br); if let Some(e) = vr.failed.take() { return Err(e); } check_cancel(cancel)?; r?; format!("valid: true\nbytes: {total}\ndepth: {}", vr.max_depth) },
+        FileFormat::Csv => { let r = scan_csv(&mut vr); check_cancel(cancel)?; r?.summary(total) }, FileFormat::Text => unreachable!()
     };
-    check_cancel(cancel)?; result?;
-    Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary: match format { FileFormat::Json => "valid JSON".into(), FileFormat::Csv => "valid CSV".into(), FileFormat::Text => unreachable!() } })
+    Ok(Inspection { input_bytes: total, output_bytes: None, elapsed_ms: started.elapsed().as_millis() as u64, valid: true, summary })
 }
 
 fn detect_bom<R: Read + Seek>(file: &mut R) -> Result<usize, crate::ToolError> { let mut b = [0u8; 3]; let n = file.read(&mut b)?; file.seek(SeekFrom::Start(0))?; Ok(if n >= 3 && b == [0xEF,0xBB,0xBF] { 3 } else { 0 }) }
@@ -227,14 +237,34 @@ fn scan_text<R: Read>(reader: &mut R, total: u64, utf8_bom: bool) -> Result<Text
     stats.finish()
 }
 
-fn scan_csv<R: Read>(reader: &mut R) -> Result<(), crate::ToolError> {
-    let mut b = [0u8; CHUNK]; let mut quoted = false; let mut after_quote = false; let mut field_start = true; let mut fields = 1u64; let mut expected = None; let mut record = 1u64; let mut row_has_data = false;
-    loop { let n = reader.read(&mut b).map_err(crate::ToolError::from)?; if n == 0 { break; } for &c in &b[..n] { if quoted { if c == b'"' { quoted = false; after_quote = true; } continue; } if after_quote { if c == b'"' { quoted = true; after_quote = false; continue; } if c != b',' && c != b'\r' && c != b'\n' { return Err(crate::ToolError::InvalidCsv { message: "unexpected character after closing quote".into(), record }); } after_quote = false; }
-        match c { b'"' if field_start => { quoted = true; row_has_data = true; field_start = false; }, b',' => { fields += 1; row_has_data = true; field_start = true; }, b'\n' => { if quoted { continue; } if let Some(e) = expected { if e != fields { return Err(crate::ToolError::InvalidCsv { message: format!("ragged record: expected {e} fields, got {fields}"), record }); } } else { expected = Some(fields); } record += 1; fields = 1; row_has_data = false; field_start = true; }, b'\r' => {}, _ => { row_has_data = true; field_start = false; } }
+/// What CSV inspection found. The first record is always taken as the header, so `rows`
+/// counts the records after it, and `header: none` means the file has no record at all.
+struct CsvStats { records: u64, columns: u64, delimiter: u8 }
+impl CsvStats {
+    fn summary(&self, bytes: u64) -> String {
+        let delimiter = match self.delimiter { b'\t' => r#""\t""#, b';' => r#"";""#, _ => r#"",""# };
+        format!("rows: {}\ncolumns: {}\ndelimiter: {delimiter}\nheader: {}\nbytes: {bytes}", self.records.saturating_sub(1), self.columns, if self.records > 0 { "assumed" } else { "none" })
+    }
+}
+
+/// The delimiter is read from the first line of the first chunk. Any comma outside quotes
+/// keeps comma, so a file whose first line has one parses exactly as before; a first line
+/// with no comma takes the more frequent of tab and semicolon (tab on a tie), if either appears.
+fn detect_delimiter(first: &[u8]) -> u8 {
+    let (mut quoted, mut comma, mut tab, mut semicolon) = (false, 0u64, 0u64, 0u64);
+    for &c in first { match c { b'"' => quoted = !quoted, _ if quoted => {}, b'\n' => break, b',' => comma += 1, b'\t' => tab += 1, b';' => semicolon += 1, _ => {} } }
+    if comma > 0 || tab + semicolon == 0 { b',' } else if tab >= semicolon { b'\t' } else { b';' }
+}
+
+fn scan_csv<R: Read>(reader: &mut R) -> Result<CsvStats, crate::ToolError> {
+    let mut b = [0u8; CHUNK]; let mut delimiter = None; let mut quoted = false; let mut after_quote = false; let mut field_start = true; let mut fields = 1u64; let mut expected = None; let mut record = 1u64; let mut row_has_data = false;
+    loop { let n = reader.read(&mut b).map_err(crate::ToolError::from)?; if n == 0 { break; } let d = *delimiter.get_or_insert_with(|| detect_delimiter(&b[..n])); for &c in &b[..n] { if quoted { if c == b'"' { quoted = false; after_quote = true; } continue; } if after_quote { if c == b'"' { quoted = true; after_quote = false; continue; } if c != d && c != b'\r' && c != b'\n' { return Err(crate::ToolError::InvalidCsv { message: "unexpected character after closing quote".into(), record }); } after_quote = false; }
+        match c { b'"' if field_start => { quoted = true; row_has_data = true; field_start = false; }, _ if c == d => { fields += 1; row_has_data = true; field_start = true; }, b'\n' => { if quoted { continue; } if let Some(e) = expected { if e != fields { return Err(crate::ToolError::InvalidCsv { message: format!("ragged record: expected {e} fields, got {fields}"), record }); } } else { expected = Some(fields); } record += 1; fields = 1; row_has_data = false; field_start = true; }, b'\r' => {}, _ => { row_has_data = true; field_start = false; } }
     }}
     if quoted { return Err(crate::ToolError::InvalidCsv { message: "unterminated quoted field".into(), record }); }
-    if fields > 1 || row_has_data { if let Some(e) = expected { if e != fields { return Err(crate::ToolError::InvalidCsv { message: format!("ragged record: expected {e} fields, got {fields}"), record }); } } }
-    Ok(())
+    let last = fields > 1 || row_has_data;
+    if last { if let Some(e) = expected { if e != fields { return Err(crate::ToolError::InvalidCsv { message: format!("ragged record: expected {e} fields, got {fields}"), record }); } } }
+    Ok(CsvStats { records: record - 1 + u64::from(last), columns: expected.unwrap_or(if last { fields } else { 0 }), delimiter: delimiter.unwrap_or(b',') })
 }
 
 struct JsonFormatter<W> { out: W, layout: JsonLayout, in_string: bool, escaped: bool, stack: Vec<bool>, after_open: bool }
@@ -291,6 +321,39 @@ pub fn preview_file(path: &Path, offset: u64, max_bytes: usize) -> Result<FilePr
     #[test] fn pretty_closes_scalar_only_containers_on_their_own_line() { let (out, _) = transform_json_bytes(br#"{"a":[1,2],"b":[true,null,-0.5e3],"c":[],"d":{}}"#, JsonLayout::Pretty, &CancellationToken::default(), |_|{}).unwrap(); assert_eq!(std::str::from_utf8(&out).unwrap(), "{\n  \"a\": [\n    1,\n    2\n  ],\n  \"b\": [\n    true,\n    null,\n    -0.5e3\n  ],\n  \"c\": [],\n  \"d\": {}\n}"); }
     #[test] fn json_stream_preserves_lexemes() { let i=file("j",r#"{"a":1.2300,"a":2}"#); let o=i.with_extension("out"); let t=CancellationToken::default(); transform_json_file(&i,&o,JsonLayout::Minify,&t, |_|{}).unwrap(); assert_eq!(std::fs::read_to_string(&o).unwrap(),r#"{"a":1.2300,"a":2}"#); let _=std::fs::remove_file(i); let _=std::fs::remove_file(o); }
     #[test] fn invalid_and_csv_ragged() { let i=file("bad", "{bad"); assert!(inspect_file(&i,FileFormat::Json,&CancellationToken::default(), |_|{}).is_err()); let c=file("csv","a,b\n1\n"); assert!(inspect_file(&c,FileFormat::Csv,&CancellationToken::default(), |_|{}).is_err()); }
+    fn inspect(name:&str,s:&str,format:FileFormat)->Result<Inspection,crate::ToolError> { let i=file(name,s); let r=inspect_file(&i,format,&CancellationToken::default(), |_|{}); let _=std::fs::remove_file(i); r }
+    fn csv(rows:u64,columns:u64,delimiter:&str,header:&str,bytes:usize)->String { format!("rows: {rows}\ncolumns: {columns}\ndelimiter: {delimiter}\nheader: {header}\nbytes: {bytes}") }
+    #[test] fn csv_summary_lists_rows_columns_delimiter_header_and_bytes() {
+        for (name, text, expected) in [
+            ("csv-sum", "id,name\n1,a\n2,b\n", csv(2, 2, r#"",""#, "assumed", 16)),
+            // A last record without a newline counts; a newline inside quotes does not end a record.
+            ("csv-last", "a,b\r\n\"x\r\ny\",2\r\n3,4", csv(2, 2, r#"",""#, "assumed", 18)),
+            ("csv-header-only", "a,b,c", csv(0, 3, r#"",""#, "assumed", 5)),
+            ("csv-empty", "", csv(0, 0, r#"",""#, "none", 0)),
+        ] { assert_eq!(inspect(name, text, FileFormat::Csv).unwrap().summary, expected, "{name}"); }
+    }
+    #[test] fn csv_delimiter_is_detected_from_the_first_line() {
+        for (name, text, expected) in [
+            ("csv-semicolon", "a;b;c\n1;2,5;3\n", csv(1, 3, r#"";""#, "assumed", 14)),
+            ("csv-tab", "a\tb\n1\t2\n", csv(1, 2, r#""\t""#, "assumed", 8)),
+            // Any comma in the first line keeps comma, so such a file parses exactly as before.
+            ("csv-comma-first", "a,b;c\n1,2;3\n", csv(1, 2, r#"",""#, "assumed", 12)),
+            ("csv-quoted-comma", "\"x,y\";z\n1;2\n", csv(1, 2, r#"";""#, "assumed", 12)),
+        ] { assert_eq!(inspect(name, text, FileFormat::Csv).unwrap().summary, expected, "{name}"); }
+        assert!(matches!(inspect("csv-semicolon-ragged", "a;b\n1\n", FileFormat::Csv), Err(crate::ToolError::InvalidCsv { record: 2, .. })));
+    }
+    #[test] fn json_summary_reports_validity_size_and_depth() {
+        for (name, text, depth) in [("json-depth", r#"{"a":[1,{"b":"[[{"}],"c":{}}"#, 3), ("json-scalar", "1", 0), ("json-empty-array", " [] ", 1)] {
+            assert_eq!(inspect(name, text, FileFormat::Json).unwrap().summary, format!("valid: true\nbytes: {}\ndepth: {depth}", text.len()), "{name}");
+        }
+    }
+    #[test] fn json_error_states_the_position_once() {
+        assert_eq!(inspect("json-bad", "x", FileFormat::Json).unwrap_err().to_string(), "invalid JSON at line 1, column 1: expected value");
+        assert_eq!(inspect("json-trailing", "{\"ok\":true}\n false", FileFormat::Json).unwrap_err().to_string(), "invalid JSON at line 2, column 2: trailing characters");
+        let error = transform_json_bytes(br#"{"a": }"#, JsonLayout::Pretty, &CancellationToken::default(), |_|{}).unwrap_err();
+        assert_eq!(error.to_string(), "invalid JSON at line 1, column 7: expected value");
+        assert!(matches!(error, crate::ToolError::InvalidJson { line: 1, column: 7, .. }));
+    }
     #[test] fn text_inspection_reports_explicit_unicode_and_newline_stats() {
         let i=file("text-stats", "one\r\ntwo\nthree\rfour\t\u{FFFD}");
         let result=inspect_file(&i,FileFormat::Text,&CancellationToken::default(), |_|{}).unwrap();
