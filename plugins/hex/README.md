@@ -5,9 +5,11 @@ This package encodes text (its exact bytes) into hexadecimal and decodes hexadec
 ## Options
 
 - `mode`: `encode` or `decode` (default `encode`)
-- `case`: `lower` or `upper` (default `lower`). Encode only.
+- `case`: `lower` ("Lowercase") or `upper` ("Uppercase") (default `lower`). Encode only.
 - `separator`: `none`, `space`, or `colon` (default `none`). Encode only.
 - `bytes-per-line`: integer 0-256 (default `0`). Encode only. `0` means output is entirely on one line.
+
+The three encode-only options are shown only while `mode` is `encode`.
 
 ## Encoding
 

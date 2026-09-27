@@ -78,6 +78,11 @@ structured errors (`xml.invalid-option`).
 | `collapse-empty` | `collapseEmpty` | boolean | `true` | Controls `<a/>` vs `<a></a>` for elements with no significant content. |
 | `trim-text` | `trimText` | boolean | `false` | Trim text in elements (changes values). |
 
+The Minify operation declares `preserve-comments`, `collapse-empty` and
+`trim-text`; `indent` belongs to Format (the button for `beautify`). The
+processor still accepts `indent` on Minify and ignores it there; `test.mjs` runs
+every minify fixture with each `indent` value and requires the pinned output.
+
 ## Tolerant diagnostics
 
 Each diagnostic is `{ code, severity: "warning", message, offset, end, line,
