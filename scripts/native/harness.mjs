@@ -184,7 +184,8 @@ export async function startApp({ release = false } = {}) {
   page.on("dialog", async (dialog) => { dialogs.push(dialog.message()); await dialog.dismiss(); });
 
   await page.waitForSelector("#tabs", { timeout: 20_000 });
-  await page.locator("#status").filter({ hasText: "Engine connected" }).waitFor({ timeout: 20_000 });
+  // "Ready", or "Ready · Ctrl+N for a new document" with nothing open: the engine answered.
+  await page.locator("#status").filter({ hasText: /^Ready/ }).waitFor({ timeout: 20_000 });
   const hooks = await page.evaluate(() => Boolean(globalThis.devtoolsTest));
   if (!release && !hooks) throw new Error("the window did not expose its test hooks; is this a debug build?");
 

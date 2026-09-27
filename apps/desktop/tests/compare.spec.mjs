@@ -5,7 +5,7 @@ import { test, expect } from './native-mock.mjs';
 
 async function openCompare(page) {
   await page.keyboard.press('Control+n');
-  await page.locator('.tool-item').filter({ has: page.locator('strong', { hasText: /^Diff & Compare$/ }) }).click();
+  await page.locator('.tool-item').filter({ has: page.locator('strong', { hasText: /^Text Diff$/ }) }).click();
   await expect(page.locator('#compare-left')).toBeVisible();
   await expect(page.locator('#compare-right')).toBeVisible();
 }
@@ -113,7 +113,7 @@ test('each side opens its own file, keeps its label and dirty state, and Swap ex
   await expect(label(page, 'left')).toHaveText('notes.txt');
   await expect(dirty(page, 'left')).toBeHidden();
   await expect(page.getByRole('tab'), 'opening into a side never creates a tab').toHaveCount(1);
-  await expect(page.locator('#active-tool-title')).toHaveText('Diff & Compare');
+  await expect(page.locator('#active-tool-title')).toHaveText('Text Diff');
 
   host.openPaths.push('fixture.json');
   await page.locator('#compare-open-right').click();
@@ -178,7 +178,7 @@ test('clipboard fills either side independently and reports an empty clipboard o
   await expect(label(page, 'right')).toHaveText('Unsaved text');
 });
 
-test('change navigation walks every change and word/character granularity is clearly unavailable', async ({ page, host }, info) => {
+test('change navigation walks every change; no word/character granularity is offered', async ({ page, host }, info) => {
   await openCompare(page);
   // Changes at b and k sit more than three context lines apart, so two hunks.
   const lines = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'];
@@ -200,10 +200,9 @@ test('change navigation walks every change and word/character granularity is cle
   await expect(page.getByRole('button', { name: 'Next change' })).toBeDisabled();
   await page.getByRole('button', { name: 'Previous change' }).click();
   await expect(counter).toHaveText('1 / 2');
-  await expect(page.locator('.compare-granularity button', { hasText: 'Line' })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.compare-granularity button', { hasText: 'Word' })).toBeDisabled();
-  await expect(page.locator('.compare-granularity button', { hasText: 'Character' })).toBeDisabled();
-  await expect(page.locator('.compare-granularity button', { hasText: 'Character' })).toHaveAttribute('title', /not available/);
+  // Lines are the only granularity the engine has, so no Word/Character buttons (B15).
+  await expect(page.locator('.format-control button')).toHaveCount(0);
+  await expect(page.getByLabel('Compare newline handling')).toBeVisible();
   await page.screenshot({ path: info.outputPath('compare-navigation.png') });
 });
 
@@ -227,7 +226,7 @@ test('switching tabs restores the same pair, labels, result and selected change 
   const calls = compareCalls(host);
 
   await compareTab.click();
-  await expect(page.locator('#active-tool-title')).toHaveText('Diff & Compare');
+  await expect(page.locator('#active-tool-title')).toHaveText('Text Diff');
   await expect(left(page)).toHaveValue('Original notes');
   await expect(right(page)).toHaveValue('Original notes\nsecond\n');
   await expect(label(page, 'left')).toHaveText('notes.txt');
@@ -242,7 +241,7 @@ test('switching tabs restores the same pair, labels, result and selected change 
 
   await page.getByRole('tab').nth(1).click();
   await expect(page.locator('#preview')).toHaveValue('scratch notes');
-  await expect(page.locator('#active-tool-title')).toHaveText('Text editor');
+  await expect(page.locator('#active-tool-title')).toHaveText('Text Editor');
 });
 
 test('the editors use the pane height and the result stacks below without shrinking them away', async ({ page, host }, info) => {

@@ -91,7 +91,9 @@ test('JSON format/minify/validate produce exclusive surfaces without duplicate c
   await page.getByRole('button', { name: 'Minify', exact: true }).click();
   await expect(page.locator('#result-output')).toHaveValue('{"hello":"world","items":[1,2]}');
   await page.getByRole('button', { name: 'Validate', exact: true }).click();
-  await expect(page.locator('#result-status-message')).toBeVisible();
+  // A validation's findings are its output, listed where an output would be (A7).
+  await expect(page.locator('#result-structured .summary-list')).toContainText('Mock completed');
+  await expect(page.locator('#result-status-message')).toBeHidden();
   await expect(page.locator('.result-code')).toBeHidden();
   await page.screenshot({ path: info.outputPath('json-validated.png') });
 });
@@ -131,12 +133,12 @@ test('mixed tabs retain drafts and selected tools while jobs complete in backgro
   await page.locator('#open-file').click();
   const image = page.getByRole('tab').nth(2);
   await notes.click();
-  await expect(page.locator('#active-tool-title')).toHaveText('Text editor');
+  await expect(page.locator('#active-tool-title')).toHaveText('Text Editor');
   await expect(page.locator('#preview')).toHaveValue('my notes');
   await expect(page.locator('.results-pane')).toBeHidden();
   await json.click();
   await ready(page);
-  await expect(page.locator('#active-tool-title')).toHaveText('JSON');
+  await expect(page.locator('#active-tool-title')).toHaveText('JSON Formatter');
   await expect(page.locator('#result-output')).toHaveValue(/"hello": "world"/);
   await image.click();
   await ready(page);
@@ -148,7 +150,7 @@ test('mixed tabs retain drafts and selected tools while jobs complete in backgro
 
 test('fast jobs never flash progress; slow jobs can be cancelled without resizing editor', async ({ page, host }) => {
   await newText(page, JSON.stringify({ lines: Array.from({ length: 200 }, (_, i) => i) }, null, 2));
-  await chooseTool(page, 'JSON');
+  await chooseTool(page, 'JSON Formatter');
   await ready(page);
   await page.locator('#preview').evaluate((input) => { input.focus(); input.setSelectionRange(10, 10); input.scrollTop = 200; });
   const before = await page.locator('#preview').evaluate((input) => ({ caret: input.selectionStart, scroll: input.scrollTop }));
@@ -170,7 +172,7 @@ test('fast jobs never flash progress; slow jobs can be cancelled without resizin
 
 test('invalid JSON does not shift the source editor and never shows an empty successful output', async ({ page, host }) => {
   await newText(page, '{"valid":true}');
-  await chooseTool(page, 'JSON');
+  await chooseTool(page, 'JSON Formatter');
   await ready(page);
   await watchGeometry(page);
   await page.locator('#preview').fill('{');
@@ -208,7 +210,7 @@ test('image tool has image-only actions; theme stays neutral and controls remain
   await expect(page.locator('#input-message')).toContainText('Open a PNG or JPEG');
   await expect(page.locator('.input-quick-actions')).toBeHidden();
   await expect(page.locator('.format-control select')).toHaveCount(0);
-  await chooseTool(page, 'JSON');
+  await chooseTool(page, 'JSON Formatter');
   // No Sample action, by the owner's decision (2026-09-27): input is typed, pasted or opened.
   await expect(page.locator('.input-quick-actions').getByRole('button', { name: 'Sample', exact: true })).toHaveCount(0);
   await page.locator('#preview').fill('{"store":{"book":[{"category":"reference"}]}}');

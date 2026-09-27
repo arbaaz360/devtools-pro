@@ -21,11 +21,13 @@ test('package tools appear beside native tools and native ids stay native', asyn
   expect(names).toContain('String Case Converter');
   expect(names).toContain('Base64 Text');
   expect(names).toContain('URL Parser');
-  // The mock host serves text.url itself, so the url package's tool with that id stays native
-  // and the sidebar shows the native entry once, not the package's title as well.
-  expect(names).toContain('URL encode / decode');
-  expect(names).not.toContain('URL Encode / Decode');
+  // The mock host serves text.url itself, so the url package's tool with that id stays native:
+  // one rail entry, with the native tool's two operations rather than the package's one.
+  expect(names.filter((name) => name === 'URL Encode / Decode').length).toBe(1);
   expect(names.filter((name) => name === 'String Case Converter').length).toBe(1);
+  await page.keyboard.press('Control+n');
+  await chooseTool(page, 'URL Encode / Decode');
+  await expect(page.locator('.toolbar-actions button')).toHaveText(['Encode', 'Decode']);
   expect(host.calls.some((call) => call.cmd === 'list_tools')).toBe(true);
 });
 
@@ -38,8 +40,11 @@ test('a package tool converts input through the worker engine with its declared 
   await completed(page);
   await expect(page.locator('#result-content')).toContainText('user_id_loader_http_server_v_2_api');
   await expect(page.locator('#result-summary')).toContainText('acronymsApplied: 3');
-  await page.getByLabel('Preserve Acronyms').uncheck();
+  // The acronym list only matters while acronyms are preserved (option rules, B6).
+  await expect(page.getByLabel('Acronyms', { exact: true })).toBeVisible();
+  await page.getByLabel('Preserve acronyms').uncheck();
   await completed(page);
+  await expect(page.getByLabel('Acronyms', { exact: true })).toHaveCount(0);
   await expect(page.locator('#result-content')).toContainText('user_id_loader_http_server_v_2_api');
   await expect(page.locator('#result-summary')).toContainText('acronymsApplied: 0');
   // No native run_tool call was made for a package tool; the result is a host document.

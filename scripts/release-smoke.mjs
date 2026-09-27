@@ -89,7 +89,7 @@ const checks = [
     id: "REL-04",
     async run({ driver }) {
       const source = { name: "release", items: [1, 2, 3], nested: { ok: true } };
-      const result = await driver.tool("JSON", { text: JSON.stringify(source), operation: "Format" });
+      const result = await driver.tool("JSON Formatter", { text: JSON.stringify(source), operation: "Format" });
       let parsed = null;
       try { parsed = JSON.parse(result.output); } catch { /* reported below */ }
       return verdict(JSON.stringify(parsed) === JSON.stringify(source) && result.output.includes("\n"),

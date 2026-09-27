@@ -98,7 +98,7 @@ class NativeMock {
       }
       case 'close_document': this.documents.delete(args.documentId); return;
       case 'list_tools': return [
-        ...['structured.json', 'encoding.image-base64', 'encoding.base64-image', 'text.compare', 'text.url'].map((id) => ({
+        ...['structured.json', 'encoding.image-base64', 'encoding.base64-image', 'text.compare', 'text.url', 'text.inspect', 'web.curl-code'].map((id) => ({
           id, label: id, contractVersion: 1, inputKinds: ['text', 'bytes'],
           limits: { maxInputBytes: null, maxOutputBytes: null }, capabilities: {}, operations: [], renderer: 'text',
         })),
@@ -154,6 +154,13 @@ class NativeMock {
           if (doc.bytes.toString('utf8') !== this.dataUri) throw new Error('Mock: truncated or changed Base64 payload');
           output = this.document('result.png', this.png, 'text', 'image/png');
           event.renderer = 'binary'; event.resultMime = 'image/png';
+        } else if (args.toolId === 'text.inspect') {
+          // As the native host reports an inspection: no output document, key: value lines.
+          const text = doc.bytes.toString('utf8');
+          event.summary = [`lines: ${text.split(String.fromCharCode(10)).length}`, `words: ${text.split(/\s+/).filter(Boolean).length}`].join(String.fromCharCode(10));
+        } else if (args.toolId === 'web.curl-code') {
+          const url = doc.bytes.toString('utf8').split(/\s+/).find((word) => word.startsWith('http')) ?? '';
+          output = this.document('result.js', Buffer.from(`await fetch(${JSON.stringify(url)});`));
         } else if (args.toolId === 'text.url') {
           output = this.document('result.txt', Buffer.from(encodeURIComponent(doc.bytes.toString('utf8'))));
         } else if (args.toolId === 'mock.preview') {
@@ -265,7 +272,7 @@ export const test = base.extend({
     const host = new NativeMock(page);
     await host.install();
     await page.goto('/');
-    await expect(page.locator('#status')).toContainText('Engine connected');
+    await expect(page.locator('#status')).toContainText('Ready');
     try { await use(host); } finally { host.dispose(); }
     expect(errors, 'uncaught errors in the real app bundle').toEqual([]);
   },
