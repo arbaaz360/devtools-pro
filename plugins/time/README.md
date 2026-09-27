@@ -4,7 +4,7 @@
 
 ## Options
 
-- `interpretation`: `auto` (default), `seconds`, `milliseconds`, `iso`.
+- `interpretation`: `auto` (default), `seconds`, `milliseconds`, `iso`, `rfc`.
 - `milliseconds-from-digits`: integer, default `12`. In `auto` mode, a numeric input with at least that many digits is milliseconds, fewer is seconds. Explicit interpretations override this heuristic.
 
 ## Inputs
@@ -14,9 +14,18 @@ Input port `input`, kind `document`, text, `required: false`. Empty input means 
 Accepted input:
 - An integer or decimal number of seconds or milliseconds (negative allowed).
 - An ISO 8601 date or date-time with `Z` or a numeric offset.
+- RFC Dates: RFC 5322 (`Fri, 21 Nov 1997 09:55:06 -0600`), IMF-fixdate (`Sun, 06 Nov 1994 08:49:37 GMT`), RFC 850 (`Sunday, 06-Nov-94 08:49:37 GMT`), and asctime (`Sun Nov  6 08:49:37 1994`).
+  - Year rules: Four digits are taken literally. RFC 5322 two-digit years below 50 add 2000, and 50-99 add 1900. Three-digit years add 1900. RFC 850 two-digit years are mapped to the current century unless that places them more than 50 years in the future, in which case they belong to the previous century.
+  - Zones: Accepted zone names are `UT`, `GMT`, `EST`, `EDT`, `CST`, `CDT`, `MST`, `MDT`, `PST`, `PDT`, or a numeric offset like `+0530`.
 - An arithmetic expression over numeric timestamps with `+ - * /`, decimal numbers, and one level of parentheses, evaluated with normal precedence.
 
 Nothing else parses: no words, no locale dates, no function calls. Ambiguous forms such as `01/02/2024` are rejected with a message naming the ISO form.
+
+The tool also specifically refuses:
+- Mismatched weekdays in RFC dates (e.g., `Mon, 14 Nov 2023 22:13:20 GMT` when the date is a Tuesday).
+- Obsolete military time zones (like `Z`) in RFC dates.
+- Impossible dates or times (like 29 Feb in a common year, hour 24, or minute 60).
+- Leap seconds (e.g., second 60, since Unix time cannot represent them).
 
 ## Output
 

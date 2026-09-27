@@ -1,0 +1,62 @@
+[
+  {
+    "input": "Tue, 14 Nov 2023 22:13:20 +0000",
+    "expected": 1700000000000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "Tue, 14 Nov 2023 22:13:20 GMT",
+    "expected": 1700000000000,
+    "interp": "imf-fixdate"
+  },
+  {
+    "input": "14 Nov 2023 22:13:20 -0500",
+    "expected": 1700018000000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "Tue, 14 Nov 2023 22:13 +0530",
+    "expected": 1699980180000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "Tuesday, 14-Nov-23 22:13:20 GMT",
+    "expected": 1700000000000,
+    "interp": "rfc850"
+  },
+  {
+    "input": "Tue, 14 Nov 2023 17:13:20 EST",
+    "expected": 1700000000000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "Tue, 14 Nov 2023 14:13:20 PST",
+    "expected": 1700000000000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "Sun, 06 Nov 1994 08:49:37 GMT",
+    "expected": 784111777000,
+    "interp": "imf-fixdate"
+  },
+  {
+    "input": "Sunday, 06-Nov-94 08:49:37 GMT",
+    "expected": 784111777000,
+    "interp": "rfc850"
+  },
+  {
+    "input": "Sun Nov  6 08:49:37 1994",
+    "expected": 784111777000,
+    "interp": "asctime"
+  },
+  {
+    "input": "Fri, 21 Nov 1997 09:55:06 -0600",
+    "expected": 880127706000,
+    "interp": "rfc5322"
+  },
+  {
+    "input": "21 Nov 97 09:55:06 GMT",
+    "expected": 880106106000,
+    "interp": "rfc5322"
+  }
+]

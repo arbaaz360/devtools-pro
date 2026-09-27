@@ -131,7 +131,7 @@ test("Input limit", async () => {
 });
 
 test("Option validation: unknown interpretation", async () => {
-  await rejects({ interpretation: "bogus" }, { input: "1700000000" }, /interpretation must be auto, seconds, milliseconds, or iso/);
+  await rejects({ interpretation: "bogus" }, { input: "1700000000" }, /interpretation must be auto, seconds, milliseconds, iso, or rfc/);
 });
 
 test("Option validation: invalid milliseconds-from-digits", async () => {
@@ -242,4 +242,51 @@ test("Local time defaults to UTC when the clock names no other zone", async () =
 
 test("An unknown time zone is a named error, not a silent UTC", async () => {
   await rejects({}, { input: "0", zone: "Not/AZone" }, /Unknown time zone: Not\/AZone/);
+});
+
+
+test("RFC dates (well-formed)", async () => {
+  const cases = JSON.parse(await readFile(new URL("./fixtures/rfc_dates.json", import.meta.url), "utf8"));
+  // Add hand-written edge cases where Python is not the oracle
+  cases.push(
+    // RFC 5322 §3.3: a four-digit year is taken literally, so 0099 is the year 99 (as in
+    // AG-132). Python's parsedate reads it as 1999.
+    { input: "Sat, 14 Nov 0099 22:13:20 +0000", expected: -59015526400000, interp: "rfc5322" },
+    // RFC 5322 §4.3: 50-99 add 1900. Python maps two-digit years below 69 to the 2000s.
+    { input: "Tue, 21 Nov 50 09:55:06 GMT", expected: -603122694000, interp: "rfc5322" },
+    // RFC 9110 §5.6.7: a timestamp more than 50 years after the clock is the previous century.
+    { input: "Sunday, 01-Jun-75 00:00:00 GMT", clock: "2025-01-01T00:00:00Z", expected: 170812800000, interp: "rfc850" }, // 1975-06-01
+    { input: "Tuesday, 01-Jan-75 00:00:00 GMT", clock: "2025-01-01T00:00:00Z", expected: 3313526400000, interp: "rfc850" } // 2075-01-01
+  );
+
+  for (const { input, expected, interp, clock = "2024-01-01T00:00:00Z" } of cases) {
+    const res = await run({ interpretation: "auto" }, { input, clock });
+    assert.equal(res.value.epochMilliseconds, expected, `Expected ${expected} for ${input}`);
+    assert.equal(res.value.interpretation, interp, `Expected ${interp} for ${input}`);
+
+    const resRfc = await run({ interpretation: "rfc" }, { input, clock });
+    assert.equal(resRfc.value.epochMilliseconds, expected);
+  }
+});
+
+test("RFC dates (refused/errors)", async () => {
+  // Mismatched weekdays
+  await rejects({ interpretation: "auto" }, { input: "Mon, 14 Nov 2023 22:13:20 GMT" }, /Weekday mismatch. The real day is Tuesday./);
+
+  // Obsolete zone Z
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:20 Z" }, /Military time zone 'Z' is obsolete and ambiguous./);
+
+  // Impossible times/dates
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 25:13:20 GMT" }, /Impossible time./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 29 Feb 2023 22:13:20 GMT" }, /Impossible date./);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:60 GMT" }, /Unix time cannot represent leap seconds./);
+
+  // Zone errors
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:20 +2460" }, /Invalid offset minutes in \+2460/);
+  await rejects({ interpretation: "auto" }, { input: "Tue, 14 Nov 2023 22:13:20 CET" }, /Unknown time zone 'CET' in RFC date/);
+
+  // Interpretation mismatches
+  await rejects({ interpretation: "rfc" }, { input: "01/02/2024" }, /Input must be an RFC date/);
+  await rejects({ interpretation: "seconds" }, { input: "Tue, 14 Nov 2023 22:13:20 GMT" }, /Input must be numeric when interpretation is seconds/);
+  await rejects({ interpretation: "milliseconds" }, { input: "Tue, 14 Nov 2023 22:13:20 GMT" }, /Input must be numeric when interpretation is milliseconds/);
 });

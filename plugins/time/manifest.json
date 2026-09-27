@@ -50,7 +50,8 @@
             { "id": "auto", "label": "Auto" },
             { "id": "seconds", "label": "Seconds" },
             { "id": "milliseconds", "label": "Milliseconds" },
-            { "id": "iso", "label": "ISO 8601" }
+            { "id": "iso", "label": "ISO 8601" },
+            { "id": "rfc", "label": "RFC Dates" }
           ],
           "persistence": "instance",
           "sensitive": false
